@@ -4,6 +4,8 @@
     ./modules/tmux.nix
     ./modules/test.nix
     ./modules/neovim/default.nix
+    ./modules/tmux-palette.nix
+    ./modules/fuse_fix.nix
   ];
 
   home.username = username;

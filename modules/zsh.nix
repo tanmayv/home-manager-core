@@ -100,7 +100,7 @@ prompt_pure_host=""
         if [[ -n $TMUX ]]; then
           eval $(tmux show-environment -s)
         fi
-        command gcert "$@"
+        command gcert "$@" && fuse_fix
       }
 
       # Fix SSH agent socket if it dies within long-running tmux sessions
