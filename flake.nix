@@ -16,7 +16,7 @@
       # CHANGE THIS TO YOUR LDAP
       username = "tanmayvijay"; 
     in {
-      homeConfigurations."minimal" = home-manager.lib.homeManagerConfiguration {
+      homeConfigurations."${username}" = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
         extraSpecialArgs = { inherit username; };
         modules = [ ./home.nix ];

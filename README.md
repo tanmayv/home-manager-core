@@ -4,12 +4,12 @@ This is a minimal Home Manager configuration tailored for Googlers setting up a 
 
 ## How to use
 
-1. Clone or copy this directory (`minimal-cloudtop`) to `~/.config/` on your Cloudtop.
+1. Clone this repository to `~/.config/home-manager` on your Cloudtop.
 2. Open `flake.nix` and change `username = "tanmayvijay";` to your LDAP.
 3. Apply the configuration by running:
 
 ```bash
-home-manager switch --flake .#minimal
+home-manager switch
 ```
 
 ## Included Tools
