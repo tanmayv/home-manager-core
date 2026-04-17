@@ -1,7 +1,7 @@
 { pkgs, lib, config, ... }:
 with lib;
 let
-  tmux-sessionizer = import ./tmux-sessionizer.nix { inherit pkgs; };
+  tmux-sessionizer = import ./tmux-sessionizer.nix { inherit pkgs; maxDirLength = config.programs.tmux.sessionizerMaxDirLength; };
 in
 {
   options.programs.tmux = {
@@ -9,6 +9,11 @@ in
       type = types.str;
       default = "bottom";
       description = "Set status bar position";
+    };
+    sessionizerMaxDirLength = mkOption {
+      type = types.int;
+      default = 16;
+      description = "Maximum directory name length to include in tmux-sessionizer search";
     };
   };
 
