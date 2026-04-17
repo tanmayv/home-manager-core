@@ -21,6 +21,11 @@ in
     initContent = ''
       # Basic Zsh config
       setopt histignorealldups sharehistory
+
+      # Source shell history forwarder if it exists
+      if [[ -f /etc/bash.bashrc.d/shell_history_forwarder.sh ]]; then
+        source /etc/bash.bashrc.d/shell_history_forwarder.sh
+      fi
     '';
   };
 
