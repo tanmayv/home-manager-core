@@ -10,6 +10,9 @@
 
   programs.home-manager.enable = true;
 
+  # Required for Home Manager to setup environment variables on non-NixOS Linux
+  targets.genericLinux.enable = true;
+
   # You can customize the status bar position here
   programs.tmux.statusBarPosition = "bottom";
 
