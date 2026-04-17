@@ -1,5 +1,6 @@
 { pkgs, config, ... }:
 let
+  palette = import ./palette.nix;
   myAliases = {
     ll = "ls -l";
     la = "ls -a";
@@ -56,8 +57,8 @@ in
       prompt pure
 
       # Make user and host visible on dark themes (default is dark grey 242)
-      zstyle ':prompt:pure:user' color cyan
-      zstyle ':prompt:pure:host' color white
+      zstyle ':prompt:pure:user' color '${palette.color6}'
+      zstyle ':prompt:pure:host' color '${palette.foreground}'
 
       # gcert wrapper to ensure environment variables are up-to-date in tmux
       function gcert() {

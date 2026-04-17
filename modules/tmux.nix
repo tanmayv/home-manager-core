@@ -1,6 +1,7 @@
 { pkgs, lib, config, ... }:
 with lib;
 let
+  palette = import ./palette.nix;
   tmux-sessionizer = import ./tmux-sessionizer.nix { inherit pkgs; maxDirLength = config.programs.tmux.sessionizerMaxDirLength; };
 in
 {
@@ -49,13 +50,13 @@ in
 
         # tmux-dotbar Tokyo Night theme configuration
         set -g status-justify "absolute-centre"
-        set -g status-left "#[bg=#0B0E14,fg=#565B66]#{?client_prefix,, #S }#[bg=#95E6CB,fg=#0B0E14,bold]#{?client_prefix, #S ,}#[bg=#0B0E14,fg=#565B66]"
+        set -g status-left "#[bg=${palette.background},fg=${palette.color8}]#{?client_prefix,, #S }#[bg=${palette.color2},fg=${palette.background},bold]#{?client_prefix, #S ,}#[bg=${palette.background},fg=${palette.color8}]"
         set -g status-right ""
         set -g window-status-format " #W "
-        set -g window-status-current-format "#[bg=#0B0E14,fg=#BFBDB6,bold] #W #[fg=#39BAE6,bg=#0B0E14]#{?window_zoomed_flag,󰊓,}#[fg=#0B0E14,bg=default]"
+        set -g window-status-current-format "#[bg=${palette.background},fg=${palette.foreground},bold] #W #[fg=${palette.color4},bg=${palette.background}]#{?window_zoomed_flag,󰊓,}#[fg=${palette.background},bg=default]"
         set -g window-status-separator " • "
-        set -g status-style "bg=#0B0E14,fg=#475266"
-        set -g window-status-style "bg=#0B0E14,fg=#475266"
+        set -g status-style "bg=${palette.background},fg=${palette.color8}"
+        set -g window-status-style "bg=${palette.background},fg=${palette.color8}"
       '';
     };
   };
