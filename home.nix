@@ -22,10 +22,12 @@
     image = "${pkgs.gnome-backgrounds}/share/backgrounds/gnome/adwaita-d.jxl";
     
     polarity = "dark";
-    # Simplified cursor to avoid null coercion errors in minimal environments
-    cursor.package = pkgs.bibata-cursors;
-    cursor.name = "Bibata-Modern-Ice";
-    cursor.size = 24;
+
+    # Disable GUI-related targets since this is a CLI-only configuration
+    targets = {
+      gtk.enable = false;
+      xresources.enable = false;
+    };
     
     fonts = {
       monospace = {
