@@ -42,9 +42,6 @@ in
       fi
 
       # Setup goog_prompt
-      if [[ ! -f ~/goog_prompt.zsh ]]; then
-        cp /google/data/ro/users/ju/jubi/goog_prompt.zsh ~/goog_prompt.zsh
-      fi
       source ~/goog_prompt.zsh
     '';
   };
