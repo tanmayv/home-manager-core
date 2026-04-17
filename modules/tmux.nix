@@ -35,6 +35,7 @@ in
       extraConfig = ''
         set -g mouse on
         bind r source-file ~/.config/tmux/tmux.conf \; display-message "Config reloaded!"
+        set -ga terminal-overrides ",*256col*:Tc"
         
         # Tmux Sessionizer integration
         bind-key C-t display-popup -w 95% -h 80% -E "tmux-sessionizer"
@@ -50,6 +51,7 @@ in
 
         # tmux-dotbar Tokyo Night theme configuration
         set -g status-justify "absolute-centre"
+        set -g status-left-length 20
         set -g status-left "#[bg=default,fg=${palette.color8}]#{?client_prefix,, #S }#[bg=${palette.color2},fg=${palette.background},bold]#{?client_prefix, #S ,}#[bg=default,fg=${palette.color8}]"
         set -g status-right ""
         set -g window-status-format " #W "

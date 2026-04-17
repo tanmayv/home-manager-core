@@ -5,6 +5,7 @@ let
     ll = "ls -l";
     la = "ls -a";
     jetski-cli = "/google/bin/releases/jetski-devs/tools/cli";
+    start-jetski-web = "/google/bin/releases/jetski-devs/jetski-web/run_jetski.par";
   };
 in
 {
@@ -13,14 +14,24 @@ in
     shellAliases = myAliases;
   };
 
+  home.packages = with pkgs; [
+    pure-prompt
+  ];
+
   programs.zsh = {
     enable = true;
     dotDir = "${config.xdg.configHome}/zsh";
     autosuggestion.enable = true;
     syntaxHighlighting.enable = true;
     shellAliases = myAliases;
+    envExtra = ''
+      export google_zsh_flysolo=1
+    '';
 
     initContent = ''
+      zmodload zsh/nearcolor
+      export COLORTERM=truecolor
+
       # Basic Zsh config
       setopt histignorealldups sharehistory
 
@@ -37,28 +48,52 @@ in
       done
 
       # Custom path logic for CitC workspaces
-      function set_citc_hash() {
-        if [[ "$PWD" == /google/src/cloud/$USER/* ]]; then
-          local ws="''${PWD#/google/src/cloud/$USER/}"
-          ws="''${ws%%/*}"
-          hash -d "$ws"="/google/src/cloud/$USER/$ws"
-        fi
-      }
-      autoload -Uz add-zsh-hook
-      add-zsh-hook chpwd set_citc_hash
-      set_citc_hash
+      # function set_citc_hash() {
+      #   if [[ "$PWD" == /google/src/cloud/$USER/* ]]; then
+      #     local ws="''${PWD#/google/src/cloud/$USER/}"
+      #     ws="''${ws%%/*}"
+      #     hash -d "$ws"="/google/src/cloud/$USER/$ws"
+      #   fi
+      # }
+      # autoload -Uz add-zsh-hook
+      # add-zsh-hook chpwd set_citc_hash
+      # set_citc_hash
 
-      # Setup pure prompt
-      # Pure prompt performance optimizations for large Google repos
-      PURE_GIT_PULL=0
-      PURE_GIT_UNTRACKED_DIRTY=0
-      PURE_CMD_MAX_EXEC_TIME=1
+      # Initialize Prompt
       autoload -U promptinit; promptinit
+
+      # optionally define some options
+      PURE_CMD_MAX_EXEC_TIME=10
+
+      # turn on git stash status
+      zstyle :prompt:pure:git:stash show yes
+
+prompt_pure_username=""
+prompt_pure_host=""
       prompt pure
 
-      # Make user and host visible on dark themes (default is dark grey 242)
-      zstyle ':prompt:pure:user' color cyan
-      zstyle ':prompt:pure:host' color white
+      # Customize Pure prompt: hide user/host and use custom workspace path
+      function customize_pure_prompt() {
+        prompt_pure_state[username]=""
+        
+        # Compute custom path
+        local custom_path="%~"
+        if [[ "$PWD" == /google/src/cloud/$USER/* ]]; then
+          local ws="''${PWD#/google/src/cloud/$USER/}"
+          local rest="''${ws#*/}"
+          ws="''${ws%%/*}"
+          if [[ "$rest" == "$ws" ]]; then
+            custom_path="%F{${palette.color5}}($ws)%f"
+          else
+            custom_path="%F{${palette.color5}}($ws)%f · $rest"
+          fi
+        fi
+        
+        # Recreate PROMPT with custom path
+        PROMPT='%(12V.%F{$prompt_pure_colors[suspended_jobs]}%12v%f .)%(13V.''${prompt_pure_state[username]} .)%F{''${prompt_pure_colors[path]}}'"$custom_path"'%f%(14V. %F{''${prompt_pure_git_branch_color}}%14v%(15V.%F{$prompt_pure_colors[git:dirty]}%15v.)%f.)%(16V. %F{$prompt_pure_colors[git:action]}%16v%f.)%(17V. %F{$prompt_pure_colors[git:arrow]}%17v%f.)%(18V. %F{$prompt_pure_colors[git:stash]}''${PURE_GIT_STASH_SYMBOL:-≡}%f.)%(19V. %F{$prompt_pure_colors[execution_time]}%19v%f.)''${prompt_newline}%(20V.%F{$prompt_pure_colors[virtualenv]}%20v%f .)%(?.%F{${palette.color3}}.%F{$prompt_pure_colors[prompt:error]})''${prompt_pure_state[prompt]}%f '
+      }
+      autoload -Uz add-zsh-hook
+      add-zsh-hook precmd customize_pure_prompt
 
       # gcert wrapper to ensure environment variables are up-to-date in tmux
       function gcert() {
@@ -77,20 +112,22 @@ in
           fi
         fi
       }
+
+
+
       
       if [[ -n "''${SSH_AUTH_SOCK}" ]]; then
         autoload -Uz add-zsh-hook
         add-zsh-hook preexec fixup_ssh_auth_sock
       fi
 
-      # Auto-attach to tmux on SSH login
-      if [[ -n "$SSH_CLIENT" || -n "$SSH_TTY" ]] && [[ -z "$TMUX" ]]; then
-        if tmux ls >/dev/null 2>&1; then
-          exec tmux attach-session
-        else
-          exec tmux new-session -s default
-        fi
-      fi
+	if [[ -n "$SSH_CLIENT" || -n "$SSH_TTY" ]] && [[ -z "$TMUX" ]]; then
+	  if tmux ls >/dev/null 2>&1; then
+	    exec tmux attach-session
+	  else
+	    exec tmux new-session -s default
+	  fi
+	fi
     '';
   };
 

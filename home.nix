@@ -2,6 +2,7 @@
   imports = [
     ./modules/zsh.nix
     ./modules/tmux.nix
+    ./modules/test.nix
   ];
 
   home.username = username;
