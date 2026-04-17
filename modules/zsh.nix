@@ -28,14 +28,39 @@ in
         source /etc/bash.bashrc.d/shell_history_forwarder.sh
       fi
 
-      # hgd autocomplete
-      if [[ -f /etc/bash_completion.d/hgd ]]; then
-        source /etc/bash_completion.d/hgd
-      fi
+      # Google tool completions
+      for completion_file in /etc/bash_completion.d/{hgd,jjd,p4,g4d}; do
+        if [[ -f "$completion_file" ]]; then
+          source "$completion_file"
+        fi
+      done
 
       # Setup pure prompt
       autoload -U promptinit; promptinit
       prompt pure
+
+      # gcert wrapper to ensure environment variables are up-to-date in tmux
+      function gcert() {
+        if [[ -n $TMUX ]]; then
+          eval $(tmux show-environment -s)
+        fi
+        command gcert "$@"
+      }
+
+      # Fix SSH agent socket if it dies within long-running tmux sessions
+      function fixup_ssh_auth_sock() {
+        if [[ -n "''${SSH_AUTH_SOCK}" && ! -e "''${SSH_AUTH_SOCK}" ]]; then
+          local new_sock=$(echo /tmp/ssh-*/agent.*(=UNomY1) 2>/dev/null | head -n 1)
+          if [[ -n "''${new_sock}" ]]; then
+            export SSH_AUTH_SOCK="''${new_sock}"
+          fi
+        fi
+      }
+      
+      if [[ -n "''${SSH_AUTH_SOCK}" ]]; then
+        autoload -Uz add-zsh-hook
+        add-zsh-hook preexec fixup_ssh_auth_sock
+      fi
 
       # Auto-attach to tmux on SSH login
       if [[ -n "$SSH_CLIENT" || -n "$SSH_TTY" ]] && [[ -z "$TMUX" ]]; then
