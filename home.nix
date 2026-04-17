@@ -6,6 +6,7 @@
     ./modules/neovim/default.nix
     ./modules/tmux-palette.nix
     ./modules/fuse_fix.nix
+    ./modules/ai-workflow.nix
   ];
 
   home.username = username;
