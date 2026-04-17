@@ -7,7 +7,7 @@
       ll = "ls -l";
       la = "ls -a";
     };
-    initExtra = ''
+    initContent = ''
       # Basic Zsh config
       setopt histignorealldups sharehistory
     '';
