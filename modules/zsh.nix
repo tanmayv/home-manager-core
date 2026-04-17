@@ -55,6 +55,10 @@ in
       autoload -U promptinit; promptinit
       prompt pure
 
+      # Make user and host visible on dark themes (default is dark grey 242)
+      zstyle ':prompt:pure:user' color cyan
+      zstyle ':prompt:pure:host' color white
+
       # gcert wrapper to ensure environment variables are up-to-date in tmux
       function gcert() {
         if [[ -n $TMUX ]]; then
