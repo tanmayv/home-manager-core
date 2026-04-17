@@ -18,6 +18,20 @@ in
     autosuggestion.enable = true;
     syntaxHighlighting.enable = true;
     shellAliases = myAliases;
+
+    plugins = [
+      {
+        name = "zsh-async";
+        file = "async.zsh";
+        src = pkgs.fetchFromGitHub {
+          owner = "mafredri";
+          repo = "zsh-async";
+          rev = "v1.8.6";
+          sha256 = "1lnhw9h833n5n1yp4n456sbg0ivyrdnbmb04k47sf4l0c6ygvkr6";
+        };
+      }
+    ];
+
     initContent = ''
       # Basic Zsh config
       setopt histignorealldups sharehistory
@@ -28,13 +42,9 @@ in
       fi
 
       # Setup goog_prompt
-      if [[ ! -d ~/zsh-async ]]; then
-        git clone https://github.com/mafredri/zsh-async.git ~/zsh-async
-      fi
       if [[ ! -f ~/goog_prompt.zsh ]]; then
         cp /google/data/ro/users/ju/jubi/goog_prompt.zsh ~/goog_prompt.zsh
       fi
-      source ~/zsh-async/async.zsh
       source ~/goog_prompt.zsh
     '';
   };
