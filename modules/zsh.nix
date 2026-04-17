@@ -36,6 +36,10 @@ in
       done
 
       # Setup pure prompt
+      # Pure prompt performance optimizations for large Google repos
+      PURE_GIT_PULL=0
+      PURE_GIT_UNTRACKED_DIRTY=0
+      PURE_CMD_MAX_EXEC_TIME=1
       autoload -U promptinit; promptinit
       prompt pure
 
