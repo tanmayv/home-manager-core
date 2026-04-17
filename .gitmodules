@@ -1,0 +1,3 @@
+[submodule "modules/neovim/dotfiles/nvim"]
+	path = modules/neovim/dotfiles/nvim
+	url = https://github.com/AstroNvim/template

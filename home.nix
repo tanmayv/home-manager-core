@@ -3,6 +3,7 @@
     ./modules/zsh.nix
     ./modules/tmux.nix
     ./modules/test.nix
+    ./modules/neovim/default.nix
   ];
 
   home.username = username;

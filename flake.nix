@@ -8,9 +8,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     stylix.url = "github:danth/stylix";
+    astronvim-template = {
+      url = "github:AstroNvim/template";
+      flake = false;
+    };
   };
 
-  outputs = { nixpkgs, home-manager, stylix, ... }:
+  outputs = { nixpkgs, home-manager, stylix, ... }@inputs:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
@@ -19,7 +23,7 @@
     in {
       homeConfigurations."${username}" = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
-        extraSpecialArgs = { inherit username; };
+        extraSpecialArgs = { inherit username inputs; };
         modules = [ 
           stylix.homeModules.stylix
           ./home.nix 

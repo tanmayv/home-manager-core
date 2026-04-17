@@ -286,7 +286,8 @@ pkgs.writeScriptBin "tmux-sessionizer" ''
   elif [[ ! -z $user_selected ]]; then
       selected="$user_selected"
   else
-      selected=$(find_dirs | fzf)
+      selected_display=$(find_dirs | sed "s#^/google/src/cloud/$USER/#[Fig]#" | sed "s#^$HOME#[~]#" | fzf)
+      selected=$(echo "$selected_display" | sed "s#^\[Fig\]#/google/src/cloud/$USER/#" | sed "s#^\[~\]#$HOME#")
   fi
 
   if [[ -z $selected ]]; then

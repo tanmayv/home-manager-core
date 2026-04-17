@@ -13,7 +13,7 @@ in
     };
     sessionizerMaxDirLength = mkOption {
       type = types.int;
-      default = 16;
+      default = 25;
       description = "Maximum directory name length to include in tmux-sessionizer search";
     };
   };
