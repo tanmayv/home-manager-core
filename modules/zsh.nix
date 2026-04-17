@@ -41,6 +41,11 @@ in
         source /etc/bash.bashrc.d/shell_history_forwarder.sh
       fi
 
+      # hgd autocomplete
+      if [[ -f /etc/bash_completion.d/hgd ]]; then
+        source /etc/bash_completion.d/hgd
+      fi
+
       # Setup goog_prompt
       source ~/goog_prompt.zsh
 
