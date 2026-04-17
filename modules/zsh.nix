@@ -26,6 +26,16 @@ in
       if [[ -f /etc/bash.bashrc.d/shell_history_forwarder.sh ]]; then
         source /etc/bash.bashrc.d/shell_history_forwarder.sh
       fi
+
+      # Setup goog_prompt
+      if [[ ! -d ~/zsh-async ]]; then
+        git clone https://github.com/mafredri/zsh-async.git ~/zsh-async
+      fi
+      if [[ ! -f ~/goog_prompt.zsh ]]; then
+        cp /google/data/ro/users/ju/jubi/goog_prompt.zsh ~/goog_prompt.zsh
+      fi
+      source ~/zsh-async/async.zsh
+      source ~/goog_prompt.zsh
     '';
   };
 
