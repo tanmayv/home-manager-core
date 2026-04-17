@@ -50,13 +50,13 @@ in
 
         # tmux-dotbar Tokyo Night theme configuration
         set -g status-justify "absolute-centre"
-        set -g status-left "#[bg=${palette.background},fg=${palette.color8}]#{?client_prefix,, #S }#[bg=${palette.color2},fg=${palette.background},bold]#{?client_prefix, #S ,}#[bg=${palette.background},fg=${palette.color8}]"
+        set -g status-left "#[bg=default,fg=${palette.color8}]#{?client_prefix,, #S }#[bg=${palette.color2},fg=${palette.background},bold]#{?client_prefix, #S ,}#[bg=default,fg=${palette.color8}]"
         set -g status-right ""
         set -g window-status-format " #W "
-        set -g window-status-current-format "#[bg=${palette.background},fg=${palette.foreground},bold] #W #[fg=${palette.color4},bg=${palette.background}]#{?window_zoomed_flag,󰊓,}#[fg=${palette.background},bg=default]"
+        set -g window-status-current-format "#[bg=default,fg=${palette.foreground},bold] #W #[fg=${palette.color4},bg=default]#{?window_zoomed_flag,󰊓,}#[fg=default,bg=default]"
         set -g window-status-separator " • "
-        set -g status-style "bg=${palette.background},fg=${palette.color8}"
-        set -g window-status-style "bg=${palette.background},fg=${palette.color8}"
+        set -g status-style "bg=default,fg=${palette.color8}"
+        set -g window-status-style "bg=default,fg=${palette.color8}"
       '';
     };
   };

@@ -57,8 +57,8 @@ in
       prompt pure
 
       # Make user and host visible on dark themes (default is dark grey 242)
-      zstyle ':prompt:pure:user' color '${palette.color6}'
-      zstyle ':prompt:pure:host' color '${palette.foreground}'
+      zstyle ':prompt:pure:user' color cyan
+      zstyle ':prompt:pure:host' color white
 
       # gcert wrapper to ensure environment variables are up-to-date in tmux
       function gcert() {
