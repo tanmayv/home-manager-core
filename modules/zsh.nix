@@ -43,6 +43,15 @@ in
 
       # Setup goog_prompt
       source ~/goog_prompt.zsh
+
+      # Auto-attach to tmux on SSH login
+      if [[ -n "$SSH_CLIENT" || -n "$SSH_TTY" ]] && [[ -z "$TMUX" ]]; then
+        if tmux ls >/dev/null 2>&1; then
+          exec tmux attach-session
+        else
+          exec tmux new-session -s default
+        fi
+      fi
     '';
   };
 
