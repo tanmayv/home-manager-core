@@ -35,6 +35,18 @@ in
         fi
       done
 
+      # Custom path logic for CitC workspaces
+      function set_citc_hash() {
+        if [[ "$PWD" == /google/src/cloud/$USER/* ]]; then
+          local ws="''${PWD#/google/src/cloud/$USER/}"
+          ws="''${ws%%/*}"
+          hash -d "$ws"="/google/src/cloud/$USER/$ws"
+        fi
+      }
+      autoload -Uz add-zsh-hook
+      add-zsh-hook chpwd set_citc_hash
+      set_citc_hash
+
       # Setup pure prompt
       # Pure prompt performance optimizations for large Google repos
       PURE_GIT_PULL=0
