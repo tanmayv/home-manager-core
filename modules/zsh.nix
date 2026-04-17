@@ -19,19 +19,6 @@ in
     syntaxHighlighting.enable = true;
     shellAliases = myAliases;
 
-    plugins = [
-      {
-        name = "zsh-async";
-        file = "async.zsh";
-        src = pkgs.fetchFromGitHub {
-          owner = "mafredri";
-          repo = "zsh-async";
-          rev = "v1.8.6";
-          sha256 = "1lnhw9h833n5n1yp4n456sbg0ivyrdnbmb04k47sf4l0c6ygvkr6";
-        };
-      }
-    ];
-
     initContent = ''
       # Basic Zsh config
       setopt histignorealldups sharehistory
@@ -46,8 +33,9 @@ in
         source /etc/bash_completion.d/hgd
       fi
 
-      # Setup goog_prompt
-      source ~/goog_prompt.zsh
+      # Setup pure prompt
+      autoload -U promptinit; promptinit
+      prompt pure
 
       # Auto-attach to tmux on SSH login
       if [[ -n "$SSH_CLIENT" || -n "$SSH_TTY" ]] && [[ -z "$TMUX" ]]; then

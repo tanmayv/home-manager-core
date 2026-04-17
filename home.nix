@@ -2,7 +2,6 @@
   imports = [
     ./modules/zsh.nix
     ./modules/tmux.nix
-    ./modules/goog-prompt.nix
   ];
 
   home.username = username;
@@ -20,5 +19,6 @@
   home.packages = with pkgs; [
     fzf
     ripgrep
+    pure-prompt
   ];
 }
