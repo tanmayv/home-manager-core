@@ -685,7 +685,7 @@ function prompt_precmd() {
       vcs_mtime=$(get_vcs_mtime)
       fetch_vcs_info
     else
-      vcs_mtime=''''
+      vcs_mtime=""
       unset_vcs_info
     fi
   elif [[ -n $WORKSPACE ]]; then
