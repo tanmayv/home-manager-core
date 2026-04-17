@@ -1,13 +1,23 @@
-{ pkgs, config, ... }: {
+{ pkgs, config, ... }:
+let
+  myAliases = {
+    ll = "ls -l";
+    la = "ls -a";
+    jetski-cli = "/google/bin/releases/jetski-devs/tools/cli";
+  };
+in
+{
+  programs.bash = {
+    enable = true;
+    shellAliases = myAliases;
+  };
+
   programs.zsh = {
     enable = true;
     dotDir = "${config.xdg.configHome}/zsh";
     autosuggestion.enable = true;
     syntaxHighlighting.enable = true;
-    shellAliases = {
-      ll = "ls -l";
-      la = "ls -a";
-    };
+    shellAliases = myAliases;
     initContent = ''
       # Basic Zsh config
       setopt histignorealldups sharehistory
