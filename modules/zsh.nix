@@ -1,4 +1,4 @@
-{ pkgs, config, ... }:
+{ pkgs, config, username, ... }:
 let
   palette = import ./palette.nix;
   myAliases = {
@@ -24,13 +24,11 @@ in
     autosuggestion.enable = true;
     syntaxHighlighting.enable = true;
     shellAliases = myAliases;
-    envExtra = ''
-      export google_zsh_flysolo=1
-    '';
 
     initContent = ''
       zmodload zsh/nearcolor
       export COLORTERM=truecolor
+
 
       # Basic Zsh config
       setopt histignorealldups sharehistory
@@ -121,13 +119,23 @@ prompt_pure_host=""
         add-zsh-hook preexec fixup_ssh_auth_sock
       fi
 
+      # Autostart tmux only if not in Cider terminal
+      if [[ "$TERM_PROGRAM" != "cider" ]]; then
 	if [[ -n "$SSH_CLIENT" || -n "$SSH_TTY" ]] && [[ -z "$TMUX" ]]; then
-	  if tmux ls >/dev/null 2>&1; then
-	    exec tmux attach-session
+	  current_dir=$(pwd)
+	  workspace_root="/google/src/cloud/${username}"
+	  # Check if current dir is a direct child of workspace_root
+	  if [[ "$current_dir" == "$workspace_root"/* ]] && [[ "$(dirname "$current_dir")" == "$workspace_root" ]]; then
+	    exec tmux-sessionizer "$current_dir"
 	  else
-	    exec tmux new-session -s default
+	    if tmux ls >/dev/null 2>&1; then
+	      exec tmux attach-session
+	    else
+	      exec tmux new-session -s default
+	    fi
 	  fi
 	fi
+      fi
     '';
   };
 

@@ -18,12 +18,12 @@
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
-      # CHANGE THIS TO YOUR LDAP
-      username = "tanmayvijay"; 
+      userSettings = import ./setup.nix;
+      username = userSettings.username;
     in {
       homeConfigurations."${username}" = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
-        extraSpecialArgs = { inherit username inputs; };
+        extraSpecialArgs = { inherit username inputs userSettings; };
         modules = [ 
           stylix.homeModules.stylix
           ./home.nix 

@@ -1,10 +1,10 @@
-{ pkgs, inputs, lib, ... }:
+{ pkgs, inputs, lib, userSettings, ... }:
 
 {
   home.packages = [ pkgs.neovim ];
 
   home.sessionVariables = {
-    EDITOR = "nvim";
+    EDITOR = userSettings.editor;
   };
 
   home.activation.copyAstroNvim = lib.hm.dag.entryAfter ["writeBoundary"] ''

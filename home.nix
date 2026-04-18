@@ -1,13 +1,13 @@
-{ pkgs, username, ... }: {
+{ pkgs, username, userSettings, ... }: {
   imports = [
     ./modules/zsh.nix
     ./modules/tmux.nix
     ./modules/test.nix
-    ./modules/neovim/default.nix
     ./modules/tmux-palette.nix
     ./modules/fuse_fix.nix
-    ./modules/ai-workflow.nix
-  ];
+    ./modules/build-and-switch.nix
+  ] ++ (if userSettings.enable-ai-workflow then [ ./modules/ai-workflow.nix ] else [])
+    ++ (if userSettings.enable-neovim then [ ./modules/neovim/default.nix ] else []);
 
   home.username = username;
   home.homeDirectory = "/usr/local/google/home/${username}";
