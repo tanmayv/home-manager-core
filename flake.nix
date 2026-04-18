@@ -7,14 +7,14 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    stylix.url = "github:danth/stylix";
+
     astronvim-template = {
       url = "github:AstroNvim/template";
       flake = false;
     };
   };
 
-  outputs = { nixpkgs, home-manager, stylix, ... }@inputs:
+  outputs = { nixpkgs, home-manager, ... }@inputs:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
@@ -25,7 +25,7 @@
         inherit pkgs;
         extraSpecialArgs = { inherit username inputs userSettings; };
         modules = [ 
-          stylix.homeModules.stylix
+
           ./home.nix 
         ];
       };

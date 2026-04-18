@@ -1,12 +1,11 @@
 { pkgs, username, userSettings, ... }: {
   imports = [
-    ./modules/zsh.nix
-    ./modules/tmux.nix
+    ./modules/zsh
+    ./modules/tmux
     ./modules/test.nix
     ./modules/tmux-palette.nix
-    ./modules/fuse_fix.nix
-    ./modules/build-and-switch.nix
-  ] ++ (if userSettings.enable-ai-workflow then [ ./modules/ai-workflow.nix ] else [])
+    ./modules/scripts
+  ] ++ (if userSettings.enable-ai-workflow then [ ./modules/ai-workflow ] else [])
     ++ (if userSettings.enable-neovim then [ ./modules/neovim/default.nix ] else []);
 
   home.username = username;
@@ -18,43 +17,7 @@
   # Required for Home Manager to setup environment variables on non-NixOS Linux
   targets.genericLinux.enable = true;
 
-  # Tokyo Night Theme via Stylix
-  stylix = {
-    enable = true;
-    base16Scheme = "${pkgs.base16-schemes}/share/themes/tokyo-night-dark.yaml";
-    
-    # Required field, using a built-in NixOS/Gnome background to avoid network issues
-    image = "${pkgs.gnome-backgrounds}/share/backgrounds/gnome/adwaita-d.jxl";
-    
-    polarity = "dark";
 
-    # Disable GUI-related targets since this is a CLI-only configuration
-    targets = {
-      gtk.enable = false;
-      xresources.enable = false;
-    };
-    
-    fonts = {
-      monospace = {
-        package = pkgs.nerd-fonts.jetbrains-mono;
-        name = "JetBrainsMono Nerd Font";
-      };
-      sansSerif = {
-        package = pkgs.dejavu_fonts;
-        name = "DejaVu Sans";
-      };
-      serif = {
-        package = pkgs.dejavu_fonts;
-        name = "DejaVu Serif";
-      };
-      sizes = {
-        applications = 12;
-        terminal = 12;
-        desktop = 10;
-        popups = 10;
-      };
-    };
-  };
 
   # You can customize the status bar position here
   programs.tmux.statusBarPosition = "bottom";

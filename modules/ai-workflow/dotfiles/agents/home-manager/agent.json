@@ -1,0 +1,7 @@
+{
+  "name": "home-manager",
+  "description": "Agent for working on this Home Manager codebase.",
+  "configPath": {
+    "relativePathToConfig": "config.yaml"
+  }
+}

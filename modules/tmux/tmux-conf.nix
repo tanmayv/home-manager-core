@@ -1,7 +1,7 @@
 { pkgs, lib, config, ... }:
 with lib;
 let
-  palette = import ./palette.nix;
+  palette = import ../palette.nix;
   tmux-sessionizer = import ./tmux-sessionizer.nix { inherit pkgs; maxDirLength = config.programs.tmux.sessionizerMaxDirLength; };
   tmux-session-list-formatter = pkgs.writeScriptBin "tmux-session-list-formatter" ''
     #!${pkgs.python3}/bin/python3
@@ -94,8 +94,8 @@ in
         # tmux-dotbar Tokyo Night theme configuration
         set -g status-justify "absolute-centre"
         set -g status-left-length 20
-        set -g status-left "#[bg=${palette.color2},fg=${palette.background},bold]#{?client_prefix, PREFIX ,}#[bg=default,fg=${palette.foreground},bold] #S #[default]"
-        set -g status-right "#[range=user|palette] [CMDS] #[norange]"
+        set -g status-left "#[bg=${palette.color2},fg=${palette.background},bold]#{?client_prefix, PREFIX ,}#[bg=default,fg=${palette.color4},bold] #S #[default]"
+        set -g status-right "#[range=user|palette]#[fg=${palette.color6}] [CMDS] #[norange]"
         set -g window-status-format " #W "
         set -g window-status-current-format "#[bg=default,fg=${palette.color3},bold] #W #[fg=${palette.color4},bg=default]#{?window_zoomed_flag,󰊓,}#[fg=default,bg=default]"
         set -g window-status-separator " • "
@@ -129,10 +129,7 @@ in
         set -g status-format[1] "#[align=centre,bg=default,fg=${palette.foreground}]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter \"#{client_width}\" \"#S\")"
 
         # Global mouse binding to handle session clicks
-        bind-key -n MouseDown1Status if-shell -F '#{==:#{mouse_status_range},session}' "switch-client" "select-window -t ="
-
-        # Mouse binding for [CMDS] button in status-right
-        bind-key -n MouseDown1StatusRight if-shell -F '#{==:#{mouse_status_range},palette}' "display-popup -w 90% -h 70% -E 'tmux-palette'"
+        bind-key -n MouseDown1Status if-shell -F '#{==:#{mouse_status_range},palette}' "display-popup -w 90% -h 70% -E 'tmux-palette'" "if-shell -F '#{==:#{mouse_status_range},session}' 'switch-client -t =' 'select-window -t ='"
 
         # Enhanced right-click menu for session list on the left
         bind-key -T root MouseDown3StatusLeft display-menu -T "#[align=centre]#{session_name}" -t = -x M -y W Next n { switch-client -n } Previous p { switch-client -p } "" Renumber N { move-window -r } Rename n { command-prompt -I "#S" { rename-session "%%" } } "" "New Session" s { new-session } "New Window" w { new-window } "" "Kill Session" X { kill-session }

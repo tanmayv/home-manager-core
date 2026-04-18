@@ -1,0 +1,81 @@
+{
+  "mcpServers": {
+    "CodingMCP": {
+      "command": "/google/bin/releases/codemind-mcp-servers/coding_server.par"
+    },
+    "WorkspaceMCP": {
+      "command": "/google/bin/releases/codemind-mcp-servers/workspace_server.par"
+    },
+    "DuckieMCP": {
+      "command": "/google/bin/releases/duckie-eng-policy/duckie_server.par",
+      "timeout": 300000
+    },
+    "Buganizer": {
+      "command": "/google/bin/releases/gemini-cli/tools/remote_mcp",
+      "args": [
+        "--use_gaia_mint=True",
+        "--mcp_server=blade:devtools.buganizer.mcpservice-prod",
+        "--credential_exchanger_call_gaia_client_with_compass_stub_task_percentage=0"
+      ],
+      "includeTools": [
+        "add_buganizer_comment",
+        "create_buganizer_issue",
+        "get_bugs",
+        "list_components",
+        "render_issue"
+      ],
+      "timeout": 300000
+    },
+    "YAQS": {
+      "command": "/google/bin/releases/gemini-cli/tools/remote_mcp",
+      "args": [
+        "--use_loas_transact_dat",
+        "--mcp_server=blade:corp.yaqs.boq.mcp.proto.yaqsmcpservice-prod"
+      ],
+      "timeout": 300000
+    },
+    "TaskFlow": {
+      "command": "/google/bin/releases/corp-mcp-proxy/server.par",
+      "timeout": 300000,
+      "args": [
+        "--use_loas_transact_dat=True",
+        "--mcp_server=blade:devtools.worktracker.mcp.proto.taskflowmcpservice-prod",
+        "--alsologtostderr",
+        "--abort_on_connection_failure"
+      ],
+      "disabled": true
+    },
+    "production-agent": {
+      "command": "/google/bin/releases/production-agent-mcp/mcp_server.par",
+      "args": [],
+      "env": {},
+      "disabledTools": [
+        "cdpush_show_status",
+        "cdpush_start",
+        "cdpush_pause",
+        "cdpush_resume",
+        "content_platform_retrieval",
+        "cdpush_cancel",
+        "outage_investigator",
+        "search_irm_incidents",
+        "get_irm_details",
+        "search_irm_signals",
+        "khoj",
+        "mash_query",
+        "monarch_query"
+      ],
+      "disabled": true
+    },
+    "rollouts-arca-mcp-server": {
+      "command": "/google/bin/releases/gemini-cli/tools/remote_mcp",
+      "args": [
+        "--mcp_server=blade:rollouts.rca.api.mcp-prod",
+        "--use_loas_transact_dat=True"
+      ],
+      "timeout": 60000,
+      "includeTools": [
+        "investigate_rollout"
+      ]
+    }
+  }
+}

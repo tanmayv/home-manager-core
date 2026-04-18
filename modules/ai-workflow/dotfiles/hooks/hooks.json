@@ -1,0 +1,58 @@
+{
+  "hooks": {
+    "BeforeTool": [
+      {
+        "matcher": "run_shell_command",
+        "hooks": [
+          {
+            "name": "recursive-search-guard",
+            "type": "command",
+            "description": "Prevents excessive file searching",
+            "command": "python3 ${extensionPath}/hooks/recursive_search_guard/recursive_search_guard.py",
+            "timeout": 10000
+          }
+        ]
+      },
+      {
+        "matcher": "(read_file|write_file|replace|list_directory)",
+        "hooks": [
+          {
+            "name": "path-normalizer",
+            "type": "command",
+            "description": "Normalizes paths for cross-platform compatibility",
+            "command": "python3 ${extensionPath}/hooks/path_normalizer/path_normalizer.py",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "AfterTool": [
+      {
+        "matcher": "write_file",
+        "hooks": [
+          {
+            "name": "reconcile-changes",
+            "type": "command",
+            "description": "Reconciles changes with the original file",
+            "command": "bash ${extensionPath}/hooks/reconcile_changes/reconcile_changes.sh",
+            "timeout": 10000
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "get-google3-context",
+            "type": "command",
+            "command": "python3 ${extensionPath}/hooks/google3_context/get_google3_context.py",
+            "description": "Injects Google3 context at session start",
+            "timeout": 30000
+          }
+        ]
+      }
+    ]
+  }
+}

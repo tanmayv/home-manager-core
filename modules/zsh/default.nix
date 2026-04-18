@@ -1,11 +1,12 @@
 { pkgs, config, username, ... }:
 let
-  palette = import ./palette.nix;
+  palette = import ../palette.nix;
   myAliases = {
     ll = "ls -l";
     la = "ls -a";
     jetski-cli = "/google/bin/releases/jetski-devs/tools/cli";
     start-jetski-web = "/google/bin/releases/jetski-devs/jetski-web/run_jetski.par";
+    jetski-web = "/google/bin/releases/jetski-devs/jetski-web/run_jetski.par";
   };
 in
 {
@@ -30,6 +31,9 @@ in
       export COLORTERM=truecolor
 
 
+      # Accept autosuggestion with Ctrl+E
+      bindkey '^E' autosuggest-accept
+
       # Basic Zsh config
       setopt histignorealldups sharehistory
 
@@ -39,23 +43,11 @@ in
       fi
 
       # Google tool completions
-      for completion_file in /etc/bash_completion.d/{hgd,jjd,p4,g4d}; do
+      for completion_file in /etc/bash_completion.d/{hgd,jjd}; do
         if [[ -f "$completion_file" ]]; then
           source "$completion_file"
         fi
       done
-
-      # Custom path logic for CitC workspaces
-      # function set_citc_hash() {
-      #   if [[ "$PWD" == /google/src/cloud/$USER/* ]]; then
-      #     local ws="''${PWD#/google/src/cloud/$USER/}"
-      #     ws="''${ws%%/*}"
-      #     hash -d "$ws"="/google/src/cloud/$USER/$ws"
-      #   fi
-      # }
-      # autoload -Uz add-zsh-hook
-      # add-zsh-hook chpwd set_citc_hash
-      # set_citc_hash
 
       # Initialize Prompt
       autoload -U promptinit; promptinit
@@ -66,8 +58,8 @@ in
       # turn on git stash status
       zstyle :prompt:pure:git:stash show yes
 
-prompt_pure_username=""
-prompt_pure_host=""
+    prompt_pure_username=""
+    prompt_pure_host=""
       prompt pure
 
       # Customize Pure prompt: hide user/host and use custom workspace path
@@ -111,9 +103,6 @@ prompt_pure_host=""
         fi
       }
 
-
-
-      
       if [[ -n "''${SSH_AUTH_SOCK}" ]]; then
         autoload -Uz add-zsh-hook
         add-zsh-hook preexec fixup_ssh_auth_sock

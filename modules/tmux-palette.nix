@@ -115,4 +115,175 @@ in
   home.packages = [
     tmux-palette
   ];
+
+  home.file.".config/tmux-palette/commands.toml".text = ''
+    [[commands]]
+    name = "New Session"
+    description = "Create a new tmux session"
+    command = 'read -p "New session name: " name && tmux new-session -d -s "$name" && tmux switch-client -t "$name"'
+    group = "General"
+
+    [[commands]]
+    name = "Command Palette"
+    description = "Open command palette"
+    command = "tmux-palette"
+    group = "General"
+    mapping = "C-p"
+
+    [[commands]]
+    name = "List Windows"
+    description = "List all windows in current session"
+    command = "tmux list-windows"
+    group = "Navigation"
+    mapping = "w"
+
+    [[commands]]
+    name = "Switch Workspace"
+    description = "Switch to a CitC workspace"
+    command = "tmux-sessionizer"
+    group = "Navigation"
+    mapping = "C-t"
+
+    [[commands]]
+    name = "Next Window"
+    description = "Switch to next window"
+    command = "tmux next-window"
+    group = "Windows"
+    mapping = "n"
+
+    [[commands]]
+    name = "Previous Window"
+    description = "Switch to previous window"
+    command = "tmux previous-window"
+    group = "Windows"
+    mapping = "p"
+
+    [[commands]]
+    name = "New Window"
+    description = "Create a new window"
+    command = "tmux new-window"
+    group = "Windows"
+    mapping = "c"
+
+    [[commands]]
+    name = "Kill Window"
+    description = "Kill current window"
+    command = "tmux kill-window"
+    group = "Windows"
+    mapping = "&"
+
+    [[commands]]
+    name = "Rename Window"
+    description = "Rename current window"
+    command = 'read -p "New window name: " name && tmux rename-window "$name"'
+    group = "Windows"
+    mapping = ","
+
+    [[commands]]
+    name = "Next Pane"
+    description = "Switch to next pane"
+    command = "tmux select-pane -t :.+"
+    group = "Panes"
+    mapping = "o"
+
+    [[commands]]
+    name = "Previous Pane"
+    description = "Switch to previous pane"
+    command = "tmux select-pane -t :.-"
+    group = "Panes"
+
+    [[commands]]
+    name = "Split Vertical"
+    description = "Split window vertically"
+    command = "tmux split-window -h"
+    group = "Panes"
+    mapping = "%"
+
+    [[commands]]
+    name = "Split Horizontal"
+    description = "Split window horizontally"
+    command = "tmux split-window -v"
+    group = "Panes"
+    mapping = "\""
+
+    [[commands]]
+    name = "Kill Pane"
+    description = "Kill current pane"
+    command = "tmux kill-pane"
+    group = "Panes"
+    mapping = "x"
+
+    [[commands]]
+    name = "Rename Pane"
+    description = "Rename current pane"
+    command = 'read -p "New pane name: " name && tmux select-pane -T "$name"'
+    group = "Panes"
+
+    [[commands]]
+    name = "Zoom Pane"
+    description = "Toggle zoom for current pane"
+    command = "tmux resize-pane -Z"
+    group = "Panes"
+    mapping = "z"
+
+    [[commands]]
+    name = "Swap Pane Up"
+    description = "Swap current pane with previous"
+    command = "tmux swap-pane -U"
+    group = "Panes"
+    mapping = "{"
+
+    [[commands]]
+    name = "Swap Pane Down"
+    description = "Swap current pane with next"
+    command = "tmux swap-pane -D"
+    group = "Panes"
+    mapping = "}"
+
+    [[commands]]
+    name = "Detach Session"
+    description = "Detach from current session"
+    command = "tmux detach-client"
+    group = "General"
+    mapping = "d"
+
+    [[commands]]
+    name = "List Keys"
+    description = "List all active key bindings"
+    command = "tmux list-keys"
+    group = "Utility"
+    mapping = "?"
+
+    [[commands]]
+    name = "Show Messages"
+    description = "Show message log"
+    command = "tmux show-messages && read -p 'Press Enter to close...'"
+    group = "Utility"
+    mapping = "~"
+
+    [[commands]]
+    name = "Switch to Last Session"
+    description = "Switch to the last active session"
+    command = "tmux switch-client -l"
+    group = "General"
+
+    [[commands]]
+    name = "Reload Configuration"
+    description = "Reload tmux configuration"
+    command = "tmux source-file ~/.config/tmux/tmux.conf && tmux display-message 'Config reloaded!'"
+    group = "Utility"
+    mapping = "r"
+
+    [[commands]]
+    name = "Build and Switch"
+    description = "Rebuild and apply Home Manager configuration"
+    command = "build-and-switch && read -p 'Press Enter to close...'"
+    group = "Utility"
+
+    [[commands]]
+    name = "Edit Home-manager Configuration"
+    description = "Select and edit a file in the configuration directory"
+    command = 'editor=$(nix eval --raw --file ~/.config/home-manager-minimal-ai/setup.nix editor) && cd "$(nix eval --raw --file ~/.config/home-manager-minimal-ai/setup.nix config-location | sed "s|^~|$HOME|")" && file=$(find . -type f -not -path "*/.*" | fzf) && [[ -n "$file" ]] && tmux new-window -c "$(pwd)" -n "edit-config" "$editor $file"'
+    group = "Utility"
+  '';
 }

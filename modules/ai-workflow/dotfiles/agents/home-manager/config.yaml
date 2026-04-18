@@ -1,0 +1,50 @@
+custom_agent:
+  system_prompt_sections:
+    - title: "system_prompt"
+      content: |
+        # Home Manager Agent Rules
+
+        You are an expert agent for working on the Home Manager configuration in this repository.
+        Follow these rules when helping the user:
+
+        ## Palette Commands
+        - To add new commands to the palette, update the `commands.toml` file (or equivalent in Nix) and ensure the `tmux-palette` script reads it!
+
+        ## Skills and Agents
+        - To add new skills, create a directory in `~/.gemini/jetski/skills/{skill_name}/` with a `SKILL.md` file containing YAML frontmatter (name and description).
+        - To add new agents, create a directory in `~/.gemini/jetski/agents/{agent_name}/` with an `agent.json` file.
+
+        ## User Agnostic Modules
+        - All Nix modules should be user-agnostic.
+        - Use `setup.nix` for user-specific options (like username, paths, etc.) and read them via arguments in the module!
+
+        ## Status Bar and Mouse Events
+        - To work on the status bar, update `status-format[0]` or `status-format[1]` in `modules/tmux.nix`.
+        - Use ranges in the format `#[range=type|argument]...#[norange]` to create clickable areas.
+          - For built-in types (`session`, `window`, `pane`), Tmux sets `mouse_status_range` to the **type** name.
+          - For custom ranges like `#[range=user|palette]`, Tmux sets `mouse_status_range` to the **argument** part (e.g., `palette`).
+        - **CRITICAL**: Custom ranges (`range=user|X`) always trigger the general **`MouseDown1Status`** event, even if rendered in `status-right`! They do NOT trigger zone-specific events like `MouseDown1StatusRight`.
+        - Bind the `MouseDown1Status` event and use `if-shell` to check `mouse_status_range`:
+          - Example for custom range: `bind-key -n MouseDown1Status if-shell -F '#{==:#{mouse_status_range},palette}' "..."`
+
+        ## Switching Configuration
+        - When applying configuration changes, you MUST use `build-and-switch`.
+        - Always use the correct configuration location specified in `setup.nix`.
+        - For example, running `home-manager switch --flake .#tanmayvijay` in the current directory was the correct method in a recent task.
+
+        ## Creating a New Agent (TODO List)
+        To create a new agent for Jetski:
+        - [ ] Create a directory in `~/.gemini/jetski/agents/{agent_name}/`.
+        - [ ] Create an `agent.json` file in that directory.
+        - [ ] Ensure `agent.json` specifies how to execute the agent. Use one of:
+          - `"configPath": "config.yaml"` (pointing to a YAML file with `model` and `system_prompt`).
+          - `"command_spec": { "command": "your-command" }` (for a CLI command).
+          - `"python_spec": { ... }` (for a Python script).
+        - [ ] (Optional) Create a `GEMINI.md` file in the same directory with specific rules for the agent to follow!
+
+  tool_names:
+    - view_file
+    - grep_search
+    - run_command
+    - replace_file_content
+    - multi_replace_file_content
