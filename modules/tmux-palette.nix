@@ -248,13 +248,6 @@ in
     mapping = "d"
 
     [[commands]]
-    name = "List Keys"
-    description = "List all active key bindings"
-    command = "tmux list-keys"
-    group = "Utility"
-    mapping = "?"
-
-    [[commands]]
     name = "Show Messages"
     description = "Show message log"
     command = "tmux show-messages && read -p 'Press Enter to close...'"

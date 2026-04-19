@@ -1,12 +1,11 @@
-{ pkgs, config, username, ... }:
+{ pkgs, config, username, userSettings, ... }:
 let
   palette = import ../palette.nix;
+  enableTmuxOnSsh = userSettings.enable-tmux-on-ssh or true;
   myAliases = {
-    ll = "ls -l";
-    la = "ls -a";
     jetski-cli = "/google/bin/releases/jetski-devs/tools/cli";
-    start-jetski-web = "/google/bin/releases/jetski-devs/jetski-web/run_jetski.par";
-    jetski-web = "/google/bin/releases/jetski-devs/jetski-web/run_jetski.par";
+    gemini-cli = "/google/bin/releases/gemini-cli/tools/gemini";
+    run-jetski-web = "/google/bin/releases/jetski-devs/jetski-web/run_jetski.par";
   };
 in
 {
@@ -30,9 +29,12 @@ in
       zmodload zsh/nearcolor
       export COLORTERM=truecolor
 
-
       # Accept autosuggestion with Ctrl+E
       bindkey '^E' autosuggest-accept
+
+      # Move between next and previous commands
+      bindkey '^P' up-line-or-history
+      bindkey '^N' down-line-or-history
 
       # Basic Zsh config
       setopt histignorealldups sharehistory
@@ -53,13 +55,11 @@ in
       autoload -U promptinit; promptinit
 
       # optionally define some options
-      PURE_CMD_MAX_EXEC_TIME=10
+      PURE_CMD_MAX_EXEC_TIME=2
 
       # turn on git stash status
-      zstyle :prompt:pure:git:stash show yes
+      zstyle :prompt:pure:git:stash show no
 
-    prompt_pure_username=""
-    prompt_pure_host=""
       prompt pure
 
       # Customize Pure prompt: hide user/host and use custom workspace path
@@ -109,6 +109,7 @@ in
       fi
 
       # Autostart tmux only if not in Cider terminal
+      ${if enableTmuxOnSsh then ''
       if [[ "$TERM_PROGRAM" != "cider" ]]; then
 	if [[ -n "$SSH_CLIENT" || -n "$SSH_TTY" ]] && [[ -z "$TMUX" ]]; then
 	  current_dir=$(pwd)
@@ -125,6 +126,7 @@ in
 	  fi
 	fi
       fi
+      '' else ""}
     '';
   };
 
