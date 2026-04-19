@@ -28,7 +28,7 @@
         touch "$HISTORY_FILE"
 
         # Use --expect to distinguish between selecting an item and executing the exact query
-        output=$(fzf --prompt="CS Query (Enter: match, Ctrl-X: exact)> " --print-query --expect=ctrl-x < "$HISTORY_FILE")
+        output=$(fzf --prompt="CS Query (Enter: match, Ctrl-X: exact)> " --print-query --expect=ctrl-x < "$HISTORY_FILE" || true)
         
         if [[ -z "$output" ]]; then
             exit 0
@@ -57,7 +57,7 @@
             --delimiter=":" \
             --preview="bat --color=always --style=numbers --highlight-line {2} {1} 2>/dev/null || cat {1} 2>/dev/null" \
             --preview-window="top:60%:border-sharp" \
-            --prompt="Results> ")
+            --prompt="Results> " || true)
 
         if [[ -n "$selected" ]]; then
             # Save query to history
