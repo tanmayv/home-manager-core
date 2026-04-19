@@ -74,6 +74,30 @@ in
         builtin cd "$dest"
       }
 
+      function hgd() {
+        command hgd "$@" || return $?
+        if [[ -n "$TMUX" ]]; then
+          local target=""
+          for arg in "$@"; do
+            if [[ "$arg" != -* ]]; then
+              target="$arg"
+              break
+            fi
+          done
+
+          if [[ -n "$target" ]]; then
+            # If it looks like a workspace name, try to construct the full path for sessionizer
+            if [[ "$target" != /* && ! -d "$target" ]]; then
+              local ws_root="/google/src/cloud/$USER/$target"
+              if [[ -d "$ws_root" ]]; then
+                target="$ws_root"
+              fi
+            fi
+            tmux-sessionizer "$target"
+          fi
+        fi
+      }
+
       function fig_zoxide_cd() {
         local dest
         dest=$(zoxide query -i -- "$@")
@@ -168,11 +192,8 @@ in
 	  if [[ "$current_dir" == "$workspace_root"/* ]] && [[ "$(dirname "$current_dir")" == "$workspace_root" ]]; then
 	    tmux-sessionizer "$current_dir"
 	  else
-	    if tmux ls >/dev/null 2>&1; then
-	      tmux attach-session
-	    else
-	      tmux new-session -s default
-	    fi
+	    # Always prompt sessionizer to pick a workspace or default to a local path
+	    tmux-sessionizer
 	  fi
 	fi
       fi
