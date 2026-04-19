@@ -5,6 +5,8 @@
   enable-ai-workflow = true;
   enable-neovim = true;
   enable-tmux-on-ssh = true;
+  auto-switch-workspace-on-cd = true;
+  auto-switch-workspace-on-hgd = true;
   ai_features = {
     enable_ai_ssa_creator_skill = true;
   };
