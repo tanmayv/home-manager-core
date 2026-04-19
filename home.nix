@@ -2,6 +2,7 @@
   imports = [
     ./modules/zsh
     ./modules/tmux
+    ./modules/hg.nix
     ./modules/test.nix
     ./modules/tmux-palette.nix
     ./modules/scripts

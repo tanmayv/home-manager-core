@@ -290,5 +290,12 @@ in
     description = "Ask Duckie a question"
     command = "read -p \"Ask Duckie: \" q && tmux split-window -h \"gemini ask-duckie '\\$q'\""
     group = "AI"
+
+    [[commands]]
+    name = "Search via CodeSearch"
+    description = "Interactive CodeSearch with fzf and preview"
+    command = "tmux-cs-fzf"
+    group = "Navigation"
+    mapping = "C-s"
   '';
 }

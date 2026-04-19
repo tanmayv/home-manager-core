@@ -6,6 +6,8 @@ let
     jetski-cli = "/google/bin/releases/jetski-devs/tools/cli";
     gemini-cli = "/google/bin/releases/gemini-cli/tools/gemini";
     run-jetski-web = "/google/bin/releases/jetski-devs/jetski-web/run_jetski.par";
+    hg = "chg";
+    hgi = "fig_zoxide_cd";
   };
 in
 {
@@ -50,6 +52,54 @@ in
           source "$completion_file"
         fi
       done
+
+      function _fast_workspace_cd() {
+        local dest="$1"
+        local original_arg="$2"
+
+        # Fast string matching to check if we are in a google3 workspace and the destination is too
+        if [[ "$PWD" == /google/src/cloud/$USER/*/google3* && "$dest" == /google/src/cloud/$USER/*/google3/* ]]; then
+          local current_ws_root="''${PWD%%/google3*}/google3"
+          local dest_relative="''${dest#*/google3/}"
+          local target_path="$current_ws_root/$dest_relative"
+
+          if [[ -d "$target_path" && "$dest" != "$target_path" ]]; then
+            # Only rewrite if we used a zoxide jump (not if the user typed the exact absolute path)
+            if [[ "$original_arg" != "$dest" ]]; then
+              dest="$target_path"
+            fi
+          fi
+        fi
+
+        builtin cd "$dest"
+      }
+
+      function fig_zoxide_cd() {
+        local dest
+        dest=$(zoxide query -i -- "$@")
+        if [[ -n "$dest" ]]; then
+          _fast_workspace_cd "$dest" "$1"
+        fi
+      }
+
+      function cd() {
+        local dest
+        if [[ "$#" -eq 0 ]]; then
+          dest="$HOME"
+        elif [[ "$#" -eq 1 && "$1" == "-" ]]; then
+          dest="$OLDPWD"
+        elif [[ "$#" -eq 1 && -d "$1" ]]; then
+          dest="$1"
+        else
+          dest=$(zoxide query --exclude "$PWD" -- "$@")
+          if [[ -z "$dest" ]]; then
+            builtin cd "$@"
+            return
+          fi
+        fi
+        
+        _fast_workspace_cd "$dest" "$1"
+      }
 
       # Initialize Prompt
       autoload -U promptinit; promptinit
@@ -133,9 +183,7 @@ in
   programs.zoxide = {
     enable = true;
     enableZshIntegration = true;
-    options = [
-      "--cmd cd"
-    ];
+    options = [];
   };
 
   programs.atuin = {
