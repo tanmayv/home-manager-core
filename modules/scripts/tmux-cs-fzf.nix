@@ -41,9 +41,9 @@
             exit 0
         fi
 
-        # Run cs and pipe to fzf.
+        # Run cs and pipe to fzf. Discard stderr to prevent UI corruption from summary lines.
         # Uses delimiter ":" since cs outputs in the format "file:line:content"
-        selected=$(cs "$query" | fzf \
+        selected=$(cs "$query" 2>/dev/null | fzf \
             --delimiter=":" \
             --preview="bat --color=always --style=numbers --highlight-line {2} {1} 2>/dev/null || cat {1} 2>/dev/null" \
             --preview-window="top:60%:border-sharp" \
