@@ -49,11 +49,12 @@ in
       fi
 
       # Google tool completions
-      for completion_file in /etc/bash_completion.d/{hgd,jjd}; do
-        if [[ -f "$completion_file" ]]; then
-          source "$completion_file"
-        fi
-      done
+      if [[ -f /etc/bash_completion.d/hgd ]]; then
+        source /etc/bash_completion.d/hgd
+      fi
+      if [[ -f /etc/bash_completion.d/jjd ]]; then
+        source /etc/bash_completion.d/jjd
+      fi
 
       function _fast_workspace_cd() {
         local dest="$1"
