@@ -56,7 +56,7 @@
         selected=$(cs "$query" 2>/dev/null | sed 's|^.*/google3/||' | fzf \
             --delimiter=":" \
             --preview="bat --color=always --style=numbers --highlight-line {2} {1} 2>/dev/null || cat {1} 2>/dev/null" \
-            --preview-window="top:60%:border-sharp" \
+            --preview-window="top:60%:border-sharp:+{2}-/2" \
             --prompt="Results> " || true)
 
         if [[ -n "$selected" ]]; then
@@ -70,17 +70,27 @@
             # Keep only the last 100 items
             head -n 100 "$HISTORY_FILE" > "$HISTORY_FILE.tmp" && mv "$HISTORY_FILE.tmp" "$HISTORY_FILE"
 
-            # Open the file
+            # Extract file, line, and potentially column
             file=$(echo "$selected" | cut -d: -f1)
             line=$(echo "$selected" | cut -d: -f2)
+            col=$(echo "$selected" | cut -d: -f3)
             
             editor="''${EDITOR:-nvim}"
             
             # Open in a new tmux window relative to the workspace root
-            if [[ -n "''${TMUX:-}" ]]; then
-                tmux new-window -c "$WORKSPACE_ROOT" -n "cs-edit" "$editor +$line \"$file\""
+            if [[ "$col" =~ ^[0-9]+$ ]]; then
+                # If column is a number, format the editor command to jump to line and column
+                if [[ -n "''${TMUX:-}" ]]; then
+                    tmux new-window -c "$WORKSPACE_ROOT" -n "cs-edit" "$editor \"+call cursor($line, $col)\" \"$file\""
+                else
+                    (cd "$WORKSPACE_ROOT" && $editor "+call cursor($line, $col)" "$file")
+                fi
             else
-                (cd "$WORKSPACE_ROOT" && $editor "+$line" "$file")
+                if [[ -n "''${TMUX:-}" ]]; then
+                    tmux new-window -c "$WORKSPACE_ROOT" -n "cs-edit" "$editor +$line \"$file\""
+                else
+                    (cd "$WORKSPACE_ROOT" && $editor "+$line" "$file")
+                fi
             fi
         fi
       '';
