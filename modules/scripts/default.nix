@@ -8,5 +8,6 @@
     ./waiting.nix
     ./send-message-to-agent.nix
     ./tmux-cs-fzf.nix
+    ./ask-duckie.nix
   ];
 }

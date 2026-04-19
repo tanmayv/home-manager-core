@@ -287,8 +287,8 @@ in
 
     [[commands]]
     name = "Ask Duckie"
-    description = "Ask Duckie a question"
-    command = "read -p \"Ask Duckie: \" q && tmux split-window -h \"gemini ask-duckie '\\$q'\""
+    description = "Ask Duckie a question (with pane context)"
+    command = "ask-duckie-context"
     group = "AI"
 
     [[commands]]
