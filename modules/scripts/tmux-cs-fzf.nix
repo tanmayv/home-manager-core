@@ -9,9 +9,18 @@
         bat
         coreutils
         gnugrep
+        gnused
       ];
 
       text = ''
+        if [[ "$PWD" != /google/src/cloud/$USER/*/google3* ]]; then
+            echo "Error: Must be run from within a google3 workspace."
+            read -r -p "Press Enter to exit..."
+            exit 1
+        fi
+        
+        WORKSPACE_ROOT="''${PWD%%/google3*}/google3"
+
         HISTORY_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/tmux-cs-fzf"
         HISTORY_FILE="$HISTORY_DIR/history.txt"
 
@@ -42,8 +51,9 @@
         fi
 
         # Run cs and pipe to fzf. Discard stderr to prevent UI corruption from summary lines.
+        # Strip the absolute path up to /google3/ so paths are relative to the workspace.
         # Uses delimiter ":" since cs outputs in the format "file:line:content"
-        selected=$(cs "$query" 2>/dev/null | fzf \
+        selected=$(cs "$query" 2>/dev/null | sed 's|^.*/google3/||' | fzf \
             --delimiter=":" \
             --preview="bat --color=always --style=numbers --highlight-line {2} {1} 2>/dev/null || cat {1} 2>/dev/null" \
             --preview-window="top:60%:border-sharp" \
@@ -66,11 +76,11 @@
             
             editor="''${EDITOR:-nvim}"
             
-            # Open in a new tmux window
+            # Open in a new tmux window relative to the workspace root
             if [[ -n "''${TMUX:-}" ]]; then
-                tmux new-window -n "cs-edit" "$editor +$line \"$file\""
+                tmux new-window -c "$WORKSPACE_ROOT" -n "cs-edit" "$editor +$line \"$file\""
             else
-                $editor "+$line" "$file"
+                (cd "$WORKSPACE_ROOT" && $editor "+$line" "$file")
             fi
         fi
       '';
