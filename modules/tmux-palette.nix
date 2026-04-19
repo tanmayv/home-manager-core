@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, userSettings, ... }:
 
 let
   tmux-palette = pkgs.writeScriptBin "tmux-palette" ''
@@ -70,7 +70,7 @@ let
 
     try:
         process = subprocess.Popen(
-            ["fzf", "--delimiter=\\|"],
+            ["${pkgs.fzf}/bin/fzf", "--delimiter=\\|"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             text=True
@@ -276,7 +276,19 @@ in
     [[commands]]
     name = "Edit Home-manager Configuration"
     description = "Select and edit a file in the configuration directory"
-    command = 'editor=$(nix eval --raw --file ~/.config/home-manager-minimal-ai/setup.nix editor) && cd "$(nix eval --raw --file ~/.config/home-manager-minimal-ai/setup.nix config-location | sed "s|^~|$HOME|")" && file=$(find . -type f -not -path "*/.*" | fzf) && [[ -n "$file" ]] && tmux new-window -c "$(pwd)" -n "edit-config" "$editor $file"'
+    command = 'editor="${userSettings.editor}" && config_location="${userSettings.config-location}" && config_location="''${config_location/#\~/$HOME}" && cd "$config_location" && file=$(find . -type f -not -path "*/.*" | ${pkgs.fzf}/bin/fzf) && [[ -n "$file" ]] && tmux new-window -c "$(pwd)" -n "edit-config" "$editor $file"'
     group = "Utility"
+
+    [[commands]]
+    name = "Chat with Gemini"
+    description = "Open Gemini CLI in a new pane"
+    command = "tmux split-window -h 'gemini'"
+    group = "AI"
+
+    [[commands]]
+    name = "Ask Duckie"
+    description = "Ask Duckie a question"
+    command = "read -p \"Ask Duckie: \" q && tmux split-window -h \"gemini ask-duckie '\\$q'\""
+    group = "AI"
   '';
 }

@@ -116,12 +116,12 @@ in
 	  workspace_root="/google/src/cloud/${username}"
 	  # Check if current dir is a direct child of workspace_root
 	  if [[ "$current_dir" == "$workspace_root"/* ]] && [[ "$(dirname "$current_dir")" == "$workspace_root" ]]; then
-	    exec tmux-sessionizer "$current_dir"
+	    tmux-sessionizer "$current_dir"
 	  else
 	    if tmux ls >/dev/null 2>&1; then
-	      exec tmux attach-session
+	      tmux attach-session
 	    else
-	      exec tmux new-session -s default
+	      tmux new-session -s default
 	    fi
 	  fi
 	fi

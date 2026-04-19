@@ -1,19 +1,11 @@
-{ pkgs, ... }:
+{ pkgs, userSettings, ... }:
 
 let
   build-and-switch = pkgs.writeScriptBin "build-and-switch" ''
     #!/usr/bin/env bash
 
-    CONFIG_FILE="$HOME/.config/home-manager-minimal-ai/setup.nix"
-
-    if [[ ! -f "$CONFIG_FILE" ]]; then
-        echo "Config file not found: $CONFIG_FILE"
-        exit 1
-    fi
-
-    # Read values using nix eval
-    config_location=$(nix eval --raw --file "$CONFIG_FILE" config-location)
-    username=$(nix eval --raw --file "$CONFIG_FILE" username)
+    config_location="${userSettings.config-location}"
+    username="${userSettings.username}"
 
     # Expand ~ if present
     config_location="''${config_location/#\~/$HOME}"

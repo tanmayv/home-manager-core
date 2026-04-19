@@ -4,7 +4,7 @@ pkgs.writeScriptBin "tmux-sessionizer" ''
   CONFIG_FILE_NAME="tmux-sessionizer.conf"
   CONFIG_DIR="''${XDG_CONFIG_HOME:-$HOME/.config}/tmux-sessionizer"
   CONFIG_FILE="$CONFIG_DIR/$CONFIG_FILE_NAME"
-  PANE_CACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}/tmux-sessionizer"
+  PANE_CACHE_DIR="/tmp/tmux-sessionizer-$USER"
   PANE_CACHE_FILE="$PANE_CACHE_DIR/panes.cache"
 
   if [[ -f "$CONFIG_FILE" ]]; then
@@ -286,7 +286,7 @@ pkgs.writeScriptBin "tmux-sessionizer" ''
   elif [[ ! -z $user_selected ]]; then
       selected="$user_selected"
   else
-      selected_display=$(find_dirs | sed "s#^/google/src/cloud/$USER/#[Fig]#" | sed "s#^$HOME#[~]#" | fzf)
+      selected_display=$(find_dirs | sed "s#^/google/src/cloud/$USER/#[Fig]#" | sed "s#^$HOME#[~]#" | ${pkgs.fzf}/bin/fzf)
       selected=$(echo "$selected_display" | sed "s#^\[Fig\]#/google/src/cloud/$USER/#" | sed "s#^\[~\]#$HOME#")
   fi
 

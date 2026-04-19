@@ -1,6 +1,6 @@
 {
   username = "tanmayvijay";
-  config-location = "~/.config/home-manager-minimal-ai";
+  config-location = "~/.config/minimal-cloudtop";
   editor = "nvim";
   enable-ai-workflow = true;
   enable-neovim = true;
