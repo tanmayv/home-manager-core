@@ -92,26 +92,28 @@ in
       }
 
       function hgd() {
-        command hgd "$@" || return $?
-        ${if autoSwitchHg then ''
-        if [[ -n "$TMUX" ]]; then
-          local target=""
-          for arg in "$@"; do
-            if [[ "$arg" != -* ]]; then
-              target="$arg"
-              break
-            fi
-          done
+        local target_dir
+        # Run hg hgd, capturing stdout and allowing stderr to print to terminal
+        target_dir=$(hg hgd "$@")
+        local status=$?
+        
+        if [[ $status -ne 0 || -z "$target_dir" ]]; then
+          return $status
+        fi
+        
+        # Change to the target directory
+        builtin cd "$target_dir" || return $?
 
-          if [[ -n "$target" ]]; then
-            # If it looks like a workspace name, try to construct the full path for sessionizer
-            if [[ "$target" != /* && ! -d "$target" ]]; then
-              local ws_root="/google/src/cloud/$USER/$target"
-              if [[ -d "$ws_root" ]]; then
-                target="$ws_root"
-              fi
-            fi
-            tmux-sessionizer "$target"
+        ${if autoSwitchHg then ''
+        # If in TMUX and we successfully switched to a workspace, sync the session
+        if [[ -n "$TMUX" && "$PWD" == /google/src/cloud/$USER/* ]]; then
+          local ws_part="''${PWD#/google/src/cloud/$USER/}"
+          local ws_name="''${ws_part%%/*}"
+          local ws_root="/google/src/cloud/$USER/$ws_name"
+          
+          local current_session=$(tmux display-message -p '#S' 2>/dev/null)
+          if [[ "$current_session" != "$ws_name" && -d "$ws_root" ]]; then
+            tmux-sessionizer "$ws_root"
           fi
         fi
         '' else ""}
