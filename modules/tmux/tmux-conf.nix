@@ -37,7 +37,7 @@ let
     for s in sessions:
         name = s["name"]
         sid = s["id"]
-        display_name = f"#[bold]{name}#[nobold]" if name == current else name
+        display_name = f"#[fg=${palette.color3},bold]{name}#[default]" if name == current else name
         formatted.append(f"#[range=session|{sid}]{display_name}#[norange]")
 
     output = ' · '.join(formatted)
@@ -55,6 +55,12 @@ let
 
     width = int(sys.argv[1]) if len(sys.argv) > 1 else 100
     available = width - 20
+
+    # Get current pane ID to highlight active agent
+    try:
+        current_pane = subprocess.check_output(["tmux", "display-message", "-p", "#{pane_id}"]).decode("utf-8").strip()
+    except:
+        current_pane = ""
 
     # Get all panes with @agent_name
     try:
@@ -79,9 +85,14 @@ let
 
     formatted = []
     for a in agents:
+        name = a['name']
+        # Highlight if it's the agent in the current focused pane
+        if a['id'] == current_pane:
+            name = f"#[fg=${palette.color3},bold]{name}#[default]"
+            
         # Range format: agent:PANE_ID
         range_arg = f"agent:{a['id']}"
-        formatted.append(f"#[range=user|{range_arg}]{a['name']}#[norange]")
+        formatted.append(f"#[range=user|{range_arg}]{name}#[norange]")
 
     res = ' · '.join(formatted)
     print(res)
