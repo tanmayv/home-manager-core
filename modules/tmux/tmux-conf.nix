@@ -145,7 +145,7 @@ in
         run-shell "if [ $(tmux list-sessions | wc -l) -gt 1 ]; then tmux set -g status 2; else tmux set -g status on; fi"
 
         # Content of the second status line
-        set -g status-format[1] "#[align=left,fg=${palette.color4},bold]Active Sessions: #[fg=${palette.foreground},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\")#[align=right,fg=${palette.color5}]#(hg-cl) #[fg=default,nobold]#(hg-age) "
+        set -g status-format[1] "#[align=left,fg=${palette.color4},bold] Active Sessions: #[fg=${palette.foreground},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\")#[align=right,fg=${palette.color5}]#(hg-cl) #[fg=default,nobold]#(hg-age) "
 
         # Global mouse binding to handle status bar clicks
         bind-key -n MouseDown1Status if-shell -F '#{==:#{mouse_status_range},palette}' \
