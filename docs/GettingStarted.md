@@ -21,7 +21,7 @@ We rely on Nix for package management and Home Manager for configuration.
 Clone this repository to the expected location on your Cloudtop:
 
 ```bash
-git clone sso://user/tanmayvijay/home-manager-minimal-ai ~/.config/minimal-cloudtop
+git clone -b stable --single-branch sso://user/tanmayvijay/home-manager-minimal-ai ~/.config/minimal-cloudtop
 cd ~/.config/minimal-cloudtop
 ```
 
@@ -44,7 +44,7 @@ Apply the configuration for the first time:
 
 ```bash
 cd <cloned director>
-nix run home-manager switch --flake ".#your-ldap-here"
+nix run home-manager -- switch --backup backup --flake ".#your-ldap-here"
 ```
 
 *Note: After the initial successful build, you can use the `build-and-switch` command (or the Command Palette shortcut) to apply future updates.*
