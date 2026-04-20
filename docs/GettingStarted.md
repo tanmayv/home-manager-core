@@ -11,7 +11,9 @@ Before you begin, ensure your Cloudtop has an internet exception. This is requir
 ### Install Nix and Home Manager
 We rely on Nix for package management and Home Manager for configuration.
 - Follow the official Google guide at **go/nix** to install Nix.
-- Ensure you follow the steps to set up **Home Manager** as well.
+  - You need to ensure that nix binary is avaiable and you are part of nix-users group
+  - (Optional: Setup channels)
+
 
 ## 2. Repository Setup
 
@@ -39,7 +41,8 @@ Open `setup.nix` and update the `username` to match your LDAP:
 Apply the configuration for the first time:
 
 ```bash
-home-manager switch --flake ".#your-ldap-here"
+cd <cloned director>
+nix run home-manager switch --flake ".#your-ldap-here"
 ```
 
 *Note: After the initial successful build, you can use the `build-and-switch` command (or the Command Palette shortcut) to apply future updates.*
