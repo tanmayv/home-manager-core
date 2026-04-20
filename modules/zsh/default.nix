@@ -4,9 +4,17 @@ let
   enableTmuxOnSsh = userSettings.enable-tmux-on-ssh or true;
   autoSwitchHg = userSettings.auto-switch-workspace-on-hgd or true;
   enableCdVerbose = userSettings.enable-cd-verbose or true;
+  
+  enableAiWorkflow = userSettings.enable-ai-workflow or false;
+  aiFeatures = userSettings.ai_features or {
+    enable_tmux_based_agent_comms = false;
+  };
+  enableAgentComms = enableAiWorkflow && (aiFeatures.enable_tmux_based_agent_comms or false);
+  agentWrapperPrefix = if enableAgentComms then "agent-wrapper " else "";
+
   myAliases = {
-    jetski-cli = "agent-wrapper /google/bin/releases/jetski-devs/tools/cli";
-    gemini-cli = "agent-wrapper /google/bin/releases/gemini-cli/tools/gemini";
+    jetski-cli = "${agentWrapperPrefix}/google/bin/releases/jetski-devs/tools/cli";
+    gemini-cli = "${agentWrapperPrefix}/google/bin/releases/gemini-cli/tools/gemini";
     run-jetski-web = "/google/bin/releases/jetski-devs/jetski-web/run_jetski.par";
     hg = "chg";
     hgi = "fig_zoxide_cd";

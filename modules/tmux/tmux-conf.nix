@@ -1,7 +1,17 @@
-{ pkgs, lib, config, ... }:
+{ pkgs, lib, config, userSettings, ... }:
 with lib;
 let
   palette = import ../palette.nix;
+  
+  # Check if AI features are enabled
+  enableAiWorkflow = userSettings.enable-ai-workflow or false;
+  aiFeatures = userSettings.ai_features or {
+    enable_ai_ssa_creator_skill = false;
+    enable_tmux_based_agent_comms = false;
+    enable_agent_knowledge = false;
+  };
+  enableAgentComms = enableAiWorkflow && (aiFeatures.enable_tmux_based_agent_comms or false);
+
   tmux-sessionizer = import ./tmux-sessionizer.nix { inherit pkgs; maxDirLength = config.programs.tmux.sessionizerMaxDirLength; };
   hg-age = import ./hg-age.nix { inherit pkgs; };
   hg-cl = import ./hg-cl.nix { inherit pkgs; };
@@ -105,7 +115,11 @@ let
     #!${pkgs.bash}/bin/bash
     # Dynamically set status lines and formats
     num_sessions=$(tmux list-sessions | wc -l)
+    ${if enableAiWorkflow then ''
     num_agents=$(tmux list-panes -a -F "#{@agent_name}" | grep -v "^$" | wc -l)
+    '' else ''
+    num_agents=0
+    ''}
     
     # Common components
     SESSIONS_PART="#[align=left,fg=${palette.color4},bold] Active Sessions: #[fg=${palette.color8},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\")"
@@ -174,7 +188,7 @@ in
         
         # Pane border and title configuration
         set -g pane-border-status top
-        set -g pane-border-format "#[fg=${palette.color8}]─(#[fg=${palette.color5}] #D #[fg=${palette.color8}]| #[fg=${palette.color4}]#{?@agent_name,#{@agent_name},no-name} #[fg=${palette.color8}]| #[fg=${palette.color2}]#T #[fg=${palette.color8}])─"
+        set -g pane-border-format "#[fg=${palette.color8}]─(#[fg=${palette.color5}] #D #[fg=${palette.color8}]| ${if enableAgentComms then "#[fg=${palette.color4}]#{?@agent_name,#{@agent_name},no-name} #[fg=${palette.color8}]| " else ""}#[fg=${palette.color2}]#T #[fg=${palette.color8}])─"
         set -g pane-border-style "fg=${palette.color8}"
         set -g pane-active-border-style "fg=${palette.color4}"
         
