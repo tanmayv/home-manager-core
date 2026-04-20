@@ -147,28 +147,33 @@ in
         # Content of the second status line
         set -g status-format[1] "#[align=left,fg=default] #(hg-age) #[fg=${palette.color4},bold]Active Sessions: #[fg=${palette.foreground},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\")#[align=right,fg=${palette.color5}]#(hg-cl) "
 
-        # Global mouse binding to handle session clicks
+        # Global mouse binding to handle status bar clicks
         bind-key -n MouseDown1Status if-shell -F '#{==:#{mouse_status_range},palette}' \
-            "display-popup -w 90% -h 70% -E 'tmux-palette'" \
-            "if-shell -F '#{==:#{mouse_status_range},clinfo}' \
-                'run-shell \"hg-cl --copy\"' \
-                \"if-shell -F '#{==:#{mouse_status_range},session}' \
-                    'switch-client -t =' \
-                    'select-window -t ='\"\""
+            { display-popup -w 90% -h 70% -E "tmux-palette" } \
+            { if-shell -F '#{==:#{mouse_status_range},clinfo}' \
+                { run-shell "hg-cl --copy" } \
+                { if-shell -F '#{==:#{mouse_status_range},session}' \
+                    { switch-client -t = } \
+                    { select-window -t = } \
+                } \
+            }
 
         # Right-click menu for hg-age (ageinfo range) or hg-cl (clinfo range)
         bind-key -n MouseDown3Status \
             if-shell -F '#{==:#{mouse_status_range},ageinfo}' \
-                "display-menu -T \"#[align=centre]Repository Sync\" -t = -x M -y W \
-                    \"Sync Current\" s { display-popup -T \"Syncing Current Workspace\" -w 80% -h 60% -E \"hg sync && read\" } \
-                    \"Sync All\" a { display-popup -T \"Syncing All Workspaces\" -w 80% -h 60% -E \"for d in /google/src/cloud/$USER/*; do if [ -d \\\"\\\$d/google3\\\" ]; then echo \\\"Syncing \\\$d...\\\"; (cd \\\"\\\$d\\\" && hg sync); fi; done; echo \\\"Finished syncing all workspaces.\\\"; read\" }\" \
-                \"if-shell -F '#{==:#{mouse_status_range},clinfo}' \
-                    'display-menu -T \"#[align=centre]CL Management\" -t = -x M -y W \
-                        \"Copy CL Number\" c { run-shell \"hg-cl --copy\" } \
-                        \"Switch CL\" s { display-popup -T \"Switch CL\" -w 80% -h 60% -E \"hg change\" } \
-                        \"Amend\" a { display-popup -T \"Amend CL\" -w 95% -h 80% -E \"hg amend -i\" } \
-                        \"Commit\" C { display-popup -T \"Commit CL\" -w 95% -h 80% -E \"hg commit -i\" }' \
-                    'select-window -t =''\""
+                { display-menu -T "#[align=centre]Repository Sync" -t = -x M -y W \
+                    "Sync Current" s { display-popup -T "Syncing Current Workspace" -w 80% -h 60% -E "hg sync && read" } \
+                    "Sync All" a { display-popup -T "Syncing All Workspaces" -w 80% -h 60% -E "for d in /google/src/cloud/$USER/*; do if [ -d \"$d/google3\" ]; then echo \"Syncing $d...\"; (cd \"$d\" && hg sync); fi; done; echo \"Finished syncing all workspaces.\"; read" } \
+                } \
+                { if-shell -F '#{==:#{mouse_status_range},clinfo}' \
+                    { display-menu -T "#[align=centre]CL Management" -t = -x M -y W \
+                        "Copy CL Number" c { run-shell "hg-cl --copy" } \
+                        "Switch CL" s { display-popup -T "Switch CL" -w 80% -h 60% -E "hg change" } \
+                        "Amend" a { display-popup -T "Amend CL" -w 95% -h 80% -E "hg amend -i" } \
+                        "Commit" C { display-popup -T "Commit CL" -w 95% -h 80% -E "hg commit -i" } \
+                    } \
+                    { select-window -t = } \
+                }
 
         # Enhanced right-click menu for session list on the left
         bind-key -T root MouseDown3StatusLeft display-menu -T "#[align=centre]#{session_name}" -t = -x M -y W Next n { switch-client -n } Previous p { switch-client -p } "" Renumber N { move-window -r } Rename n { command-prompt -I "#S" { rename-session "%%" } } "" "New Session" s { new-session } "New Window" w { new-window } "" "Kill Session" X { kill-session }
