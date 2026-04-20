@@ -71,6 +71,13 @@ in
             # Only rewrite if we used a zoxide jump (not if the user typed the exact absolute path)
             if [[ "$original_arg" != "$dest" ]]; then
               if [[ -d "$target_path" ]]; then
+                # Automatically rewrite to current workspace and notify user
+                local src_ws="''${dest#/google/src/cloud/$USER/}"
+                src_ws="''${src_ws%%/*}"
+                local current_ws="''${PWD#/google/src/cloud/$USER/}"
+                current_ws="''${current_ws%%/*}"
+                
+                echo "Switching workspace from '$src_ws' -> '$current_ws' (Safe CD)" >&2
                 dest="$target_path"
               else
                 local dest_ws="''${dest#/google/src/cloud/$USER/}"
@@ -78,6 +85,9 @@ in
                 echo -n "Directory not found in current workspace. Open in '$dest_ws' workspace? [y/N] "
                 if read -q; then
                   echo
+                  local current_ws="''${PWD#/google/src/cloud/$USER/}"
+                  current_ws="''${current_ws%%/*}"
+                  echo "Switching workspace from '$current_ws' -> '$dest_ws'" >&2
                   builtin cd "$dest"
                   return 0
                 else
