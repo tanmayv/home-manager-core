@@ -10,6 +10,11 @@ To facilitate multi-agent workflows, common AI CLI tools (`jetski-cli`, `gemini-
 - **Workspace Awareness**: The name automatically prefixes the current CitC/Fig workspace name. If not in a workspace, `local` is used.
 - **Incremental Numbering**: Each new agent instance in the same tmux session is assigned the next available number.
 - **Visual Feedback**: The assigned name is displayed in the tmux **pane title** (border) for easy identification across windows and sessions.
+- **Custom Naming**: If the user gives you a specific role (e.g., "You are the Notes Agent"), you MUST update your identity in the tmux environment using the following command:
+  ```bash
+  tmux set-option -p @agent_name "Notes-Agent"
+  ```
+  This ensures your new role is visible to the user in the pane title.
 
 ## Inter-Agent Communication
 
