@@ -13,6 +13,8 @@ All user-specific customization is centralized in `setup.nix`. After making chan
 
 ## Configuration Options
 
+> **Important Rule for Contributors/Agents:** If you add a new configuration flag or setting to `setup.nix`, you **must** document it in this file. Provide a clear description, its default value, and its behavior when toggled.
+
 ### Core Settings
 
 | Option | Description | Default |
