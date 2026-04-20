@@ -8,6 +8,7 @@
   enable-neovim = true;
   enable-tmux-on-ssh = true;
   auto-switch-workspace-on-hgd = true;
+  enable-cd-verbose = true;
   import-extras = true;
   ai_features = {
     enable_ai_ssa_creator_skill = true;

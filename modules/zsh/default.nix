@@ -3,6 +3,7 @@ let
   palette = import ../palette.nix;
   enableTmuxOnSsh = userSettings.enable-tmux-on-ssh or true;
   autoSwitchHg = userSettings.auto-switch-workspace-on-hgd or true;
+  enableCdVerbose = userSettings.enable-cd-verbose or true;
   myAliases = {
     jetski-cli = "agent-wrapper /google/bin/releases/jetski-devs/tools/cli";
     gemini-cli = "agent-wrapper /google/bin/releases/gemini-cli/tools/gemini";
@@ -77,8 +78,10 @@ in
                 local current_ws="''${PWD#/google/src/cloud/$USER/}"
                 current_ws="''${current_ws%%/*}"
                 
+                ${if enableCdVerbose then ''
                 echo "Switching workspace from '$src_ws' -> '$current_ws'." >&2
                 echo "Use 'builtin cd $dest' to jump to original workspace." >&2
+                '' else ""}
                 dest="$target_path"
               else
                 local dest_ws="''${dest#/google/src/cloud/$USER/}"
@@ -88,7 +91,9 @@ in
                   echo
                   local current_ws="''${PWD#/google/src/cloud/$USER/}"
                   current_ws="''${current_ws%%/*}"
+                  ${if enableCdVerbose then ''
                   echo "Switching workspace from '$current_ws' -> '$dest_ws'" >&2
+                  '' else ""}
                   builtin cd "$dest"
                   return 0
                 else
