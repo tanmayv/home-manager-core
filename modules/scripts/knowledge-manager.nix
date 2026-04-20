@@ -27,10 +27,9 @@
             CREATE_CMD="${userSettings.local_agent_knowledge_create_command or ""}"
             
             if [[ -n "$CREATE_CMD" ]]; then
-                # If a custom create command is provided, just run it in the popup.
-                tmux display-popup -w 95% -h 90% -d "$KNOWLEDGE_DIR" -E "bash -c \"cd '$KNOWLEDGE_DIR' && $CREATE_CMD\""
+                # Run custom command directly in the current popup
+                eval "$CREATE_CMD"
             else
-                # Otherwise, fall back to the default name-then-editor flow.
                 read -r -p "Note name: " NAME
                 if [[ -z "$NAME" ]]; then
                     exit 0
@@ -41,7 +40,8 @@
                     FILE="$FILE.md"
                 fi
 
-                tmux display-popup -w 95% -h 90% -d "$KNOWLEDGE_DIR" -E "bash -c \"cd '$KNOWLEDGE_DIR' && ${userSettings.editor} '$FILE'\""
+                # Run editor directly in the current popup
+                ${userSettings.editor} "$FILE"
             fi
         elif [[ "$MODE" == "list" || "$MODE" == "open" ]]; then
             FILE=$(find . -type f -name "*.md" 2>/dev/null | fzf --preview "bat --color=always --style=numbers {}" --header "Select a note to open")
