@@ -47,6 +47,87 @@ let
 
     print(output)
   '';
+
+  tmux-agent-list-formatter = pkgs.writeScriptBin "tmux-agent-list-formatter" ''
+    #!${pkgs.python3}/bin/python3
+    import sys
+    import subprocess
+
+    width = int(sys.argv[1]) if len(sys.argv) > 1 else 100
+    available = width - 20
+
+    # Get all panes with @agent_name
+    try:
+        output = subprocess.check_output([
+            "tmux", "list-panes", "-a", "-F", 
+            "#{session_name}|#{window_index}|#{pane_index}|#{@agent_name}"
+        ]).decode("utf-8")
+    except:
+        sys.exit(0)
+
+    agents = []
+    for line in output.splitlines():
+        parts = line.split("|")
+        if len(parts) == 4 and parts[3].strip():
+            agents.append({
+                "session": parts[0],
+                "window": parts[1],
+                "pane": parts[2],
+                "name": parts[3].strip()
+            })
+
+    if not agents:
+        sys.exit(0)
+
+    formatted = []
+    for a in agents:
+        # Range format: agent:SESSION:WINDOW:PANE
+        target = f"{a['session']}:{a['window']}.{a['pane']}"
+        range_arg = f"agent:{a['session']}:{a['window']}:{a['pane']}"
+        formatted.append(f"#[range=user|{range_arg}]{a['name']}#[norange]")
+
+    res = ' · '.join(formatted)
+    print(res)
+  '';
+
+  tmux-status-refresh = pkgs.writeScriptBin "tmux-status-refresh" ''
+    #!${pkgs.bash}/bin/bash
+    # Dynamically set status lines (1, 2, or 3) and set global flags
+    num_sessions=$(tmux list-sessions | wc -l)
+    num_agents=$(tmux list-panes -a -F "#{@agent_name}" | grep -v "^$" | wc -l)
+    
+    if [ "$num_sessions" -gt 1 ]; then
+        tmux set-option -g @is_multi_session 1
+    else
+        tmux set-option -g @is_multi_session 0
+    fi
+
+    if [ "$num_agents" -gt 0 ]; then
+        tmux set-option -g @has_agents 1
+    else
+        tmux set-option -g @has_agents 0
+    fi
+
+    lines=1
+    if [ "$num_sessions" -gt 1 ]; then
+        lines=$((lines + 1))
+    fi
+    if [ "$num_agents" -gt 0 ]; then
+        lines=$((lines + 1))
+    fi
+    
+    current_status=$(tmux show-options -g status | cut -d' ' -f2)
+    
+    if [ "$lines" -eq 1 ]; then
+        target="on"
+    else
+        target="$lines"
+    fi
+    
+    if [ "$current_status" != "$target" ]; then
+        tmux set -g status "$target"
+    fi
+  '';
 in
 {
   options.programs.tmux = {
@@ -66,6 +147,8 @@ in
     home.packages = [
       tmux-sessionizer
       tmux-session-list-formatter
+      tmux-agent-list-formatter
+      tmux-status-refresh
       hg-age
       hg-cl
     ];
@@ -135,17 +218,22 @@ in
 
         # Set default status bar to 1 line
         set -g status on
+        set -g status-interval 5
         set -g detach-on-destroy off
 
-        # Dynamic second status line based on session count
-        set-hook -g session-created 'run-shell "if [ $(tmux list-sessions | wc -l) -gt 1 ]; then tmux set -g status 2; else tmux set -g status on; fi"'
-        set-hook -g session-closed 'run-shell "if [ $(tmux list-sessions | wc -l) -gt 1 ]; then tmux set -g status 2; else tmux set -g status on; fi"'
+        # Dynamic status line management based on session and agent count
+        set-hook -g session-created 'run-shell "tmux-status-refresh"'
+        set-hook -g session-closed 'run-shell "tmux-status-refresh"'
+        set-hook -g pane-exited 'run-shell "tmux-status-refresh"'
 
         # Run the check immediately on config load
-        run-shell "if [ $(tmux list-sessions | wc -l) -gt 1 ]; then tmux set -g status 2; else tmux set -g status on; fi"
+        run-shell "tmux-status-refresh"
 
-        # Content of the second status line
-        set -g status-format[1] "#[align=left,fg=${palette.color4},bold] Active Sessions: #[fg=${palette.foreground},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\")#[align=right,fg=${palette.color5}]#(hg-cl) #[fg=default,nobold]#(hg-age) "
+        # Content of the second status line (Sessions if > 1, else Agents if any)
+        set -g status-format[1] "#[align=left,fg=${palette.color4},bold]#{?#{==:#{@is_multi_session},1}, Active Sessions: #[fg=${palette.foreground},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\"), Active Agents: #[fg=${palette.foreground},nobold]#(tmux-agent-list-formatter \"#{client_width}\")}#[align=right,fg=${palette.color5}]#(hg-cl) #[fg=default,nobold]#(hg-age) "
+        
+        # Content of the third status line (Agents if sessions > 1 and agents exist)
+        set -g status-format[2] "#[align=left,fg=${palette.color4},bold] Active Agents: #[fg=${palette.foreground},nobold]#(tmux-agent-list-formatter \"#{client_width}\")"
 
         # Global mouse binding to handle status bar clicks
         bind-key -n MouseDown1Status if-shell -F '#{==:#{mouse_status_range},palette}' \
@@ -154,7 +242,22 @@ in
                 { run-shell "hg-cl --copy" } \
                 { if-shell -F '#{==:#{mouse_status_range},session}' \
                     { switch-client -t = } \
-                    { select-window -t = } \
+                    { if-shell -F '#{m:agent:*,#{mouse_status_range}}' \
+                        { 
+                            # Extract SESSION:WINDOW:PANE from agent:SESSION:WINDOW:PANE
+                            target="#{s/agent://:mouse_status_range}"
+                            # target is now SESSION:WINDOW:PANE, but wait, 
+                            # tmux switch-client -t expects target-pane.
+                            # The s/// might be tricky with multiple colons.
+                            # Let's use a run-shell helper if it's too complex for native format.
+                            run-shell "tmux_target=$(echo '#{mouse_status_range}' | cut -d: -f2-4 | tr ':' '.'); \
+                                       session_name=$(echo \$tmux_target | cut -d. -f1); \
+                                       tmux switch-client -t \$session_name; \
+                                       tmux select-window -t \$tmux_target; \
+                                       tmux select-pane -t \$tmux_target"
+                        } \
+                        { select-window -t = } \
+                    } \
                 } \
             }
 

@@ -26,7 +26,6 @@
           fi
           
           # Find all agent names in current session to find next available number
-          # We check all panes in the current session
           existing_agents=$(tmux list-panes -a -F "#S #{@agent_name}" | grep "^''${current_session} " | cut -d' ' -f2- | grep -v "^$" || true)
           
           next_num=1
@@ -37,6 +36,9 @@
           agent_name="''${ws}-agent-''${next_num}"
           tmux set-option -p @agent_name "$agent_name"
           tmux select-pane -T "$agent_name"
+          
+          # Refresh status bar to show the new agent
+          tmux-status-refresh
         fi
         
         # Run the tool
@@ -46,6 +48,8 @@
           # Reset after the command finishes
           tmux set-option -p -u @agent_name
           tmux select-pane -T ""
+          # Refresh status bar to remove the agent
+          tmux-status-refresh
         fi
       '';
     })
