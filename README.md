@@ -8,6 +8,7 @@ This is a modern, AI-focused Home Manager configuration tailored for Googlers se
     *   **Inter-Agent Protocol**: Integrated tools (`send-message-to-agent`, `waiting`, `iamdone`) allow AI agents in different tmux panes to coordinate, share data via `/tmp`, and signal completion.
     *   **Agent Identity**: Clear visual identification in tmux pane borders showing `[Pane ID] | [Agent Name] | [Current Title]`.
     *   **Context-Aware Queries**: Automated tools to capture active pane context and pass it to AI agents for smarter assistance.
+    *   **Agent Knowledge Management**: Dedicated directory for persistent markdown notes, accessible via the Command Palette for quick reading and writing.
 *   **Intelligent Workspace Navigation (Fig/CitC Aware)**:
     *   Lightning-fast `cd` wrapper using Zoxide that automatically syncs with your Fig workspaces.
     *   `hgd` wrapper that automatically switches your Tmux session when you change directories.
