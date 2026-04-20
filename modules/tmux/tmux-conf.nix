@@ -245,7 +245,7 @@ in
                 } \
             }
 
-        # Right-click menu for hg-age (ageinfo range) or hg-cl (clinfo range)
+        # Right-click menu for hg-age (ageinfo range) or hg-cl (clinfo range) or session
         bind-key -n MouseDown3Status \
             if-shell -F '#{==:#{mouse_status_range},ageinfo}' \
                 { display-menu -T "#[align=centre]Repository Sync" -t = -x M -y W \
@@ -259,7 +259,10 @@ in
                         "Amend" a { display-popup -T "Amend CL" -w 95% -h 80% -E "hg amend -i" } \
                         "Commit" C { display-popup -T "Commit CL" -w 95% -h 80% -E "hg commit -i" } \
                     } \
-                    { select-window -t = } \
+                    { if-shell -F '#{==:#{mouse_status_range},session}' \
+                        { display-menu -T "#[align=centre]#{session_name}" -t = -x M -y W Next n { switch-client -n } Previous p { switch-client -p } "" Renumber N { move-window -r } Rename n { command-prompt -I "#S" { rename-session "%%" } } "" "New Session" s { new-session } "New Window" w { new-window } "" "Kill Session" X { kill-session } } \
+                        { select-window -t = } \
+                    } \
                 }
 
         # Enhanced right-click menu for session list on the left
