@@ -16,6 +16,7 @@ in
     "${lib.removePrefix "~/" userSettings.local_agent_knowledge_dir}/.keep".text = "";
 
     ".gemini/mcp_config.json".source = ./dotfiles/mcp_config.json;
+    ".gemini/jetski/mcp_config.json".source = ./dotfiles/mcp_config.json;
 
     # Link directories
     ".gemini/skills/test-skill".source = ./dotfiles/skills/test-skill;
