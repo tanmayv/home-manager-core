@@ -2,7 +2,6 @@
 let
   palette = import ../palette.nix;
   enableTmuxOnSsh = userSettings.enable-tmux-on-ssh or true;
-  autoSwitchCd = userSettings.auto-switch-workspace-on-cd or true;
   autoSwitchHg = userSettings.auto-switch-workspace-on-hgd or true;
   myAliases = {
     jetski-cli = "agent-wrapper /google/bin/releases/jetski-devs/tools/cli";
@@ -80,20 +79,6 @@ in
                 if read -q; then
                   echo
                   builtin cd "$dest"
-                  
-                  ${if autoSwitchCd then ''
-                  # If we navigated into a workspace and we are in tmux, sync the session
-                  if [[ -n "$TMUX" && "$PWD" == /google/src/cloud/$USER/* ]]; then
-                    local ws_part="''${PWD#/google/src/cloud/$USER/}"
-                    local ws_name="''${ws_part%%/*}"
-                    local ws_root="/google/src/cloud/$USER/$ws_name"
-                    
-                    local current_session=$(tmux display-message -p '#S' 2>/dev/null)
-                    if [[ "$current_session" != "$ws_name" && -d "$ws_root" ]]; then
-                      tmux-sessionizer "$ws_root"
-                    fi
-                  fi
-                  '' else ""}
                   return 0
                 else
                   echo
