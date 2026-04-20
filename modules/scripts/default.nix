@@ -10,5 +10,6 @@
     ./tmux-cs-fzf.nix
     ./knowledge-manager.nix
     ./agent-wrapper.nix
+    ./check-for-update.nix
   ];
 }

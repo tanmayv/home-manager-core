@@ -1,0 +1,56 @@
+{ pkgs, ... }:
+
+{
+  home.packages = [
+    (pkgs.writeShellApplication {
+      name = "check-for-update";
+      runtimeInputs = with pkgs; [ git coreutils ];
+      text = ''
+        CONFIG_DIR="$HOME/.config/minimal-cloudtop"
+        CACHE_FILE="$HOME/.cache/minimal-cloudtop-update-check"
+
+        if [ ! -d "$CONFIG_DIR/.git" ]; then exit 0; fi
+
+        cd "$CONFIG_DIR" || exit 0
+
+        current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+        if [[ "$current_branch" == "main" || "$current_branch" == "master" ]]; then
+          exit 0
+        fi
+
+        # Check once a day
+        if [ -f "$CACHE_FILE" ]; then
+          # Fallback to 0 if stat fails
+          last_check=$(stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0)
+          now=$(date +%s)
+          if [ $((now - last_check)) -lt 86400 ]; then
+            exit 0
+          fi
+        fi
+        
+        mkdir -p "$(dirname "$CACHE_FILE")"
+        touch "$CACHE_FILE"
+
+        # Fetch stable tag from origin
+        git fetch origin tag stable --no-tags >/dev/null 2>&1 || exit 0
+
+        # Check if stable is ahead of HEAD
+        if git merge-base --is-ancestor HEAD stable 2>/dev/null; then
+          # HEAD is an ancestor of stable. Are they different?
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse stable)" ]; then
+            echo ""
+            echo "========================================================="
+            echo "🎉 A new stable version of Minimal Cloudtop is available!"
+            echo "========================================================="
+            read -r -p "Would you like to update now? [y/N] " response
+            if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+              echo "Updating..."
+              git checkout stable
+              build-and-switch
+            fi
+          fi
+        fi
+      '';
+    })
+  ];
+}
