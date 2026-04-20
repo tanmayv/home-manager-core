@@ -154,8 +154,8 @@ in
             "display-popup -w 90% -h 70% -E 'tmux-palette'" \
             "if-shell -F '#{==:#{mouse_status_range},session}' \
                 'switch-client -t =' \
-                \"if-shell -F '#{==:#{m/3:cl:,#{mouse_status_range}},cl:}' \
-                    'run-shell \"cl-copy #{s/cl://:mouse_status_range}\"' \
+                \"if-shell -F '#{m:cl_copy:*,#{mouse_status_range}}' \
+                    'run-shell \"cl-copy #{s/cl_copy://:mouse_status_range}\"' \
                     'select-window -t ='\"\""
 
         # Enhanced right-click menu for session list on the left

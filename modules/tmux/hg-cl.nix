@@ -32,8 +32,8 @@ pkgs.writeShellApplication {
       fi
       
       cl_display="CL:$cl"
-      # Wrap CL in a range for clicking. format: cl:NUMBER
-      cl_part="#[range=user|cl:$cl]$cl_display#[norange]"
+      # Wrap CL in a range for clicking. format: cl_copy:NUMBER
+      cl_part="#[range=user|cl_copy:$cl]$cl_display#[norange]"
 
       if [ -n "$desc" ]; then
         echo "$cl_part [$desc]"
