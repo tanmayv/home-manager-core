@@ -168,7 +168,7 @@ in
                 { if-shell -F '#{==:#{mouse_status_range},clinfo}' \
                     { display-menu -T "#[align=centre]CL Management" -t = -x M -y W \
                         "Copy CL Number" c { run-shell "hg-cl --copy" } \
-                        "Switch CL" s { display-popup -T "Switch CL" -w 80% -h 60% -E "hg change" } \
+                        "Switch CL" s { display-popup -T "Switch CL" -w 80% -h 60% -E "hg pickcheckout" } \
                         "Amend" a { display-popup -T "Amend CL" -w 95% -h 80% -E "hg amend -i" } \
                         "Commit" C { display-popup -T "Commit CL" -w 95% -h 80% -E "hg commit -i" } \
                     } \
