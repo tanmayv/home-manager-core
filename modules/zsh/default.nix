@@ -71,7 +71,35 @@ in
             
             # Only rewrite if we used a zoxide jump (not if the user typed the exact absolute path)
             if [[ "$original_arg" != "$dest" ]]; then
-              dest="$target_path"
+              if [[ -d "$target_path" ]]; then
+                dest="$target_path"
+              else
+                local dest_ws="''${dest#/google/src/cloud/$USER/}"
+                dest_ws="''${dest_ws%%/*}"
+                echo -n "Directory not found in current workspace. Open in '$dest_ws' workspace? [y/N] "
+                if read -q; then
+                  echo
+                  builtin cd "$dest"
+                  
+                  ${if autoSwitchCd then ''
+                  # If we navigated into a workspace and we are in tmux, sync the session
+                  if [[ -n "$TMUX" && "$PWD" == /google/src/cloud/$USER/* ]]; then
+                    local ws_part="''${PWD#/google/src/cloud/$USER/}"
+                    local ws_name="''${ws_part%%/*}"
+                    local ws_root="/google/src/cloud/$USER/$ws_name"
+                    
+                    local current_session=$(tmux display-message -p '#S' 2>/dev/null)
+                    if [[ "$current_session" != "$ws_name" && -d "$ws_root" ]]; then
+                      tmux-sessionizer "$ws_root"
+                    fi
+                  fi
+                  '' else ""}
+                  return 0
+                else
+                  echo
+                  return 1
+                fi
+              fi
             fi
           fi
         fi
