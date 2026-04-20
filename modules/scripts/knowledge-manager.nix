@@ -28,13 +28,22 @@
             if [[ -z "$NAME" ]]; then
                 exit 0
             fi
+            
+            read -r -p "Command (Enter for ${userSettings.editor}): " CMD
+
             FILE="$NAME"
             if [[ "$FILE" != *.md ]]; then
                 FILE="$FILE.md"
             fi
-            # Open editor in a popup for quick creation. 
-            # We use bash -c to ensure cd happens before editor starts in the popup environment.
-            tmux display-popup -w 95% -h 90% -d "$KNOWLEDGE_DIR" -E "bash -c \"cd '$KNOWLEDGE_DIR' && ${userSettings.editor} '$FILE'\""
+
+            if [[ -z "$CMD" ]]; then
+                FINAL_CMD="${userSettings.editor} '$FILE'"
+            else
+                FINAL_CMD="$CMD"
+            fi
+
+            # Open in a popup. We use bash -c to ensure cd happens before command starts.
+            tmux display-popup -w 95% -h 90% -d "$KNOWLEDGE_DIR" -E "bash -c \"cd '$KNOWLEDGE_DIR' && $FINAL_CMD\""
         elif [[ "$MODE" == "list" || "$MODE" == "open" ]]; then
             FILE=$(find . -type f -name "*.md" 2>/dev/null | fzf --preview "bat --color=always --style=numbers {}" --header "Select a note to open")
             if [[ -n "$FILE" ]]; then
