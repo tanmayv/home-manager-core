@@ -109,7 +109,7 @@ in
         # tmux-dotbar Tokyo Night theme configuration
         set -g status-justify "absolute-centre"
         set -g status-left-length 60
-        set -g status-left "#[bg=${palette.color2},fg=${palette.background},bold]#{?client_prefix, PREFIX ,}#[bg=default,fg=${palette.color4},bold] #S #[default]"
+        set -g status-left "#{?client_prefix,#[bg=${palette.color2} fg=${palette.background} bold],#[fg=${palette.color4} bold]} #S #[default]"
         set -g status-right-length 120
         set -g status-right "#[fg=${palette.color5}]#{?#{==:#{status},2},,#(hg-cl) }#[fg=default,nobold]#{?#{==:#{status},2},,#(hg-age) }#[range=user|palette]#[fg=${palette.color6}] [CMDS] #[norange]"
         set -g window-status-format " #W "
