@@ -14,6 +14,11 @@ custom_agent:
         - To add new skills, create a directory in `~/.gemini/skills/{skill_name}/` with a `SKILL.md` file containing YAML frontmatter (name and description).
         - To add new agents, create a directory in `~/.gemini/agents/{agent_name}/` with an `agent.json` file.
 
+        ## Agent Knowledge
+        - The directory for agent knowledge (markdown notes) is specified in `setup.nix` as `local_agent_knowledge_dir`.
+        - Agents should use this directory to store and retrieve persistent knowledge across sessions.
+        - When creating a new note, use a descriptive filename with a `.md` extension.
+
         ## User Agnostic Modules
         - All Nix modules should be user-agnostic.
         - Use `setup.nix` for user-specific options (like username, paths, etc.) and read them via arguments in the module!

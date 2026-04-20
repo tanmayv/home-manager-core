@@ -1,6 +1,7 @@
 {
   username = "tanmayvijay";
   config-location = "~/.config/minimal-cloudtop";
+  local_agent_knowledge_dir = "~/.gemini/knowledge";
   editor = "nvim";
   enable-ai-workflow = true;
   enable-neovim = true;

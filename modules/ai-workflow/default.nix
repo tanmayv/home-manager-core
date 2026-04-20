@@ -13,6 +13,7 @@ in
     
     ".gemini/agents/.keep".text = "";
     ".gemini/skills/.keep".text = "";
+    "${lib.removePrefix "~/" userSettings.local_agent_knowledge_dir}/.keep".text = "";
 
     ".gemini/mcp_config.json".source = ./dotfiles/mcp_config.json;
 
