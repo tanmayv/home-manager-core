@@ -5,6 +5,7 @@ pkgs.writeShellApplication {
   runtimeInputs = with pkgs; [
     coreutils
     bash
+    mercurial
   ];
 
   text = ''
@@ -12,7 +13,7 @@ pkgs.writeShellApplication {
     if hg root > /dev/null 2>&1; then  # Check if inside an hg repository
       # Get the commit timestamp (seconds since epoch)
       # p4head is a specific revision in Google's mercurial setup (fig)
-      commit_timestamp=$(hg log -r p4head -T '{date}' 2>/dev/null | cut -d. -f1)
+      commit_timestamp=$(hg log -r p4head -T '{date}' 2>/dev/null | cut -d. -f1 || true)
 
       if [ -n "$commit_timestamp" ]; then
         current_timestamp=$(date +%s)
