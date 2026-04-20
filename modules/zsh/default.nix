@@ -75,21 +75,6 @@ in
         fi
 
         builtin cd "$dest"
-
-        ${if autoSwitchCd then ''
-        # If we navigated into a workspace and we are in tmux, sync the session
-        if [[ -n "$TMUX" && "$PWD" == /google/src/cloud/$USER/* ]]; then
-          local ws_part="''${PWD#/google/src/cloud/$USER/}"
-          local ws_name="''${ws_part%%/*}"
-          local ws_root="/google/src/cloud/$USER/$ws_name"
-          
-          # Only trigger sessionizer if the tmux session name doesn't already match the workspace name
-          local current_session=$(tmux display-message -p '#S' 2>/dev/null)
-          if [[ "$current_session" != "$ws_name" && -d "$ws_root" ]]; then
-            tmux-sessionizer "$ws_root"
-          fi
-        fi
-        '' else ""}
       }
 
       function hgd() {

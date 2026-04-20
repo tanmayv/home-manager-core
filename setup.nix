@@ -7,7 +7,6 @@
   enable-ai-workflow = true;
   enable-neovim = true;
   enable-tmux-on-ssh = true;
-  auto-switch-workspace-on-cd = true;
   auto-switch-workspace-on-hgd = true;
   import-extras = true;
   ai_features = {
