@@ -77,7 +77,8 @@ in
                 local current_ws="''${PWD#/google/src/cloud/$USER/}"
                 current_ws="''${current_ws%%/*}"
                 
-                echo "Switching workspace from '$src_ws' -> '$current_ws' (Safe CD)" >&2
+                echo "Switching workspace from '$src_ws' -> '$current_ws'." >&2
+                echo "Use 'builtin cd $dest' to jump to original workspace." >&2
                 dest="$target_path"
               else
                 local dest_ws="''${dest#/google/src/cloud/$USER/}"
