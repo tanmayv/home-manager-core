@@ -96,10 +96,10 @@ in
         local target_dir
         # Run hg hgd, capturing stdout and allowing stderr to print to terminal
         target_dir=$(hg hgd "$@")
-        local status=$?
+        local local_status=$?
         
-        if [[ $status -ne 0 || -z "$target_dir" ]]; then
-          return $status
+        if [[ $local_status -ne 0 || -z "$target_dir" ]]; then
+          return $local_status
         fi
         
         # Change to the target directory
