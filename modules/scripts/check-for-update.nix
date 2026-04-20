@@ -45,8 +45,13 @@
             read -r -p "Would you like to update now? [y/N] " response
             if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
               echo "Updating..."
-              git checkout stable
-              build-and-switch
+              # Rebase current branch onto the new stable tag
+              if git rebase origin/stable; then
+                build-and-switch
+              else
+                echo "Rebase conflict detected! Please resolve conflicts manually and then run 'build-and-switch'."
+                git rebase --abort || true
+              fi
             fi
           fi
         fi

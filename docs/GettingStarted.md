@@ -25,6 +25,13 @@ git clone -b stable --single-branch sso://user/tanmayvijay/home-manager-minimal-
 cd ~/.config/minimal-cloudtop
 ```
 
+### Create Your Personal Branch (Important!)
+Before editing configuration files, create a personal branch. This allows the automatic updater to seamlessly rebase your customizations over new stable releases without conflicts.
+
+```bash
+git checkout -b my-config
+```
+
 ### Personalize your Configuration
 Open `setup.nix` and update the `username` to match your LDAP:
 
@@ -34,6 +41,11 @@ Open `setup.nix` and update the `username` to match your LDAP:
   username = "your-ldap-here";
   # ... other settings
 }
+```
+
+Commit your changes:
+```bash
+git commit -am "chore: personalize setup.nix"
 ```
 
 *For a full list of configuration options and feature toggles, please see the [Customization Guide](Customization.md).*

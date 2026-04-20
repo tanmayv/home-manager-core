@@ -1,8 +1,50 @@
 # Customizing Your Configuration
 
-All user-specific customization is centralized in `setup.nix`. After making changes to this file, you must apply them using the `build-and-switch` command.
+All user-specific customization is centralized in `setup.nix`. Because this configuration is version-controlled by Git, modifying tracked files locally requires a strategy to avoid merge conflicts when pulling new updates.
 
-## Applying Changes
+## Managing Customizations (Two Strategies)
+
+### Strategy 1: The "Personal Branch & Rebase" Workflow (Recommended)
+This is the simplest method and is integrated directly into the `GettingStarted.md` guide.
+
+1. **Setup**: After cloning the repository, immediately create your own branch (e.g., `git checkout -b my-config`).
+2. **Customize**: Edit `setup.nix` and commit your changes to your `my-config` branch.
+3. **Updating**: When the automatic updater detects a new `stable` release, it will prompt you. If you accept, it will automatically fetch the latest `stable` version and **rebase** your `my-config` commits on top of it. This seamlessly applies your custom settings over the new update.
+
+### Strategy 2: The "Flake Input" Architecture (Advanced)
+This is the most robust, update-proof method, but requires understanding Nix Flakes. Instead of editing this repository directly, you create a new, separate repository for your configuration and import this one as a library.
+
+In your personal `flake.nix`, import minimal-cloudtop as an input:
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    home-manager.url = "github:nix-community/home-manager";
+    # Import minimal-cloudtop as a module
+    minimal-cloudtop.url = "git+sso://user/tanmayvijay/home-manager-minimal-ai?ref=stable";
+  };
+
+  outputs = { self, nixpkgs, home-manager, minimal-cloudtop, ... }: {
+    homeConfigurations."your-ldap" = home-manager.lib.homeManagerConfiguration {
+      modules = [
+        # Load all base configurations
+        minimal-cloudtop.homeModules.default 
+        
+        # Your personal overrides
+        ({ config, pkgs, ... }: {
+           setup.username = "your-ldap";
+           # Add your own packages or override settings here
+        })
+      ];
+    };
+  };
+}
+```
+To update, simply run `nix flake update` in your personal repository.
+
+---
+
+## Applying Changes Locally
 
 1.  Open `setup.nix` in your editor.
 2.  Modify the desired values or flags.
