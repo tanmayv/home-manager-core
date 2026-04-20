@@ -36,6 +36,8 @@ Open `setup.nix` and update the `username` to match your LDAP:
 }
 ```
 
+*For a full list of configuration options and feature toggles, please see the [Customization Guide](Customization.md).*
+
 ## 3. Initial Build
 
 Apply the configuration for the first time:

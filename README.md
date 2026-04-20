@@ -44,6 +44,10 @@ We support a **User-Visible Knowledge Base** (markdown notes in `~/agent_knowled
 
 Please refer to [docs/GettingStarted.md](docs/GettingStarted.md) for detailed installation instructions.
 
+## Customization
+
+To learn how to personalize your configuration and toggle features in `setup.nix`, please read the [Customization Guide](docs/Customization.md).
+
 ## Key Features (Technical List)
 
 *   **Intelligent Navigation**: Fig/CitC aware `cd` and `hgd` wrappers.
