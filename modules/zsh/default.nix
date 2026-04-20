@@ -60,16 +60,20 @@ in
         local dest="$1"
         local original_arg="$2"
 
-        # Fast string matching to check if we are in a google3 workspace and the destination is too
-        if [[ "$PWD" == /google/src/cloud/$USER/*/google3* && "$dest" == /google/src/cloud/$USER/*/google3/* ]]; then
+        # Check if we are currently in a CitC workspace
+        if [[ "$PWD" == /google/src/cloud/$USER/*/google3* ]]; then
           local current_ws_root="''${PWD%%/google3*}/google3"
-          local dest_relative="''${dest#*/google3/}"
-          local target_path="$current_ws_root/$dest_relative"
-
-          if [[ -d "$target_path" && "$dest" != "$target_path" ]]; then
-            # Only rewrite if we used a zoxide jump (not if the user typed the exact absolute path)
-            if [[ "$original_arg" != "$dest" ]]; then
-              dest="$target_path"
+          
+          # If the destination contains 'google3/', rewrite it to use our current workspace root
+          if [[ "$dest" == */google3/* ]]; then
+            local dest_relative="''${dest#*/google3/}"
+            local target_path="$current_ws_root/$dest_relative"
+            
+            if [[ -d "$target_path" && "$dest" != "$target_path" ]]; then
+              # Only rewrite if we used a zoxide jump (not if the user typed the exact absolute path)
+              if [[ "$original_arg" != "$dest" ]]; then
+                dest="$target_path"
+              fi
             fi
           fi
         fi
