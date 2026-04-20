@@ -32,13 +32,14 @@
             if [[ "$FILE" != *.md ]]; then
                 FILE="$FILE.md"
             fi
-            # Open editor in a popup for quick creation
-            tmux display-popup -w 95% -h 90% -d "$KNOWLEDGE_DIR" -E "${userSettings.editor} \"$FILE\""
+            # Open editor in a popup for quick creation. 
+            # We use bash -c to ensure cd happens before editor starts in the popup environment.
+            tmux display-popup -w 95% -h 90% -d "$KNOWLEDGE_DIR" -E "bash -c \"cd '$KNOWLEDGE_DIR' && ${userSettings.editor} '$FILE'\""
         elif [[ "$MODE" == "list" || "$MODE" == "open" ]]; then
             FILE=$(find . -type f -name "*.md" 2>/dev/null | fzf --preview "bat --color=always --style=numbers {}" --header "Select a note to open")
             if [[ -n "$FILE" ]]; then
                 # Open existing notes in a new window for better reading/editing
-                tmux new-window -c "$KNOWLEDGE_DIR" -n "knowledge" "${userSettings.editor} \"$FILE\""
+                tmux new-window -c "$KNOWLEDGE_DIR" -n "knowledge" "bash -c \"cd '$KNOWLEDGE_DIR' && ${userSettings.editor} '$FILE'\""
             fi
         fi
       '';
