@@ -4,7 +4,7 @@
   home.packages = [
     (pkgs.writeShellApplication {
       name = "check-for-update";
-      runtimeInputs = with pkgs; [ git coreutils ];
+      runtimeInputs = with pkgs; [ coreutils ];
       text = ''
         CONFIG_DIR="$HOME/.config/minimal-cloudtop"
         CACHE_FILE="$HOME/.cache/minimal-cloudtop-update-check"
