@@ -109,7 +109,7 @@ in
         # tmux-dotbar Tokyo Night theme configuration
         set -g status-justify "absolute-centre"
         set -g status-left-length 150
-        set -g status-left "#[bg=${palette.color2},fg=${palette.background},bold]#{?client_prefix, PREFIX ,}#[bg=default,fg=${palette.color4},bold] #(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter \"#{status-left-length}\" \"#S\") #[fg=${palette.color8},nobold]#{?#{==:#{status},2},,#(hg-age)}#[default]"
+        set -g status-left "#[bg=${palette.color2},fg=${palette.background},bold]#{?client_prefix, PREFIX ,}#[bg=default,fg=${palette.color4},bold] Active Sessions: #(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter \"#{status-left-length}\" \"#S\") #[fg=${palette.color8},nobold]#{?#{==:#{status},2},,#(hg-age)}#[default]"
         set -g status-right-length 100
         set -g status-right "#[fg=${palette.color5}]#{?#{==:#{status},2},,#(hg-cl) }#[range=user|palette]#[fg=${palette.color6}] [CMDS] #[norange]"
         set -g window-status-format " #W "
