@@ -31,6 +31,7 @@ This tool uses `tmux send-keys` to simulate typing directly into the target pane
 - **Reliability**: The target pane MUST be running a process that actively listens to `stdin` (e.g., a shell prompt or the `waiting` script).
 - **Usage**: `send-message-to-agent <target> "From: <your_name> | <message>"`
   - **Target**: Can be a pane ID (e.g. `%10`), a tmux index (e.g. `0:1.0`), or an **agent name** (e.g. `Notes-Agent`).
+  - **Identity**: `<your_name>` MUST be the exact value of your `@agent_name` tmux option so the receiver can reply to you.
 - **Protocol**: You MUST always use `send-message-to-agent` to reply to messages with a `From:` prefix instead of printing to your own stdout.
 
 ### 2. File-Based Signaling (`waiting` & `iamdone`)
