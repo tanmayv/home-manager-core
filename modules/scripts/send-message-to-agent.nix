@@ -29,7 +29,9 @@
             flock -x -w 10 200 || { echo "Error: Timeout waiting for lock after 10 seconds"; exit 1; }
           fi
           
-          tmux send-keys -t "$TARGET" "$MESSAGE" Enter
+          tmux send-keys -t "$TARGET" "$MESSAGE"
+          sleep 0.1
+          tmux send-keys -t "$TARGET" C-m
           
         ) 200>"$LOCKFILE"
       '';
