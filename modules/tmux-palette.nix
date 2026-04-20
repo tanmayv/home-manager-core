@@ -289,13 +289,13 @@ in
     [[commands]]
     name = "Open/Create Knowledge Note"
     description = "Open an existing note or create a new one in the knowledge directory"
-    command = 'knowledge_dir="${userSettings.local_agent_knowledge_dir}" && knowledge_dir="''${knowledge_dir/#\~/$HOME}" && mkdir -p "$knowledge_dir" && cd "$knowledge_dir" && file=$(find . -type f -name "*.md" | ${pkgs.fzf}/bin/fzf --print-query --header "Select a note or type a new name") && if [[ -n "$file" ]]; then if [[ -f "$file" ]]; then tmux new-window -n "knowledge" "${userSettings.editor} $file"; else if [[ "$file" != *.md ]]; then file="$file.md"; fi; tmux new-window -n "knowledge" "${userSettings.editor} $file"; fi; fi'
+    command = 'knowledge_dir="${userSettings.local_agent_knowledge_dir}" && knowledge_dir="''${knowledge_dir/#\~/$HOME}" && mkdir -p "$knowledge_dir" && cd "$knowledge_dir" && selection=$(find . -type f -name "*.md" | ${pkgs.fzf}/bin/fzf --print-query --header "Select a note or type a new name") && if [[ -n "$selection" ]]; then file=$(echo "$selection" | tail -n1); if [[ -n "$file" ]]; then if [[ "$file" != *.md ]]; then file="$file.md"; fi; tmux new-window -c "$knowledge_dir" -n "knowledge" "${userSettings.editor} \"$file\""; fi; fi'
     group = "AI"
 
     [[commands]]
     name = "List Knowledge Notes"
     description = "Fuzzy search and read knowledge notes"
-    command = 'knowledge_dir="${userSettings.local_agent_knowledge_dir}" && knowledge_dir="''${knowledge_dir/#\~/$HOME}" && mkdir -p "$knowledge_dir" && cd "$knowledge_dir" && file=$(find . -type f -name "*.md" | ${pkgs.fzf}/bin/fzf --preview "${pkgs.bat}/bin/bat --color=always --style=numbers {}") && [[ -n "$file" ]] && tmux new-window -n "knowledge" "${userSettings.editor} $file"'
+    command = 'knowledge_dir="${userSettings.local_agent_knowledge_dir}" && knowledge_dir="''${knowledge_dir/#\~/$HOME}" && mkdir -p "$knowledge_dir" && cd "$knowledge_dir" && file=$(find . -type f -name "*.md" | ${pkgs.fzf}/bin/fzf --preview "${pkgs.bat}/bin/bat --color=always --style=numbers {}") && [[ -n "$file" ]] && tmux new-window -c "$knowledge_dir" -n "knowledge" "${userSettings.editor} \"$file\""'
     group = "AI"
   '';
 }
