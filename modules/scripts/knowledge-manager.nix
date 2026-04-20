@@ -23,29 +23,22 @@
 
         MODE="''${1:-open}"
 
-        if [[ "$MODE" == "list" ]]; then
-            FILE=$(find . -type f -name "*.md" 2>/dev/null | fzf --preview "bat --color=always --style=numbers {}")
-            if [[ -n "$FILE" ]]; then
-                tmux new-window -c "$KNOWLEDGE_DIR" -n "knowledge" "${userSettings.editor} \"$FILE\""
+        if [[ "$MODE" == "create" ]]; then
+            read -r -p "Note name: " NAME
+            if [[ -z "$NAME" ]]; then
+                exit 0
             fi
-        else
-            SELECTION=$(find . -type f -name "*.md" 2>/dev/null | fzf --print-query --header "Select a note or type a new name")
-            if [[ -n "$SELECTION" ]]; then
-                QUERY=$(echo "$SELECTION" | sed -n '1p')
-                MATCH=$(echo "$SELECTION" | sed -n '2p')
-                
-                if [[ -n "$MATCH" ]]; then
-                    FILE="$MATCH"
-                else
-                    FILE="$QUERY"
-                fi
-
-                if [[ -n "$FILE" ]]; then
-                    if [[ "$FILE" != *.md ]]; then
-                        FILE="$FILE.md"
-                    fi
-                    tmux new-window -c "$KNOWLEDGE_DIR" -n "knowledge" "${userSettings.editor} \"$FILE\""
-                fi
+            FILE="$NAME"
+            if [[ "$FILE" != *.md ]]; then
+                FILE="$FILE.md"
+            fi
+            # Open editor in a popup for quick creation
+            tmux display-popup -w 95% -h 90% -d "$KNOWLEDGE_DIR" -E "${userSettings.editor} \"$FILE\""
+        elif [[ "$MODE" == "list" || "$MODE" == "open" ]]; then
+            FILE=$(find . -type f -name "*.md" 2>/dev/null | fzf --preview "bat --color=always --style=numbers {}" --header "Select a note to open")
+            if [[ -n "$FILE" ]]; then
+                # Open existing notes in a new window for better reading/editing
+                tmux new-window -c "$KNOWLEDGE_DIR" -n "knowledge" "${userSettings.editor} \"$FILE\""
             fi
         fi
       '';

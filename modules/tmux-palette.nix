@@ -287,14 +287,14 @@ in
     mapping = "C-s"
 
     [[commands]]
-    name = "Open/Create Knowledge Note"
-    description = "Open an existing note or create a new one in the knowledge directory"
-    command = "knowledge-manager open"
+    name = "Create Knowledge Note"
+    description = "Create a new note in the knowledge directory and edit it in a popup"
+    command = "knowledge-manager create"
     group = "AI"
 
     [[commands]]
-    name = "List Knowledge Notes"
-    description = "Fuzzy search and read knowledge notes"
+    name = "Open/List Knowledge Notes"
+    description = "Fuzzy search and read/edit knowledge notes"
     command = "knowledge-manager list"
     group = "AI"
   '';
