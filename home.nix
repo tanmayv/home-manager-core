@@ -7,7 +7,8 @@
     ./modules/tmux-palette.nix
     ./modules/scripts
   ] ++ (if userSettings.enable-ai-workflow then [ ./modules/ai-workflow ] else [])
-    ++ (if userSettings.enable-neovim then [ ./modules/neovim/default.nix ] else []);
+    ++ (if userSettings.enable-neovim then [ ./modules/neovim/default.nix ] else [])
+    ++ (if userSettings.import-extras or false then [ ./modules/extras ] else []);
 
   home.username = username;
   home.homeDirectory = "/usr/local/google/home/${username}";

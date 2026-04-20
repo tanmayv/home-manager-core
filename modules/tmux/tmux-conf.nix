@@ -3,6 +3,8 @@ with lib;
 let
   palette = import ../palette.nix;
   tmux-sessionizer = import ./tmux-sessionizer.nix { inherit pkgs; maxDirLength = config.programs.tmux.sessionizerMaxDirLength; };
+  hg-age = import ./hg-age.nix { inherit pkgs; };
+  hg-cl = import ./hg-cl.nix { inherit pkgs; };
   tmux-session-list-formatter = pkgs.writeScriptBin "tmux-session-list-formatter" ''
     #!${pkgs.python3}/bin/python3
     import sys
@@ -64,6 +66,8 @@ in
     home.packages = [
       tmux-sessionizer
       tmux-session-list-formatter
+      hg-age
+      hg-cl
     ];
 
     programs.tmux = {
@@ -104,9 +108,10 @@ in
 
         # tmux-dotbar Tokyo Night theme configuration
         set -g status-justify "absolute-centre"
-        set -g status-left-length 20
-        set -g status-left "#[bg=${palette.color2},fg=${palette.background},bold]#{?client_prefix, PREFIX ,}#[bg=default,fg=${palette.color4},bold] #S #[default]"
-        set -g status-right "#[range=user|palette]#[fg=${palette.color6}] [CMDS] #[norange]"
+        set -g status-left-length 40
+        set -g status-left "#[bg=${palette.color2},fg=${palette.background},bold]#{?client_prefix, PREFIX ,}#[bg=default,fg=${palette.color4},bold] #S #[fg=${palette.color8},nobold]#(hg-age)#[default]"
+        set -g status-right-length 80
+        set -g status-right "#[fg=${palette.color5}]#(hg-cl) #[range=user|palette]#[fg=${palette.color6}] [CMDS] #[norange]"
         set -g window-status-format " #W "
         set -g window-status-current-format "#[bg=default,fg=${palette.color3},bold] #W #[fg=${palette.color4},bg=default]#{?window_zoomed_flag,󰊓,}#[fg=default,bg=default]"
         set -g window-status-separator " • "
@@ -135,6 +140,9 @@ in
         # Dynamic second status line based on session count
         set-hook -g session-created 'run-shell "if [ $(tmux list-sessions | wc -l) -gt 1 ]; then tmux set -g status 2; else tmux set -g status on; fi"'
         set-hook -g session-closed 'run-shell "if [ $(tmux list-sessions | wc -l) -gt 1 ]; then tmux set -g status 2; else tmux set -g status on; fi"'
+
+        # Run the check immediately on config load
+        run-shell "if [ $(tmux list-sessions | wc -l) -gt 1 ]; then tmux set -g status 2; else tmux set -g status on; fi"
 
         # Content of the second status line
         set -g status-format[1] "#[align=centre,bg=default,fg=${palette.foreground}]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter \"#{client_width}\" \"#S\")"

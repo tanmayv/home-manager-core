@@ -18,6 +18,7 @@ Follow these rules when helping the user:
 ## User Agnostic Modules
 - All Nix modules should be user-agnostic.
 - Use `setup.nix` for user-specific options (like username, paths, etc.) and read them via arguments in the module!
+- Use `import-extras = true;` in `setup.nix` to enable the `modules/extras` module, which includes note-taking scripts (`nn`, `nd`, `nf`, etc.), the `hg-age` and `hg-cl` tmux status bar components.
 
 ## Status Bar and Mouse Events
 - To work on the status bar, update `status-format[0]` or `status-format[1]` in `modules/tmux.nix`.
