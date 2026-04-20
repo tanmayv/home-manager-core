@@ -87,7 +87,7 @@ in
         
         # Pane border and title configuration
         set -g pane-border-status top
-        set -g pane-border-format "#[fg=${palette.color8}]─(#[fg=${palette.color4}] #T #[fg=${palette.color8}]|#[fg=${palette.color2}] #{pane_current_command} #[fg=${palette.color8}])─"
+        set -g pane-border-format "#[fg=${palette.color8}]─(#[fg=${palette.color5}] #D #[fg=${palette.color8}]| #[fg=${palette.color4}]#{?@agent_name,#{@agent_name},no-name} #[fg=${palette.color8}]| #[fg=${palette.color2}]#T #[fg=${palette.color8}])─"
         set -g pane-border-style "fg=${palette.color8}"
         set -g pane-active-border-style "fg=${palette.color4}"
         
