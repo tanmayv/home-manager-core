@@ -23,23 +23,45 @@ To facilitate multi-agent workflows, common AI CLI tools (`jetski-cli`, `gemini-
 
 ## Inter-Agent Communication
 
-Agents MUST communicate across panes and sessions using the following protocols. 
+Agents MUST communicate across panes and sessions using specialized protocols. Implementation scripts are located in `~/.config/minimal-cloudtop/modules/scripts/`.
 
-**IMPORTANT**: When you receive a message in the format `From: <sender_name> | <message>`, you MUST use `send-message-to-agent` to reply back to the sender instead of printing to stdout. This ensures the conversation stays within the correct panes.
+### 1. Direct Keyboard Simulation (`send-message-to-agent`)
+This tool uses `tmux send-keys` to simulate typing directly into the target pane's input buffer. 
 
-- `send-message-to-agent <target> "From: <your_name> | <message>"`: 
+- **Reliability**: The target pane MUST be running a process that actively listens to `stdin` (e.g., a shell prompt or the `waiting` script).
+- **Usage**: `send-message-to-agent <target> "From: <your_name> | <message>"`
   - **Target**: Can be a pane ID (e.g. `%10`), a tmux index (e.g. `0:1.0`), or an **agent name** (e.g. `Notes-Agent`).
-- `waiting <UUID>`: Polls for a response from another agent.
-- `iamdone <UUID> "message"`: Responds to a request.
+- **Protocol**: You MUST always use `send-message-to-agent` to reply to messages with a `From:` prefix instead of printing to your own stdout.
 
-### Example Protocol:
+### 2. File-Based Signaling (`waiting` & `iamdone`)
+For more reliable or asynchronous communication, agents use persistent signals stored in `~/.tmux_signals/`.
+
+- **`waiting <UUID>`**: Blocks and polls for a response file named after the UUID.
+- **`iamdone <UUID> "message"`**: Writes the response message to the signal file, unblocking the waiting agent.
+
+### Example Flows:
+
+#### Simple Interactive Reply
 1. **Agent A** (`nixcloud-agent-1`):
    ```bash
    send-message-to-agent "Notes-Agent" "From: nixcloud-agent-1 | What is the status of ZV2?"
    ```
-2. **Notes-Agent** sees the input and replies:
+2. **Notes-Agent** receives the typed text and replies:
    ```bash
    send-message-to-agent "nixcloud-agent-1" "From: Notes-Agent | ZV2 investigation is in progress..."
    ```
 
-See `modules/scripts/` for implementation details of these tools.
+#### Asynchronous Task (File-Based)
+1. **Agent A** needs a long-running task done. It generates a UUID (or lets the script generate one) and runs:
+   ```bash
+   waiting 1234-abcd
+   ```
+2. **Agent A** sends the request to **Agent B**:
+   ```bash
+   send-message-to-agent "Agent-B" "From: Agent-A | Please index this directory and reply to UUID 1234-abcd"
+   ```
+3. **Agent B** completes the indexing, then signals completion:
+   ```bash
+   iamdone 1234-abcd "Indexing complete. Found 50 files."
+   ```
+4. **Agent A**'s `waiting` process detects the file, prints the message, and exits, allowing Agent A to continue.
