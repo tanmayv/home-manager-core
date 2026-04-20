@@ -18,10 +18,15 @@ To facilitate multi-agent workflows, common AI CLI tools (`jetski-cli`, `gemini-
 
 ## Inter-Agent Communication
 
-Agents can communicate across panes and sessions using the following protocols:
+Agents MUST communicate across panes and sessions using the following protocols. **IMPORTANT**: You MUST always prefix your message with `From: <your_agent_name> | ` so the receiving agent knows who to respond to.
 
-- `send-message-to-agent <target_pane> "message"`: Sends a locked message to another agent.
+- `send-message-to-agent <target_pane> "From: <your_name> | <message>"`: Sends a locked message to another agent.
 - `waiting <UUID>`: Polls for a response from another agent.
 - `iamdone <UUID> "message"`: Responds to a request.
+
+Example:
+```bash
+send-message-to-agent "%10" "From: minimal-cloudtop-agent-1 | What is the status of ZV2?"
+```
 
 See `modules/scripts/` for implementation details of these tools.
