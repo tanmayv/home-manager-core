@@ -7,18 +7,29 @@
         coreutils
         util-linux
         tmux
+        gnugrep
       ];
 
       text = ''
         if [ "$#" -lt 2 ] || [ "$1" = "--help" ] || [ "$1" = "help" ]; then
-          echo "Usage: send-message-to-agent <target_location> <message>"
+          echo "Usage: send-message-to-agent <target_location_or_name> <message>"
           echo "Sends a message to a tmux pane/window using send-keys, with locking."
+          echo "Target can be a pane ID (e.g. %10), index (e.g. 0:1.0), or agent name (e.g. nixcloud-agent-1)."
           exit 0
         fi
 
         TARGET="$1"
         shift
         MESSAGE="$*"
+
+        # Check if TARGET is an agent name (doesn't start with % or look like session:window.pane)
+        if [[ ! "$TARGET" =~ ^%[0-9]+$ ]] && [[ ! "$TARGET" =~ ^[0-9]+:[0-9]+\.[0-9]+$ ]]; then
+          # Try to find a pane with matching @agent_name
+          found_pane=$(tmux list-panes -a -F "#{pane_id} #{@agent_name}" | grep " ''${TARGET}$" | cut -d' ' -f1 | head -n 1 || true)
+          if [[ -n "$found_pane" ]]; then
+            TARGET="$found_pane"
+          fi
+        fi
 
         LOCKFILE="/tmp/agent_tmux.lock"
 
