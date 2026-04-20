@@ -60,7 +60,7 @@ let
     try:
         output = subprocess.check_output([
             "tmux", "list-panes", "-a", "-F", 
-            "#{session_name}|#{window_index}|#{pane_index}|#{@agent_name}"
+            "#{pane_id}|#{@agent_name}"
         ]).decode("utf-8")
     except:
         sys.exit(0)
@@ -68,12 +68,10 @@ let
     agents = []
     for line in output.splitlines():
         parts = line.split("|")
-        if len(parts) == 4 and parts[3].strip():
+        if len(parts) == 2 and parts[1].strip():
             agents.append({
-                "session": parts[0],
-                "window": parts[1],
-                "pane": parts[2],
-                "name": parts[3].strip()
+                "id": parts[0],
+                "name": parts[1].strip()
             })
 
     if not agents:
@@ -81,9 +79,8 @@ let
 
     formatted = []
     for a in agents:
-        # Range format: agent:SESSION:WINDOW:PANE
-        target = f"{a['session']}:{a['window']}.{a['pane']}"
-        range_arg = f"agent:{a['session']}:{a['window']}:{a['pane']}"
+        # Range format: agent:PANE_ID
+        range_arg = f"agent:{a['id']}"
         formatted.append(f"#[range=user|{range_arg}]{a['name']}#[norange]")
 
     res = ' · '.join(formatted)
@@ -227,17 +224,10 @@ in
                     { switch-client -t = } \
                     { if-shell -F '#{m:agent:*,#{mouse_status_range}}' \
                         { 
-                            # Extract SESSION:WINDOW:PANE from agent:SESSION:WINDOW:PANE
-                            target="#{s/agent://:mouse_status_range}"
-                            # target is now SESSION:WINDOW:PANE, but wait, 
-                            # tmux switch-client -t expects target-pane.
-                            # The s/// might be tricky with multiple colons.
-                            # Let's use a run-shell helper if it's too complex for native format.
-                            run-shell "tmux_target=$(echo '#{mouse_status_range}' | cut -d: -f2-4 | tr ':' '.'); \
-                                       session_name=$(echo \$tmux_target | cut -d. -f1); \
-                                       tmux switch-client -t \$session_name; \
-                                       tmux select-window -t \$tmux_target; \
-                                       tmux select-pane -t \$tmux_target"
+                            # Extract pane_id from agent:pane_id
+                            run-shell "target_id=$(echo '#{mouse_status_range}' | cut -d: -f2); \
+                                       tmux switch-client -t \$target_id; \
+                                       tmux select-pane -t \$target_id"
                         } \
                         { select-window -t = } \
                     } \
