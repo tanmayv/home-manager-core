@@ -43,7 +43,6 @@ Open `setup.nix` and update the `username` to match your LDAP:
 Apply the configuration for the first time:
 
 ```bash
-cd <cloned director>
 nix run home-manager -- switch --backup backup --flake ".#your-ldap-here"
 ```
 

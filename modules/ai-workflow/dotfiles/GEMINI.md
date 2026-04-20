@@ -21,6 +21,14 @@ To facilitate multi-agent workflows, common AI CLI tools (`jetski-cli`, `gemini-
   tmux set-option -p @agent_name "Notes-Agent"
   ```
 
+## Agent Knowledge & Persistence
+
+To maintain persistent memory across sessions, agents have access to a dedicated knowledge directory.
+
+- **Storage Directory**: The directory path is defined in `setup.nix` as `local_agent_knowledge_dir` (e.g., `~/agent_knowledge`).
+- **Accessing Knowledge**: You should check this directory for existing markdown notes when the user asks you to "remember" or "look up" information from past interactions.
+- **Creating Notes**: Use the command provided by `local_agent_knowledge_create_command` (typically `nn`) to create new persistent notes in your pkm directory, which will then be linked/available for future agents.
+
 ## Inter-Agent Communication
 
 Agents MUST communicate across panes and sessions using specialized protocols. Implementation scripts are located in `~/.config/minimal-cloudtop/modules/scripts/`.

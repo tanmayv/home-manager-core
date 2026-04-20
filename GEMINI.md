@@ -32,3 +32,8 @@ This `GEMINI.md` provides context and instructions for AI agents working within 
 - **AI Workflow Layout**: AI skills, hooks, and agents are linked from `modules/ai-workflow/dotfiles/` to the standard `~/.gemini/` location.
 - **Localized Instructions**: Use localized `GEMINI.md` files within specific skill or agent directories to provide sub-agent context.
 - **Building Changes**: Always advise or use the `build-and-switch` command to apply Nix configuration changes to the system.
+
+## Agent Knowledge & Note Management
+- **Knowledge Directory**: Persistent agent knowledge (markdown notes) is stored in the directory specified by `local_agent_knowledge_dir` in `setup.nix` (default: `~/agent_knowledge`).
+- **Creating Notes**: Use the command specified by `local_agent_knowledge_create_command` (e.g., `nn`) to create new persistent notes.
+- **Protocol**: When asked to remember something or take a note, agents should check this directory for relevant existing notes or create a new one using a descriptive filename.
