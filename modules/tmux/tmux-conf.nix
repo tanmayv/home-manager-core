@@ -85,6 +85,12 @@ in
         set-window-option -g automatic-rename on
         set-option -g set-titles off
         
+        # Pane border and title configuration
+        set -g pane-border-status top
+        set -g pane-border-format "#[fg=${palette.color8}]─(#[fg=${palette.color4}] #T #[fg=${palette.color8}]|#[fg=${palette.color2}] #{pane_current_command} #[fg=${palette.color8}])─"
+        set -g pane-border-style "fg=${palette.color8}"
+        set -g pane-active-border-style "fg=${palette.color4}"
+        
         # Tmux Sessionizer integration
         bind-key C-t display-popup -w 95% -h 80% -E "tmux-sessionizer"
         
