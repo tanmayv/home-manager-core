@@ -56,3 +56,11 @@ To learn how to personalize your configuration and toggle features in `setup.nix
 *   **AI Orchestration**: Protocol tools (`iamdone`, `waiting`, `send-message-to-agent`) for multi-agent workflows.
 *   **Agent Knowledge**: Dedicated directory for persistent markdown notes.
 *   **Tokyo Night Theme**: Unified high-contrast aesthetic across all tools.
+
+## Terminals
+
+| Terminal | Supported |
+| :--- | :--- |
+| Ghostty | ✅ |
+| Kitty | ✅ |
+
