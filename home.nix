@@ -26,6 +26,7 @@
   home.packages = with pkgs; [
     fzf
     ripgrep
+    bat
     pure-prompt
   ];
 }
