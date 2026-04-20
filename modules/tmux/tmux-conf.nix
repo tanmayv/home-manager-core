@@ -92,40 +92,29 @@ let
 
   tmux-status-refresh = pkgs.writeScriptBin "tmux-status-refresh" ''
     #!${pkgs.bash}/bin/bash
-    # Dynamically set status lines (1, 2, or 3) and set global flags
+    # Dynamically set status lines and formats
     num_sessions=$(tmux list-sessions | wc -l)
     num_agents=$(tmux list-panes -a -F "#{@agent_name}" | grep -v "^$" | wc -l)
     
-    if [ "$num_sessions" -gt 1 ]; then
-        tmux set-option -g @is_multi_session 1
-    else
-        tmux set-option -g @is_multi_session 0
-    fi
+    # Common components
+    SESSIONS_PART="#[align=left,fg=${palette.color4},bold] Active Sessions: #[fg=${palette.foreground},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\")"
+    AGENTS_PART="#[align=left,fg=${palette.color4},bold] Active Agents: #[fg=${palette.foreground},nobold]#(tmux-agent-list-formatter \"#{client_width}\")"
+    RIGHT_PART="#[align=right,fg=${palette.color5}]#(hg-cl) #[fg=default,nobold]#(hg-age) "
 
-    if [ "$num_agents" -gt 0 ]; then
-        tmux set-option -g @has_agents 1
-    else
-        tmux set-option -g @has_agents 0
-    fi
-
-    lines=1
     if [ "$num_sessions" -gt 1 ]; then
-        lines=$((lines + 1))
-    fi
-    if [ "$num_agents" -gt 0 ]; then
-        lines=$((lines + 1))
-    fi
-    
-    current_status=$(tmux show-options -g status | cut -d' ' -f2)
-    
-    if [ "$lines" -eq 1 ]; then
-        target="on"
+        if [ "$num_agents" -gt 0 ]; then
+            tmux set -g status 3
+            tmux set -g status-format[1] "$SESSIONS_PART$RIGHT_PART"
+            tmux set -g status-format[2] "$AGENTS_PART"
+        else
+            tmux set -g status 2
+            tmux set -g status-format[1] "$SESSIONS_PART$RIGHT_PART"
+        fi
+    elif [ "$num_agents" -gt 0 ]; then
+        tmux set -g status 2
+        tmux set -g status-format[1] "$AGENTS_PART$RIGHT_PART"
     else
-        target="$lines"
-    fi
-    
-    if [ "$current_status" != "$target" ]; then
-        tmux set -g status "$target"
+        tmux set -g status on
     fi
   '';
 in
@@ -228,12 +217,6 @@ in
 
         # Run the check immediately on config load
         run-shell "tmux-status-refresh"
-
-        # Content of the second status line (Sessions if > 1, else Agents if any)
-        set -g status-format[1] "#[align=left,fg=${palette.color4},bold]#{?#{==:#{@is_multi_session},1}, Active Sessions: #[fg=${palette.foreground},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\"), Active Agents: #[fg=${palette.foreground},nobold]#(tmux-agent-list-formatter \"#{client_width}\")}#[align=right,fg=${palette.color5}]#(hg-cl) #[fg=default,nobold]#(hg-age) "
-        
-        # Content of the third status line (Agents if sessions > 1 and agents exist)
-        set -g status-format[2] "#[align=left,fg=${palette.color4},bold] Active Agents: #[fg=${palette.foreground},nobold]#(tmux-agent-list-formatter \"#{client_width}\")"
 
         # Global mouse binding to handle status bar clicks
         bind-key -n MouseDown1Status if-shell -F '#{==:#{mouse_status_range},palette}' \
