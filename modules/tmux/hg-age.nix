@@ -28,7 +28,7 @@ pkgs.writeShellApplication {
           age_str="$((diff_seconds / 86400))d"
         fi
         
-        display_str="Last Sync: $age_str ago"
+        display_str="Age: $age_str ago"
         echo "#[range=user|ageinfo]$display_str#[norange]"
       fi
     fi

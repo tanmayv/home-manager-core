@@ -109,9 +109,9 @@ in
         # tmux-dotbar Tokyo Night theme configuration
         set -g status-justify "absolute-centre"
         set -g status-left-length 60
-        set -g status-left "#[bg=${palette.color2},fg=${palette.background},bold]#{?client_prefix, PREFIX ,}#[bg=default,fg=${palette.color4},bold] #S #[fg=default,nobold]#{?#{==:#{status},2},,#(hg-age)}#[default]"
-        set -g status-right-length 100
-        set -g status-right "#[fg=${palette.color5}]#{?#{==:#{status},2},,#(hg-cl) }#[range=user|palette]#[fg=${palette.color6}] [CMDS] #[norange]"
+        set -g status-left "#[bg=${palette.color2},fg=${palette.background},bold]#{?client_prefix, PREFIX ,}#[bg=default,fg=${palette.color4},bold] #S #[default]"
+        set -g status-right-length 120
+        set -g status-right "#[fg=${palette.color5}]#{?#{==:#{status},2},,#(hg-cl) }#[fg=default,nobold]#{?#{==:#{status},2},,#(hg-age) }#[range=user|palette]#[fg=${palette.color6}] [CMDS] #[norange]"
         set -g window-status-format " #W "
         set -g window-status-current-format "#[bg=default,fg=${palette.color3},bold] #W #[fg=${palette.color4},bg=default]#{?window_zoomed_flag,󰊓,}#[fg=default,bg=default]"
         set -g window-status-separator " • "
@@ -145,7 +145,7 @@ in
         run-shell "if [ $(tmux list-sessions | wc -l) -gt 1 ]; then tmux set -g status 2; else tmux set -g status on; fi"
 
         # Content of the second status line
-        set -g status-format[1] "#[align=left,fg=default] #(hg-age) #[fg=${palette.color4},bold]Active Sessions: #[fg=${palette.foreground},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\")#[align=right,fg=${palette.color5}]#(hg-cl) "
+        set -g status-format[1] "#[align=left,fg=${palette.color4},bold]Active Sessions: #[fg=${palette.foreground},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\")#[align=right,fg=${palette.color5}]#(hg-cl) #[fg=default,nobold]#(hg-age) "
 
         # Global mouse binding to handle status bar clicks
         bind-key -n MouseDown1Status if-shell -F '#{==:#{mouse_status_range},palette}' \
