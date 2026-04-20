@@ -280,18 +280,6 @@ in
     group = "Utility"
 
     [[commands]]
-    name = "Chat with Gemini"
-    description = "Open Gemini CLI in a new pane"
-    command = "tmux split-window -h 'gemini'"
-    group = "AI"
-
-    [[commands]]
-    name = "Ask Duckie"
-    description = "Ask Duckie a question (with pane context)"
-    command = "ask-duckie-context"
-    group = "AI"
-
-    [[commands]]
     name = "Search via CodeSearch"
     description = "Interactive CodeSearch with fzf and preview"
     command = "tmux-cs-fzf"
