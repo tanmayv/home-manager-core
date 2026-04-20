@@ -71,7 +71,7 @@ To update, simply run `nix flake update` in your personal repository.
 
 | Flag | Behavior if `true` | Behavior if `false` |
 | :--- | :--- | :--- |
-| `enable-ai-workflow` | Loads agents, skills, and inter-agent communication tools. | Disables all AI-specific logic and scripts. |
+| `enable-ai-workflow` | Loads agents, skills, inter-agent communication tools, AI status bar elements, and wraps AI CLI tools. | Disables all AI-specific logic, removes agent tracking from the status bar, and uses raw CLI binaries. |
 | `enable-neovim` | Loads custom Neovim config with plugins and keybindings. | Uses the default system Neovim without custom setup. |
 | `enable-tmux-on-ssh` | Automatically starts/attaches tmux on SSH login (non-Cider). | Standard shell login without automatic tmux. |
 | `auto-switch-workspace-on-cd` | Automatically switches tmux session when `cd`-ing into a workspace. | Standard `cd` behavior; sessions stay unchanged. |
@@ -81,8 +81,9 @@ To update, simply run `nix flake update` in your personal repository.
 
 | Flag | Behavior if `true` | Behavior if `false` |
 | :--- | :--- | :--- |
+| `enable_agent_knowledge` | Enables the agent knowledge section in `GEMINI.md`, instructing agents to use the knowledge directory. | Agents do not receive explicit instructions about the knowledge directory. |
 | `enable_ai_ssa_creator_skill` | Links the `ai-ssa-creator` skill to `~/.gemini/skills/`. | The skill is unavailable to agents. |
-| `enable_tmux_based_agent_comms` | Installs `iamdone`, `waiting`, `send-message-to-agent` and communication skills. | Inter-agent communication tools are not installed. |
+| `enable_tmux_based_agent_comms` | Installs communication scripts (`iamdone`, `waiting`, `send-message-to-agent`), shows `@agent_name` in pane titles, and wraps CLI tools with `agent-wrapper`. | Inter-agent communication tools are not installed, pane titles are standard, and raw CLI binaries are used. |
 
 ---
 
