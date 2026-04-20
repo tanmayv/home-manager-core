@@ -80,6 +80,11 @@ in
         bind r source-file ~/.config/tmux/tmux.conf \; display-message "Config reloaded!"
         set -ga terminal-overrides ",*256col*:Tc"
         
+        # Disable application-driven renaming, but keep tmux automatic renaming
+        set-window-option -g allow-rename off
+        set-window-option -g automatic-rename on
+        set-option -g set-titles off
+        
         # Tmux Sessionizer integration
         bind-key C-t display-popup -w 95% -h 80% -E "tmux-sessionizer"
         

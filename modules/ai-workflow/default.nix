@@ -4,26 +4,29 @@ let
   inherit (pkgs) lib;
   aiFeatures = userSettings.ai_features or {
     enable_ai_ssa_creator_skill = false;
+    enable_tmux_based_agent_comms = false;
   };
 in
 {
   home.file = {
-    ".gemini/jetski/GEMINI.md".source = ./dotfiles/GEMINI.md;
+    ".gemini/GEMINI.md".source = ./dotfiles/GEMINI.md;
     
-    ".gemini/jetski/agents/.keep".text = "";
-    ".gemini/jetski/skills/.keep".text = "";
+    ".gemini/agents/.keep".text = "";
+    ".gemini/skills/.keep".text = "";
 
-    ".gemini/jetski/mcp_config.json".source = ./dotfiles/mcp_config.json;
+    ".gemini/mcp_config.json".source = ./dotfiles/mcp_config.json;
 
     # Link directories
-    ".gemini/jetski/skills/test-skill".source = ./dotfiles/skills/test-skill;
-    ".gemini/jetski/agents/home-manager".source = ./dotfiles/agents/home-manager;
+    ".gemini/skills/test-skill".source = ./dotfiles/skills/test-skill;
+    ".gemini/agents/home-manager".source = ./dotfiles/agents/home-manager;
     
     # Link hooks
-    ".gemini/jetski/hooks.json".source = ./dotfiles/hooks/hooks.json;
-    ".gemini/jetski/hooks".source = ./dotfiles/hooks;
+    ".gemini/hooks.json".source = ./dotfiles/hooks/hooks.json;
+    ".gemini/hooks".source = ./dotfiles/hooks;
 
   } // (if aiFeatures.enable_ai_ssa_creator_skill then {
-    ".gemini/jetski/skills/ai-ssa-creator".source = ./dotfiles/skills/ai-ssa-creator;
+    ".gemini/skills/ai-ssa-creator".source = ./dotfiles/skills/ai-ssa-creator;
+  } else { }) // (if aiFeatures.enable_tmux_based_agent_comms then {
+    ".gemini/skills/tmux-send-messages-to-agent".source = ./dotfiles/skills/tmux-send-messages-to-agent;
   } else { });
 }

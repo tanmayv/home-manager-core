@@ -29,6 +29,6 @@ This `GEMINI.md` provides context and instructions for AI agents working within 
 - **Command Palette**: Add new commands to the `tmux-palette` configuration within `modules/tmux-palette.nix`. When adding support for a new CLI tool, ALWAYS prefer adding its most common commands or workflows to the tmux palette to improve discoverability and ease of use.
 
 ## AI Workflow Integration
-- **Jetski Layout**: AI skills, hooks, and agents are linked from `modules/ai-workflow/dotfiles/` to the standard `~/.gemini/jetski/` location.
+- **AI Workflow Layout**: AI skills, hooks, and agents are linked from `modules/ai-workflow/dotfiles/` to the standard `~/.gemini/` location.
 - **Localized Instructions**: Use localized `GEMINI.md` files within specific skill or agent directories to provide sub-agent context.
 - **Building Changes**: Always advise or use the `build-and-switch` command to apply Nix configuration changes to the system.
