@@ -24,9 +24,14 @@ This `GEMINI.md` provides context and instructions for AI agents working within 
 
 ## Tmux Configuration Specifics
 - **Mouse-Centric UX**: Maintain and respect the custom `MouseDown1Status` bindings. The UI relies on custom `#[range=...]` tags to allow users to switch sessions or trigger the command palette via mouse clicks.
-- **Status Bar Hierarchy**: Use a dynamic, two-tier status bar. `status-format[0]` is the primary bar for window navigation. `status-format[1]` is a secondary bar for session discovery, dynamically toggled via `set-hook` based on the active session count.
+- **Status Bar Hierarchy**: Use a dynamic status bar that expands up to 3 lines based on context. `status-format[0]` is the primary bar for window navigation. `status-format[1]` shows Active Sessions (if multiple) or Active Agents. `status-format[2]` shows Active Agents (if multiple sessions AND agents exist).
 - **Vim Interoperability**: Navigation shortcuts (`C-h/j/k/l`) MUST remain "smart." The `is_vim` regex check must be maintained and updated to allow seamless pane switching that respects Vim, Neovim, Helix, and Lazygit.
 - **Command Palette**: Add new commands to the `tmux-palette` configuration within `modules/tmux-palette.nix`. When adding support for a new CLI tool, ALWAYS prefer adding its most common commands or workflows to the tmux palette to improve discoverability and ease of use.
+
+## Versioning & User Customization
+- **Release Strategy**: The project uses SemVer tags (e.g., `v0.1.0`) and a floating `stable` tag for releases.
+- **User Customizations**: Users are instructed to create a personal branch (e.g., `my-config`) off `stable` to modify `setup.nix`. 
+- **Updates**: When updating the configuration via `check-for-update` or manually, the agent/script must **rebase** the user's branch onto the new `stable` tag (`git rebase origin/stable`) to preserve their customizations in `setup.nix` without merge conflicts.
 
 ## AI Workflow Integration
 - **AI Workflow Layout**: AI skills, hooks, and agents are linked from `modules/ai-workflow/dotfiles/` to the standard `~/.gemini/` location.
