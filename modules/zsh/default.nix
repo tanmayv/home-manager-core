@@ -5,8 +5,8 @@ let
   autoSwitchCd = userSettings.auto-switch-workspace-on-cd or true;
   autoSwitchHg = userSettings.auto-switch-workspace-on-hgd or true;
   myAliases = {
-    jetski-cli = "/google/bin/releases/jetski-devs/tools/cli";
-    gemini-cli = "/google/bin/releases/gemini-cli/tools/gemini";
+    jetski-cli = "agent-wrapper /google/bin/releases/jetski-devs/tools/cli";
+    gemini-cli = "agent-wrapper /google/bin/releases/gemini-cli/tools/gemini";
     run-jetski-web = "/google/bin/releases/jetski-devs/jetski-web/run_jetski.par";
     hg = "chg";
     hgi = "fig_zoxide_cd";
