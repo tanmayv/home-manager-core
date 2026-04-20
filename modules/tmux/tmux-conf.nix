@@ -152,10 +152,10 @@ in
         # Global mouse binding to handle session clicks
         bind-key -n MouseDown1Status if-shell -F '#{==:#{mouse_status_range},palette}' \
             "display-popup -w 90% -h 70% -E 'tmux-palette'" \
-            "if-shell -F '#{==:#{mouse_status_range},session}' \
-                'switch-client -t =' \
-                \"if-shell -F '#{m:cl_copy:*,#{mouse_status_range}}' \
-                    'run-shell \"cl-copy #{s/cl_copy://:mouse_status_range}\"' \
+            "if-shell -F '#{==:#{mouse_status_range},clinfo}' \
+                'run-shell \"hg-cl --copy\"' \
+                \"if-shell -F '#{==:#{mouse_status_range},session}' \
+                    'switch-client -t =' \
                     'select-window -t ='\"\""
 
         # Enhanced right-click menu for session list on the left
