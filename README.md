@@ -4,20 +4,20 @@ This is a modern, AI-focused Home Manager configuration tailored for Googlers se
 
 ## Key Features
 
+*   **AI Agent Orchestration & Communication**:
+    *   **Inter-Agent Protocol**: Integrated tools (`send-message-to-agent`, `waiting`, `iamdone`) allow AI agents in different tmux panes to coordinate, share data via `/tmp`, and signal completion.
+    *   **Agent Identity**: Clear visual identification in tmux pane borders showing `[Pane ID] | [Agent Name] | [Current Title]`.
+    *   **Context-Aware Queries**: Automated tools to capture active pane context and pass it to AI agents for smarter assistance.
 *   **Intelligent Workspace Navigation (Fig/CitC Aware)**:
     *   Lightning-fast `cd` wrapper using Zoxide that automatically syncs with your Fig workspaces.
     *   `hgd` wrapper that automatically switches your Tmux session when you change directories.
-    *   (Both auto-switching behaviors are enabled by default but configurable via `setup.nix`).
 *   **Mouse-Centric Tmux Experience**:
     *   Clickable session list in the status bar for instant context switching.
     *   Right-click context menus on sessions to create, rename, or kill them easily.
     *   Smart pane navigation (`Ctrl+h/j/k/l`) that seamlessly integrates with Vim, Neovim, Helix, and Lazygit.
 *   **Command Palette (`Ctrl+p`)**:
     *   A searchable, LRU-ranked (Least Recently Used) command palette built with `fzf`.
-    *   Quick access to window management, session switching, and reloading the configuration.
-*   **AI Integration & Tooling**:
-    *   Built-in "Chat with Gemini" and "Ask Duckie" commands right in the command palette.
-    *   Coordination scripts (`iamdone`, `waiting`, `send-message-to-agent`) included to support autonomous multi-agent workflows.
+    *   Quick access to window management, session switching, and workflow tools.
 *   **Interactive CodeSearch (`Ctrl+s`)**:
     *   Search the Google3 codebase directly from the terminal with a live, syntax-highlighted `bat` preview.
     *   Maintains search history and instantly opens the selected file relative to your workspace root.
@@ -26,16 +26,17 @@ This is a modern, AI-focused Home Manager configuration tailored for Googlers se
     *   **Zoxide** for smarter, fuzzy `cd` jumping.
     *   **Atuin** for magical, searchable shell history.
     *   **Mercurial (`hg`)** configured with `extdiff` (using Neovim) and standard `.hgignore` exclusions.
+*   **Tokyo Night Theming**: Unified color palette across all tools for a consistent, high-contrast aesthetic.
 
 ## Installation & Setup
 
 1.  Clone this repository to `~/.config/minimal-cloudtop` on your Cloudtop.
-2.  Open `setup.nix` and change `username = "tanmayvijay";` to your LDAP. You can also toggle specific features on or off in this file.
+2.  Open `setup.nix` and change `username = "tanmayvijay";` to your LDAP. You can also toggle specific AI features in the `ai_features` block.
 3.  Apply the configuration by running:
 
 ```bash
 cd ~/.config/minimal-cloudtop
-home-manager switch --flake ".#your-ldap"
+build-and-switch
 ```
 
 ## Updating Configuration
