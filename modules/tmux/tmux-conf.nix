@@ -5,6 +5,7 @@ let
   tmux-sessionizer = import ./tmux-sessionizer.nix { inherit pkgs; maxDirLength = config.programs.tmux.sessionizerMaxDirLength; };
   hg-age = import ./hg-age.nix { inherit pkgs; };
   hg-cl = import ./hg-cl.nix { inherit pkgs; };
+  cl-copy = import ./cl-copy.nix { inherit pkgs; };
   tmux-session-list-formatter = pkgs.writeScriptBin "tmux-session-list-formatter" ''
     #!${pkgs.python3}/bin/python3
     import sys
@@ -68,6 +69,7 @@ in
       tmux-session-list-formatter
       hg-age
       hg-cl
+      cl-copy
     ];
 
     programs.tmux = {
@@ -148,7 +150,13 @@ in
         set -g status-format[1] "#[align=left,fg=${palette.color8}] #(hg-age) #[fg=${palette.color4},bold]Active Sessions: #[fg=${palette.foreground},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\")#[align=right,fg=${palette.color5}]#(hg-cl) "
 
         # Global mouse binding to handle session clicks
-        bind-key -n MouseDown1Status if-shell -F '#{==:#{mouse_status_range},palette}' "display-popup -w 90% -h 70% -E 'tmux-palette'" "if-shell -F '#{==:#{mouse_status_range},session}' 'switch-client -t =' 'select-window -t ='"
+        bind-key -n MouseDown1Status if-shell -F '#{==:#{mouse_status_range},palette}' \
+            "display-popup -w 90% -h 70% -E 'tmux-palette'" \
+            "if-shell -F '#{==:#{mouse_status_range},session}' \
+                'switch-client -t =' \
+                \"if-shell -F '#{==:#{m/3:cl:,#{mouse_status_range}},cl:}' \
+                    'run-shell \"cl-copy #{s/cl://:mouse_status_range}\"' \
+                    'select-window -t ='\"\""
 
         # Enhanced right-click menu for session list on the left
         bind-key -T root MouseDown3StatusLeft display-menu -T "#[align=centre]#{session_name}" -t = -x M -y W Next n { switch-client -n } Previous p { switch-client -p } "" Renumber N { move-window -r } Rename n { command-prompt -I "#S" { rename-session "%%" } } "" "New Session" s { new-session } "New Window" w { new-window } "" "Kill Session" X { kill-session }
