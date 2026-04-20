@@ -37,7 +37,10 @@ let
     for s in sessions:
         name = s["name"]
         sid = s["id"]
-        display_name = f"#[fg=${palette.color3},bold]{name}#[default]" if name == current else name
+        if name == current:
+            display_name = f"#[fg=${palette.color3},bold]{name}#[fg=${palette.color8},nobold]"
+        else:
+            display_name = name
         formatted.append(f"#[range=session|{sid}]{display_name}#[norange]")
 
     output = ' · '.join(formatted)
@@ -88,7 +91,7 @@ let
         name = a['name']
         # Highlight if it's the agent in the current focused pane
         if a['id'] == current_pane:
-            name = f"#[fg=${palette.color3},bold]{name}#[default]"
+            name = f"#[fg=${palette.color3},bold]{name}#[fg=${palette.color8},nobold]"
             
         # Range format: agent:PANE_ID
         range_arg = f"agent:{a['id']}"
@@ -105,8 +108,8 @@ let
     num_agents=$(tmux list-panes -a -F "#{@agent_name}" | grep -v "^$" | wc -l)
     
     # Common components
-    SESSIONS_PART="#[align=left,fg=${palette.color4},bold] Active Sessions: #[fg=${palette.foreground},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\")"
-    AGENTS_PART="#[align=left,fg=${palette.color4},bold] Active Agents: #[fg=${palette.foreground},nobold]#(tmux-agent-list-formatter \"#{client_width}\")"
+    SESSIONS_PART="#[align=left,fg=${palette.color4},bold] Active Sessions: #[fg=${palette.color8},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\")"
+    AGENTS_PART="#[align=left,fg=${palette.color4},bold] Active Agents: #[fg=${palette.color8},nobold]#(tmux-agent-list-formatter \"#{client_width}\")"
     RIGHT_PART="#[align=right,fg=${palette.color5}]#(hg-cl) #[fg=default,nobold]#(hg-age) "
 
     if [ "$num_sessions" -gt 1 ]; then
