@@ -9,7 +9,5 @@
     ./send-message-to-agent.nix
     ./tmux-cs-fzf.nix
     ./knowledge-manager.nix
-    ./pbcopy.nix
-    ./pbpaste.nix
   ];
 }

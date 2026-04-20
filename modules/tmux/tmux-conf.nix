@@ -5,7 +5,6 @@ let
   tmux-sessionizer = import ./tmux-sessionizer.nix { inherit pkgs; maxDirLength = config.programs.tmux.sessionizerMaxDirLength; };
   hg-age = import ./hg-age.nix { inherit pkgs; };
   hg-cl = import ./hg-cl.nix { inherit pkgs; };
-  cl-copy = import ./cl-copy.nix { inherit pkgs; };
   tmux-session-list-formatter = pkgs.writeScriptBin "tmux-session-list-formatter" ''
     #!${pkgs.python3}/bin/python3
     import sys
@@ -69,7 +68,6 @@ in
       tmux-session-list-formatter
       hg-age
       hg-cl
-      cl-copy
     ];
 
     programs.tmux = {

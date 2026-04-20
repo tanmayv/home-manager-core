@@ -8,6 +8,7 @@ pkgs.writeShellApplication {
     gnused
     gnugrep
     mercurial
+    tmux
   ];
 
   text = ''
@@ -31,9 +32,8 @@ pkgs.writeShellApplication {
     if [[ "''${1:-}" == "--copy" ]]; then
       cl=$(get_cl_info)
       if [[ "$cl" != "no-cl" ]]; then
-        # Use OSC 52 logic directly or call cl-copy
-        # We'll just call cl-copy as it's already defined
-        cl-copy "$cl"
+        tmux set-buffer -w "$cl"
+        tmux display-message "Copied CL: $cl"
       fi
       exit 0
     fi
