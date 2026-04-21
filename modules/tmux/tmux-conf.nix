@@ -65,6 +65,9 @@ let
     #!${pkgs.python3}/bin/python3
     import sys
     import subprocess
+    import socket
+    import json
+    import os
 
     width = int(sys.argv[1]) if len(sys.argv) > 1 else 100
     available = width - 20
@@ -75,37 +78,30 @@ let
     except:
         current_pane = ""
 
-    # Get all panes with @agent_name
+    # Get all agents from agent-tracker
     try:
-        output = subprocess.check_output([
-            "tmux", "list-panes", "-a", "-F", 
-            "#{pane_id}|#{@agent_name}"
-        ]).decode("utf-8")
-    except:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.connect(os.path.expanduser("~/.cache/agent-tracker.sock"))
+        s.sendall(json.dumps({"jsonrpc": "2.0", "method": "list", "id": 1}).encode())
+        resp = s.recv(4096)
+        data = json.loads(resp.decode())
+        agents_dict = data.get("result", {})
+    except Exception:
         sys.exit(0)
 
-    agents = []
-    for line in output.splitlines():
-        parts = line.split("|")
-        if len(parts) == 2 and parts[1].strip():
-            agents.append({
-                "id": parts[0],
-                "name": parts[1].strip()
-            })
-
-    if not agents:
+    if not agents_dict:
         sys.exit(0)
 
     formatted = []
-    for a in agents:
-        name = a['name']
+    for name, info in agents_dict.items():
+        display_name = name
         # Highlight if it's the agent in the current focused pane
-        if a['id'] == current_pane:
-            name = f"#[fg=${palette.color3},bold]{name}#[fg=${palette.color8},nobold]"
+        if info.get("tmux_pane") == current_pane:
+            display_name = f"#[fg=${palette.color3},bold]{name}#[fg=${palette.color8},nobold]"
             
         # Range format: agent:PANE_ID
-        range_arg = f"agent:{a['id']}"
-        formatted.append(f"#[range=user|{range_arg}]{name}#[norange]")
+        range_arg = f"agent:{info.get('tmux_pane')}"
+        formatted.append(f"#[range=user|{range_arg}]{display_name}#[norange]")
 
     res = ' · '.join(formatted)
     print(res)
@@ -116,7 +112,7 @@ let
     # Dynamically set status lines and formats
     num_sessions=$(tmux list-sessions | wc -l)
     ${if enableAiWorkflow then ''
-    num_agents=$(tmux list-panes -a -F "#{@agent_name}" | grep -v "^$" | wc -l)
+    num_agents=$(python3 -c "import socket, json, os; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.connect(os.path.expanduser('~/.cache/agent-tracker.sock')); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'list', 'id': 1}).encode()); resp = s.recv(4096); data = json.loads(resp.decode()); print(len(data.get('result', {})))" 2>/dev/null || echo 0)
     '' else ''
     num_agents=0
     ''}
