@@ -1,0 +1,51 @@
+{
+  "name": "mcp-extension",
+  "version": "1.0.0",
+  "mcpServers": {
+    "CodingMCP": {
+      "command": "/google/bin/releases/codemind-mcp-servers/coding_server.par"
+    },
+    "WorkspaceMCP": {
+      "command": "/google/bin/releases/codemind-mcp-servers/workspace_server.par"
+    },
+    "DuckieMCP": {
+      "command": "/google/bin/releases/duckie-eng-policy/duckie_server.par",
+      "timeout": 300000
+    },
+    "Buganizer": {
+      "command": "/google/bin/releases/gemini-cli/tools/remote_mcp",
+      "args": [
+        "--use_gaia_mint=True",
+        "--mcp_server=blade:devtools.buganizer.mcpservice-prod",
+        "--credential_exchanger_call_gaia_client_with_compass_stub_task_percentage=0"
+      ],
+      "includeTools": [
+        "add_buganizer_comment",
+        "create_buganizer_issue",
+        "get_bugs",
+        "list_components",
+        "render_issue"
+      ],
+      "timeout": 300000
+    },
+    "YAQS": {
+      "command": "/google/bin/releases/gemini-cli/tools/remote_mcp",
+      "args": [
+        "--use_loas_transact_dat",
+        "--mcp_server=blade:corp.yaqs.boq.mcp.proto.yaqsmcpservice-prod"
+      ],
+      "timeout": 300000
+    },
+    "rollouts-arca-mcp-server": {
+      "command": "/google/bin/releases/gemini-cli/tools/remote_mcp",
+      "args": [
+        "--mcp_server=blade:rollouts.rca.api.mcp-prod",
+        "--use_loas_transact_dat=True"
+      ],
+      "timeout": 60000,
+      "includeTools": [
+        "investigate_rollout"
+      ]
+    }
+  }
+}

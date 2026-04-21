@@ -16,6 +16,8 @@ in
     ./tmux-cs-fzf.nix
     ./knowledge-manager.nix
     ./check-for-update.nix
+    ./new-gemini-agent.nix
+    ./ai-wrappers.nix
   ] ++ (if enableAgentComms then [
     ./iamdone.nix
     ./waiting.nix

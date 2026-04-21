@@ -39,11 +39,13 @@
             # Wait for 10 seconds
             flock -x -w 10 200 || { echo "Error: Timeout waiting for lock after 10 seconds"; exit 1; }
           fi
-          
-          tmux send-keys -t "$TARGET" "$MESSAGE"
+
+          tmux send-keys -t "$TARGET" Escape "[200~"
+          tmux send-keys -l -t "$TARGET" "$MESSAGE"
+          tmux send-keys -t "$TARGET" Escape "[201~"
           sleep 0.1
-          tmux send-keys -t "$TARGET" C-m
-          
+          tmux send-keys -t "$TARGET" Enter
+
         ) 200>"$LOCKFILE"
       '';
     })

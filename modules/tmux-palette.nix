@@ -297,5 +297,11 @@ in
     description = "Fuzzy search and read/edit knowledge notes"
     command = "knowledge-manager list"
     group = "AI"
+
+    [[commands]]
+    name = "Run Agent in Current Directory"
+    description = "List all agents and run the selected agent in zsh or new window"
+    command = "new-gemini-agent"
+    group = "AI"
   '';
 }

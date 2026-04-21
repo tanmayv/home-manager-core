@@ -10,11 +10,8 @@ let
     enable_tmux_based_agent_comms = false;
   };
   enableAgentComms = enableAiWorkflow && (aiFeatures.enable_tmux_based_agent_comms or false);
-  agentWrapperPrefix = if enableAgentComms then "agent-wrapper " else "";
 
   myAliases = {
-    jetski-cli = "${agentWrapperPrefix}/google/bin/releases/jetski-devs/tools/cli";
-    gemini-cli = "${agentWrapperPrefix}/google/bin/releases/gemini-cli/tools/gemini";
     run-jetski-web = "/google/bin/releases/jetski-devs/jetski-web/run_jetski.par";
     hg = "chg";
     hgi = "fig_zoxide_cd";

@@ -37,17 +37,6 @@
             tmux set-option -p -t "''${pane_id}" @agent_name "$agent_name"
             tmux select-pane -t "''${pane_id}" -T "$agent_name"
             tmux-status-refresh
-            
-            # 3. Gather others for context
-            all_agents=$(tmux list-panes -a -F "Agent: #{@agent_name} | Location: #{pane_id}" | grep -v "Agent:  |" || true)
-            
-            context="Note: You are ''${agent_name} in pane ''${pane_id}.
-Currently active agents in this environment:
-''${all_agents}"
-
-            # 4. Inject context (wait for TUI to be ready)
-            sleep 2
-            tmux send-keys -t "''${pane_id}" "From: system | ''${context}" C-m
           ) &
           
           # Run the tool in FOREGROUND to keep TUI interactive

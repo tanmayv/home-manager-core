@@ -1,8 +1,8 @@
 {
   username = "tanmayvijay";
-  config-location = "~/.config/minimal-cloudtop";
-  local_agent_knowledge_dir = "~/agent_knowledge";
-  local_agent_knowledge_create_command = ""; # e.g., "nn"
+  config-location = "~/minimal-cloudtop";
+  local_agent_knowledge_dir = "~/pkm/dots";
+  local_agent_knowledge_create_command = "nn --print-path"; # e.g., "nn"
   editor = "nvim";
   enable-ai-workflow = true;
   enable-neovim = true;
@@ -14,5 +14,6 @@
     enable_agent_knowledge = true;
     enable_ai_ssa_creator_skill = true;
     enable_tmux_based_agent_comms = true;
+    enable_home_manager_skill = true;
   };
 }

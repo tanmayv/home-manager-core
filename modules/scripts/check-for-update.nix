@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, userSettings, ... }:
 
 {
   home.packages = [
@@ -6,7 +6,9 @@
       name = "check-for-update";
       runtimeInputs = with pkgs; [ coreutils ];
       text = ''
-        CONFIG_DIR="$HOME/.config/minimal-cloudtop"
+        # shellcheck disable=SC2088
+        CONFIG_DIR="${userSettings.config-location}"
+        CONFIG_DIR="''${CONFIG_DIR/#\~/$HOME}"
         CACHE_FILE="$HOME/.cache/minimal-cloudtop-update-check"
 
         if [ ! -d "$CONFIG_DIR/.git" ]; then exit 0; fi
