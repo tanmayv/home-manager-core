@@ -177,7 +177,13 @@ def background_monitor():
 def handle_client(conn):
     try:
         conn.settimeout(2.0) # Safety timeout for reads
-        data = conn.recv(BUFFER_SIZE)
+        data = b""
+        while True:
+            chunk = conn.recv(BUFFER_SIZE)
+            if not chunk:
+                break
+            data += chunk
+            
         if not data:
             return
         

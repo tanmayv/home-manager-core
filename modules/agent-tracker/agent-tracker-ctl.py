@@ -13,6 +13,7 @@ def call_rpc(method, params={}):
         s.settimeout(5.0)
         s.connect(SOCKET_PATH)
         s.sendall(json.dumps({"jsonrpc": "2.0", "method": method, "params": params, "id": 1}).encode())
+        s.shutdown(socket.SHUT_WR)
         resp = s.recv(4096)
         data = json.loads(resp.decode())
         if "error" in data:
