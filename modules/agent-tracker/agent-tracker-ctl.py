@@ -48,6 +48,10 @@ def main():
     spin_parser.add_argument("name", help="Name for the new agent")
     spin_parser.add_argument("command", help="Command to run in the new agent")
 
+    read_inbox_parser = subparsers.add_parser("read-inbox", help="Read agent inbox")
+    read_inbox_parser.add_argument("--clear", action="store_true", help="Clear inbox after reading")
+    read_inbox_parser.add_argument("--name", help="Agent name to read inbox for (defaults to current agent)")
+
     args = parser.parse_args()
 
     if args.subcommand == "list":
@@ -119,6 +123,32 @@ def main():
         resolved_name = call_rpc("spin_agent", {"session": session, "command": args.command, "name": args.name})
         if resolved_name:
             print(f"Agent spun successfully as: {resolved_name}")
+    elif args.subcommand == "read-inbox":
+        if args.name:
+            agent_name = args.name
+        else:
+            try:
+                agent_name = subprocess.check_output(["tmux", "display-message", "-p", "#{@agent_name}"]).decode("utf-8").strip()
+            except subprocess.CalledProcessError:
+                print("Error: Failed to get agent name from tmux option. Are you in an agent pane?", file=sys.stderr)
+                sys.exit(1)
+                
+            if not agent_name:
+                print("Error: @agent_name option is empty. Are you in an agent pane?", file=sys.stderr)
+                sys.exit(1)
+            
+        inbox_content = call_rpc("get_inbox", {"agent_name": agent_name, "clear": args.clear})
+        if inbox_content:
+            if inbox_content == "Inbox is empty.":
+                print(inbox_content)
+            else:
+                for line in inbox_content.splitlines():
+                    if line:
+                        try:
+                            msg_obj = json.loads(line)
+                            print(f"[{msg_obj['timestamp']}] From {msg_obj['sender']}: {msg_obj['message']}")
+                        except json.JSONDecodeError:
+                            print(f"Raw: {line}")
     else:
         parser.print_help()
 

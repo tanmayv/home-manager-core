@@ -3,6 +3,7 @@ import logging
 import os
 import socket
 import sys
+import uuid
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', stream=sys.stderr)
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", 5))
@@ -100,7 +101,9 @@ def init_state():
                                     "tmux_socket": "", # Fallback to default
                                     "wrapper_pid": None,
                                     "status": "idle",
-                                    "waiting_approval": False
+                                    "waiting_approval": False,
+                                    "uuid": str(uuid.uuid4()),
+                                    "inbox": []
                                 }
                             logging.info(f"Recovered agent {agent_name} with PID {agent_pid}")
                     except subprocess.CalledProcessError as e:
@@ -145,6 +148,24 @@ def background_monitor():
                                 state[name]["pid"] = actual_pid
                 except:
                     pass
+            
+            # Flush inbox to file
+            inbox = info.get("inbox", [])
+            if inbox:
+                uuid_str = info.get("uuid")
+                if not uuid_str:
+                    uuid_str = name
+                inbox_file = os.path.join("/tmp/agent-inboxes", f"{uuid_str}.inbox")
+                try:
+                    os.makedirs(os.path.dirname(inbox_file), exist_ok=True)
+                    with open(inbox_file, "a") as f:
+                        for msg_obj in inbox:
+                            f.write(json.dumps(msg_obj) + "\n")
+                    with state_lock:
+                        if name in state:
+                            state[name]["inbox"] = []
+                except IOError as e:
+                    logging.error(f"Failed to flush inbox for {name}: {e}")
 
         if to_remove:
             with state_lock:
@@ -199,7 +220,9 @@ def handle_client(conn):
                         "tmux_socket": tmux_socket, 
                         "pid": None,
                         "status": "idle",
-                        "waiting_approval": False
+                        "waiting_approval": False,
+                        "uuid": str(uuid.uuid4()),
+                        "inbox": []
                     }
                     result = agent_name
             else:
@@ -294,13 +317,64 @@ def handle_client(conn):
             if sender_name and agent_name and msg:
                 with state_lock:
                     if agent_name in state:
+                        import datetime
+                        msg_obj = {
+                            "sender": sender_name,
+                            "timestamp": datetime.datetime.utcnow().isoformat(),
+                            "message": msg
+                        }
+                        if "inbox" not in state[agent_name]:
+                            state[agent_name]["inbox"] = []
+                        state[agent_name]["inbox"].append(msg_obj)
+                        
                         info = state[agent_name]
-                        full_msg = f"From {sender_name}: {msg}"
-                        # Queue the slow tmux interaction to keep this thread responsive
-                        task_queue.put({'cmd': ["tmux", "-S", info["tmux_socket"], "send-keys", "-t", info["tmux_pane"], full_msg, "Enter"]})
+                        notify_msg = f"[New message in inbox! Use agent-tracker-ctl read-inbox]"
+                        task_queue.put({'cmd': ["tmux", "-S", info["tmux_socket"], "send-keys", "-t", info["tmux_pane"], notify_msg, "Enter"]})
                         result = True
                     else:
                         error = {"code": -32602, "message": "Target agent not found"}
+            else:
+                error = {"code": -32602, "message": "Invalid params"}
+        elif method == "get_inbox":
+            agent_name = params.get("agent_name")
+            clear = params.get("clear", False)
+            
+            if agent_name:
+                # Trigger flush first to ensure we get all messages
+                with state_lock:
+                    if agent_name in state:
+                        info = state[agent_name]
+                        inbox = info.get("inbox", [])
+                        uuid_str = info.get("uuid")
+                        if not uuid_str:
+                            uuid_str = agent_name
+                            
+                        inbox_file = os.path.join("/tmp/agent-inboxes", f"{uuid_str}.inbox")
+                        
+                        if inbox:
+                            try:
+                                os.makedirs(os.path.dirname(inbox_file), exist_ok=True)
+                                with open(inbox_file, "a") as f:
+                                    for msg_obj in inbox:
+                                        f.write(json.dumps(msg_obj) + "\n")
+                                state[agent_name]["inbox"] = []
+                            except IOError as e:
+                                logging.error(f"Failed to flush inbox on demand for {agent_name}: {e}")
+                                
+                        # Now read the file
+                        logging.info(f"Checking inbox file: {inbox_file}")
+                        if os.path.exists(inbox_file):
+                            try:
+                                with open(inbox_file, "r") as f:
+                                    result = f.read()
+                                if clear:
+                                    os.remove(inbox_file)
+                            except IOError as e:
+                                error = {"code": -32603, "message": f"Failed to read inbox: {e}"}
+                        else:
+                            result = "Inbox is empty."
+                    else:
+                        error = {"code": -32602, "message": "Agent not found"}
             else:
                 error = {"code": -32602, "message": "Invalid params"}
         else:
