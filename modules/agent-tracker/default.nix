@@ -46,7 +46,8 @@ in
             parser = argparse.ArgumentParser(description="Agent Tracker Control")
             subparsers = parser.add_subparsers(dest="command", help="Subcommands")
 
-            subparsers.add_parser("list", help="List agents for status bar")
+            subparsers.add_parser("list", help="List agents in JSON format")
+            subparsers.add_parser("status-bar", help="List agents for status bar")
 
             send_parser = subparsers.add_parser("send-message", help="Send message to agent")
             send_parser.add_argument("agent_name", help="Target agent name")
@@ -58,6 +59,10 @@ in
             args = parser.parse_args()
 
             if args.command == "list":
+                agents = call_rpc("list")
+                print(json.dumps(agents))
+
+            elif args.command == "status-bar":
                 agents = call_rpc("list")
                 if not agents:
                     sys.exit(0)
@@ -184,21 +189,37 @@ in
               finally:
                   writer.close()
 
+          def is_process_alive(pid):
+              try:
+                  state_char = None
+                  ppid = None
+                  with open(f"/proc/{pid}/status", "r") as f:
+                      for line in f:
+                          if line.startswith("State:"):
+                              state_char = line.split()[1]
+                          elif line.startswith("PPid:"):
+                              ppid = int(line.split()[1])
+                  
+                  if state_char is None or ppid is None:
+                      return False
+                      
+                  # Consider dead if zombie or orphaned (PPid == 1)
+                  if state_char == "Z" or ppid == 1:
+                      return False
+                  return True
+              except FileNotFoundError:
+                  return False
+              except Exception:
+                  return False
+
           async def check_alive():
               while True:
                   await asyncio.sleep(5)
                   to_remove = []
                   for name, info in state.items():
                       pid = info.get("pid")
-                      if pid:
-                          try:
-                              os.kill(pid, 0)
-                          except ProcessLookupError:
-                              to_remove.append(name)
-                          except PermissionError:
-                              pass
-                          except Exception:
-                              to_remove.append(name)
+                      if pid and not is_process_alive(pid):
+                          to_remove.append(name)
                   for name in to_remove:
                       print(f"Removing dead agent: {name}")
                       del state[name]

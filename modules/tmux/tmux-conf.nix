@@ -75,7 +75,7 @@ let
     
     # Common components
     SESSIONS_PART="#[align=left,fg=${palette.color4},bold] Active Sessions: #[fg=${palette.color8},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\")"
-    AGENTS_PART="#[align=left,fg=${palette.color4},bold] Active Agents: #[fg=${palette.color8},nobold]#(agent-tracker-ctl list)"
+    AGENTS_PART="#[align=left,fg=${palette.color4},bold] Active Agents: #[fg=${palette.color8},nobold]#(agent-tracker-ctl status-bar)"
     RIGHT_PART="#[align=right,fg=${palette.color5}]#(hg-cl) #[fg=default,nobold]#(hg-age) "
 
     if [ "$num_sessions" -gt 1 ]; then

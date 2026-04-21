@@ -54,10 +54,11 @@ EOF
             
             # Find newest child of parent shell ($$)
             pid=$(pgrep -P $$ | sort -n | tail -n 1)
+            echo "Captured PID: $pid" >> /tmp/wrapper.log
             
             # Register with agent-tracker
             tmux_socket="''${TMUX%%,*}"
-            python3 -c "import socket, json, os, sys; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.connect(os.path.expanduser('~/.cache/agent-tracker.sock')); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'register', 'params': {'agent_name': sys.argv[1], 'session': sys.argv[2], 'tmux_pane': sys.argv[3], 'pid': int(sys.argv[4]), 'tmux_socket': sys.argv[5]}, 'id': 1}).encode())" "$agent_name" "$session_name" "$pane_id" "$pid" "$tmux_socket" 2>/dev/null || true
+            python3 -c "import socket, json, os, sys; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.connect(os.path.expanduser('~/.cache/agent-tracker.sock')); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'register', 'params': {'agent_name': sys.argv[1], 'session': sys.argv[2], 'tmux_pane': sys.argv[3], 'pid': int(sys.argv[4]), 'tmux_socket': sys.argv[5]}, 'id': 1}).encode())" "$agent_name" "$session_name" "$pane_id" "$pid" "$tmux_socket" 2>>/tmp/wrapper.log || true
           ) &
           
           # Run the tool in FOREGROUND to keep TUI interactive
