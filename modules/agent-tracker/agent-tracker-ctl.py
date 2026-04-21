@@ -28,7 +28,7 @@ def call_rpc(method, params={}):
 
 def main():
     parser = argparse.ArgumentParser(description="Agent Tracker Control")
-    subparsers = parser.add_subparsers(dest="command", help="Subcommands")
+    subparsers = parser.add_subparsers(dest="subcommand", help="Subcommands")
 
     subparsers.add_parser("list", help="List agents in JSON format")
     subparsers.add_parser("status-bar", help="List agents for status bar")
@@ -44,13 +44,17 @@ def main():
     rename_parser.add_argument("old_name", help="Current agent name")
     rename_parser.add_argument("new_name", help="New agent name")
 
+    spin_parser = subparsers.add_parser("spin", help="Spin a new agent")
+    spin_parser.add_argument("name", help="Name for the new agent")
+    spin_parser.add_argument("command", help="Command to run in the new agent")
+
     args = parser.parse_args()
 
-    if args.command == "list":
+    if args.subcommand == "list":
         agents = call_rpc("list")
         print(json.dumps(agents))
 
-    elif args.command == "status-bar":
+    elif args.subcommand == "status-bar":
         agents = call_rpc("list")
         if not agents:
             sys.exit(0)
@@ -81,11 +85,11 @@ def main():
 
         print(" · ".join(formatted))
 
-    elif args.command == "send-message":
+    elif args.subcommand == "send-message":
         call_rpc("send_message", {"sender_name": "cli-user", "agent_name": args.agent_name, "message": args.message})
         print("Message sent.")
 
-    elif args.command == "focus":
+    elif args.subcommand == "focus":
         agents = call_rpc("list")
         if args.agent_name in agents:
             info = agents[args.agent_name]
@@ -102,9 +106,19 @@ def main():
         else:
             print(f"Agent {args.agent_name} not found.", file=sys.stderr)
             sys.exit(1)
-    elif args.command == "rename":
+    elif args.subcommand == "rename":
         call_rpc("rename", {"old_name": args.old_name, "new_name": args.new_name})
         print("Agent renamed.")
+    elif args.subcommand == "spin":
+        try:
+            session = subprocess.check_output(["tmux", "display-message", "-p", "#S"]).decode("utf-8").strip()
+        except subprocess.CalledProcessError:
+            print("Error: Failed to get current tmux session. Are you in a tmux session?", file=sys.stderr)
+            sys.exit(1)
+            
+        resolved_name = call_rpc("spin_agent", {"session": session, "command": args.command, "name": args.name})
+        if resolved_name:
+            print(f"Agent spun successfully as: {resolved_name}")
     else:
         parser.print_help()
 

@@ -215,6 +215,22 @@ def handle_client(conn):
                         if new_name not in state:
                             state[new_name] = state.pop(old_name)
                             result = True
+                            
+                            info = state[new_name]
+                            tmux_pane = info.get("tmux_pane")
+                            tmux_socket = info.get("tmux_socket")
+                            if tmux_pane:
+                                cmd_opt = ["tmux"]
+                                if tmux_socket:
+                                    cmd_opt.extend(["-S", tmux_socket])
+                                cmd_opt.extend(["set-option", "-p", "-t", tmux_pane, "@agent_name", new_name])
+                                task_queue.put({'cmd': cmd_opt})
+                                
+                                cmd_title = ["tmux"]
+                                if tmux_socket:
+                                    cmd_title.extend(["-S", tmux_socket])
+                                cmd_title.extend(["select-pane", "-t", tmux_pane, "-T", new_name])
+                                task_queue.put({'cmd': cmd_title})
                         else:
                             error = {"code": -32602, "message": "New name already exists"}
                     else:
