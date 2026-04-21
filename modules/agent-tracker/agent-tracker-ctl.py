@@ -10,6 +10,7 @@ SOCKET_PATH = os.path.expanduser("~/.cache/agent-tracker.sock")
 def call_rpc(method, params={}):
     try:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(5.0)
         s.connect(SOCKET_PATH)
         s.sendall(json.dumps({"jsonrpc": "2.0", "method": method, "params": params, "id": 1}).encode())
         resp = s.recv(4096)
@@ -18,8 +19,11 @@ def call_rpc(method, params={}):
             print(f"Error: {data['error']['message']}", file=sys.stderr)
             sys.exit(1)
         return data.get("result")
-    except Exception as e:
-        print(f"Failed to connect to tracker: {e}", file=sys.stderr)
+    except (socket.error, socket.timeout) as e:
+        print(f"Socket communication failed: {e}", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Failed to decode response from tracker: {e}", file=sys.stderr)
         sys.exit(1)
 
 def main():
@@ -53,7 +57,7 @@ def main():
 
         try:
             current_pane = subprocess.check_output(["tmux", "display-message", "-p", "#{pane_id}"]).decode("utf-8").strip()
-        except:
+        except subprocess.CalledProcessError:
             current_pane = ""
 
         formatted = []

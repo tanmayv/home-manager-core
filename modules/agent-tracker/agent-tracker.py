@@ -54,7 +54,7 @@ def is_process_alive(pid):
         return True
     except FileNotFoundError:
         return False
-    except Exception:
+    except (IOError, ValueError):
         return False
 
 def init_state():
@@ -97,9 +97,9 @@ def init_state():
                                     "waiting_approval": False
                                 }
                             logging.info(f"Recovered agent {agent_name} with PID {agent_pid}")
-                    except Exception as e:
+                    except subprocess.CalledProcessError as e:
                         logging.error(f"Error recovering agent {agent_name}: {e}")
-    except Exception as e:
+    except subprocess.CalledProcessError as e:
         logging.error(f"Error during init_state: {e}")
 
 def background_monitor():
@@ -228,13 +228,17 @@ def handle_client(conn):
                         num += 1
                     agent_name = f"{session}-agent-{num}"
                 
+                import shlex
                 tmux_cmd = ["tmux"]
                 if target_pane:
                     tmux_cmd.extend(["split-window", "-t", target_pane])
                 else:
                     tmux_cmd.extend(["split-window"])
                 
-                full_cmd = f"env SUGGESTED_AGENT_NAME={agent_name} agent-wrapper {command}"
+                tmux_cmd.extend(["-e", f"SUGGESTED_AGENT_NAME={agent_name}"])
+                
+                quoted_parts = [shlex.quote(part) for part in shlex.split(command)]
+                full_cmd = f"agent-wrapper {' '.join(quoted_parts)}"
                 tmux_cmd.append(full_cmd)
                 
                 try:
@@ -271,8 +275,10 @@ def handle_client(conn):
             resp["result"] = result
 
         conn.sendall(json.dumps(resp).encode())
+    except (socket.error, socket.timeout) as e:
+        logging.error(f"Socket error handling client: {e}")
     except Exception as e:
-        logging.error(f"Error handling client: {e}")
+        logging.error(f"Unexpected error handling client: {e}")
     finally:
         conn.close()
 
@@ -296,7 +302,7 @@ def main():
             conn, _ = server.accept()
             # Each connection gets its own thread for parallelism
             threading.Thread(target=handle_client, args=(conn,), daemon=True).start()
-        except Exception as e:
+        except socket.error as e:
             logging.error(f"Server accept error: {e}")
             time.sleep(1)
 
