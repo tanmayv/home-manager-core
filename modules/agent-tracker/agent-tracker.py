@@ -166,12 +166,16 @@ def handle_client(conn):
             tmux_pane = params.get("tmux_pane")
             wrapper_pid = params.get("wrapper_pid")
             tmux_socket = params.get("tmux_socket")
+            suggested_name = params.get("suggested_name")
             if session and tmux_pane and wrapper_pid and tmux_socket:
                 with state_lock:
-                    num = 1
-                    while f"{session}-agent-{num}" in state:
-                        num += 1
-                    agent_name = f"{session}-agent-{num}"
+                    if suggested_name and suggested_name not in state:
+                        agent_name = suggested_name
+                    else:
+                        num = 1
+                        while f"{session}-agent-{num}" in state:
+                            num += 1
+                        agent_name = f"{session}-agent-{num}"
                     
                     state[agent_name] = {
                         "session": session, 
@@ -211,6 +215,33 @@ def handle_client(conn):
                             error = {"code": -32602, "message": "New name already exists"}
                     else:
                         error = {"code": -32602, "message": "Agent not found"}
+            else:
+                error = {"code": -32602, "message": "Invalid params"}
+        elif method == "spin_agent":
+            session = params.get("session")
+            command = params.get("command")
+            target_pane = params.get("target_pane")
+            if session and command:
+                with state_lock:
+                    num = 1
+                    while f"{session}-agent-{num}" in state:
+                        num += 1
+                    agent_name = f"{session}-agent-{num}"
+                
+                tmux_cmd = ["tmux"]
+                if target_pane:
+                    tmux_cmd.extend(["split-window", "-t", target_pane])
+                else:
+                    tmux_cmd.extend(["split-window"])
+                
+                full_cmd = f"env SUGGESTED_AGENT_NAME={agent_name} agent-wrapper {command}"
+                tmux_cmd.append(full_cmd)
+                
+                try:
+                    subprocess.run(tmux_cmd, check=True, capture_output=True)
+                    result = agent_name
+                except subprocess.CalledProcessError as e:
+                    error = {"code": -32603, "message": f"Failed to spin agent: {e.stderr.decode()}"}
             else:
                 error = {"code": -32602, "message": "Invalid params"}
         elif method == "send_message":
