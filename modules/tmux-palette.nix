@@ -312,8 +312,8 @@ in
     group = "Navigation"
 
     [[commands]]
-    name = "Interactive cd to new window"
-    description = "Select a directory from history and open it in a new window"
+    name = "Open Recent Directories"
+    description = "Open recent directory in new window"
     command = 'target=$(zsh -i -c "cd -i --print") && [[ -n "$target" ]] && tmux new-window -c "$target"'
     group = "Navigation"
     '' else ""}
