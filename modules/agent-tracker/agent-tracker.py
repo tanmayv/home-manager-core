@@ -73,7 +73,7 @@ def init_state():
             if len(parts) >= 2:
                 pane_id = parts[0]
                 agent_name = parts[1]
-                if agent_name and agent_name.startswith("minimal-cloudtop-agent-"):
+                if agent_name:
                     logging.info(f"Found recovered agent: {agent_name} in pane {pane_id}")
                     try:
                         tty = subprocess.check_output(["tmux", "display-message", "-p", "-t", pane_id, "#{pane_tty}"]).decode("utf-8").strip()
@@ -119,13 +119,18 @@ def background_monitor():
             
         for name, info in agents_snapshot.items():
             wrapper_pid = info.get("wrapper_pid")
-            if wrapper_pid and not is_process_alive(wrapper_pid):
-                to_remove.append(name)
-                continue
-            elif not wrapper_pid:
-                # Recovered agent fallback! Check PID directly!
-                pid = info.get("pid")
-                if pid and not is_process_alive(pid):
+            pid = info.get("pid")
+            
+            wrapper_alive = wrapper_pid and is_process_alive(wrapper_pid)
+            child_alive = pid and is_process_alive(pid)
+            
+            if wrapper_pid:
+                if not wrapper_alive and not child_alive:
+                    to_remove.append(name)
+                    continue
+            else:
+                # Recovered agent fallback
+                if pid and not child_alive:
                     to_remove.append(name)
                     continue
 
