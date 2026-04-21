@@ -61,51 +61,7 @@ let
     print(output)
   '';
 
-  tmux-agent-list-formatter = pkgs.writeScriptBin "tmux-agent-list-formatter" ''
-    #!${pkgs.python3}/bin/python3
-    import sys
-    import subprocess
-    import socket
-    import json
-    import os
 
-    width = int(sys.argv[1]) if len(sys.argv) > 1 else 100
-    available = width - 20
-
-    # Get current pane ID to highlight active agent
-    try:
-        current_pane = subprocess.check_output(["tmux", "display-message", "-p", "#{pane_id}"]).decode("utf-8").strip()
-    except:
-        current_pane = ""
-
-    # Get all agents from agent-tracker
-    try:
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.connect(os.path.expanduser("~/.cache/agent-tracker.sock"))
-        s.sendall(json.dumps({"jsonrpc": "2.0", "method": "list", "id": 1}).encode())
-        resp = s.recv(4096)
-        data = json.loads(resp.decode())
-        agents_dict = data.get("result", {})
-    except Exception:
-        sys.exit(0)
-
-    if not agents_dict:
-        sys.exit(0)
-
-    formatted = []
-    for name, info in agents_dict.items():
-        display_name = name
-        # Highlight if it's the agent in the current focused pane
-        if info.get("tmux_pane") == current_pane:
-            display_name = f"#[fg=${palette.color3},bold]{name}#[fg=${palette.color8},nobold]"
-            
-        # Range format: agent:PANE_ID
-        range_arg = f"agent:{info.get('tmux_pane')}"
-        formatted.append(f"#[range=user|{range_arg}]{display_name}#[norange]")
-
-    res = ' · '.join(formatted)
-    print(res)
-  '';
 
   tmux-status-refresh = pkgs.writeScriptBin "tmux-status-refresh" ''
     #!${pkgs.bash}/bin/bash
@@ -119,7 +75,7 @@ let
     
     # Common components
     SESSIONS_PART="#[align=left,fg=${palette.color4},bold] Active Sessions: #[fg=${palette.color8},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\")"
-    AGENTS_PART="#[align=left,fg=${palette.color4},bold] Active Agents: #[fg=${palette.color8},nobold]#(tmux-agent-list-formatter \"#{client_width}\")"
+    AGENTS_PART="#[align=left,fg=${palette.color4},bold] Active Agents: #[fg=${palette.color8},nobold]#(agent-tracker-ctl list)"
     RIGHT_PART="#[align=right,fg=${palette.color5}]#(hg-cl) #[fg=default,nobold]#(hg-age) "
 
     if [ "$num_sessions" -gt 1 ]; then
@@ -157,7 +113,6 @@ in
     home.packages = [
       tmux-sessionizer
       tmux-session-list-formatter
-      tmux-agent-list-formatter
       tmux-status-refresh
       hg-age
       hg-cl
