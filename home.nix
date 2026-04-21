@@ -9,7 +9,8 @@
   ] ++ (if userSettings.enable-ai-workflow then [ ./modules/ai-workflow ] else [])
     ++ (if userSettings.enable-neovim then [ ./modules/neovim/default.nix ] else [])
     ++ (if userSettings.import-extras or false then [ ./modules/extras ] else [])
-    ++ (if userSettings.enable-smart-cd or false then [ ./modules/smart-cd ] else []);
+    ++ (if userSettings.enable-smart-cd or false then [ ./modules/smart-cd ] else [])
+    ++ (if userSettings.enable-agent-tracker or false then [ ./modules/agent-tracker ] else []);
 
   home.username = username;
   home.homeDirectory = "/usr/local/google/home/${username}";
@@ -27,6 +28,8 @@
 
   programs.smart-cd.enable = userSettings.enable-smart-cd or false;
   programs.smart-cd.maxParents = userSettings.smart-cd-max-parents or 4;
+
+  services.agent-tracker.enable = userSettings.enable-agent-tracker or false;
 
   home.packages = with pkgs; [
     fzf

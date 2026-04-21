@@ -78,6 +78,7 @@ To update, simply run `nix flake update` in your personal repository.
 | `auto-switch-workspace-on-cd` | Automatically switches tmux session when `cd`-ing into a workspace. | Standard `cd` behavior; sessions stay unchanged. |
 | `auto-switch-workspace-on-hgd` | `hgd` command triggers an automatic tmux session switch. | `hgd` changes directory but doesn't switch sessions. |
 | `enable-auto-codesearch-with-cd` | Automatically prompts to search via CodeSearch when `cd` fails. | Suppresses the prompt on `cd` failure (but `cd --cs` still works). |
+| `enable-agent-tracker` | Enables the background agent-tracker daemon. | The daemon is not started. |
 
 ### AI Features (`ai_features` block)
 

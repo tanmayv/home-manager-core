@@ -14,6 +14,7 @@
   smart-cd-max-parents = 4;
   enable-auto-codesearch-with-cd = true;
   preferred-scripting-language = "NuShell";
+  enable-agent-tracker = true;
   ai_features = {
     enable_agent_knowledge = true;
     enable_ai_ssa_creator_skill = true;
