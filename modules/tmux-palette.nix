@@ -280,7 +280,7 @@ in
     group = "Utility"
 
     [[commands]]
-    name = "Search via CodeSearch"
+    name = "Search File via CodeSearch"
     description = "Interactive CodeSearch with fzf and preview"
     command = "tmux-cs-fzf"
     group = "Navigation"
@@ -308,7 +308,13 @@ in
     [[commands]]
     name = "Search directory with CodeSearch"
     description = "Interactive CodeSearch for directories and switch to it in a new window"
-    command = 'TARGET_PANE=$(tmux display-message -p "#{last_pane_id}") && TARGET_PATH=$(tmux display-message -t "$TARGET_PANE" -p "#{pane_current_path}") && read -p "Query: " query && [[ -n "$query" ]] && tmux new-window -c "$TARGET_PATH" -n "cs-cd" "cd --cs $query; zsh"'
+    command = "tmux-cs-cd"
+    group = "Navigation"
+
+    [[commands]]
+    name = "Interactive cd to new window"
+    description = "Select a directory from history and open it in a new window"
+    command = 'target=$(zsh -i -c "cd -i --print") && [[ -n "$target" ]] && tmux new-window -c "$target"'
     group = "Navigation"
     '' else ""}
   '';

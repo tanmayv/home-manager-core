@@ -22,6 +22,16 @@ This skill provides procedures and standards for modifying the Minimal Cloudtop 
 - **Contributing Back:** Only use the `master` branch if you intend to submit a pull request or contribute changes back to the upstream repository.
 - **Updates:** When updating, rebase your personal branch onto the latest upstream changes to preserve your customizations in `setup.nix`.
 
+## Process and Planning Guidelines
+
+When requested to make changes by the user:
+
+1. **Use Non-Main Branch**: Always perform work on a non-`main` branch (e.g., `develop` or a specific feature branch).
+2. **Implementation Plan**:
+   - Create an implementation plan before making changes (when in planning mode).
+   - **Include Git steps** in the plan: specify the branch to use and the commit step at the end.
+3. **Commit After Approval**: Once the implementation plan is approved and changes are made and verified, perform a `git commit` to save the work on the branch.
+
 ## Common Workflows
 
 ### 1. Adding a New Feature/Module

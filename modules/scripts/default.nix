@@ -14,6 +14,7 @@ in
     ./fuse_fix.nix
     ./build-and-switch.nix
     ./tmux-cs-fzf.nix
+    ./tmux-cs-cd.nix
     ./knowledge-manager.nix
     ./check-for-update.nix
     ./new-gemini-agent.nix

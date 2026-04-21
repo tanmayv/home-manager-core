@@ -150,22 +150,65 @@ in
       }
 
       function cd() {
-        local dest
-        if [[ "$#" -ge 1 && "$1" == "--cs" ]]; then
-          shift
-          cd-cs "$@"
+        local print_only=false
+        local interactive=false
+        local codesearch=false
+        local help=false
+        local args=()
+
+        while [[ "$#" -gt 0 ]]; do
+          case "$1" in
+            --print)
+              print_only=true
+              shift
+              ;;
+            -i)
+              interactive=true
+              shift
+              ;;
+            --cs)
+              codesearch=true
+              shift
+              ;;
+            -h|--help)
+              help=true
+              shift
+              ;;
+            *)
+              args+=("$1")
+              shift
+              ;;
+          esac
+        done
+
+        if [[ "$help" == "true" ]]; then
+          echo "Usage: cd [options] [path|query]"
+          echo "Options:"
+          echo "  -i          Interactive mode (uses zoxide and fzf)"
+          echo "  --cs        Search via CodeSearch"
+          echo "  --print     Only print the target path, do not change directory"
+          echo "  -h, --help  Show this help message"
+          return 0
+        fi
+
+        if [[ "$codesearch" == "true" ]]; then
+          cd-cs "''${args[@]}"
           if [[ -f /tmp/cd-cs-result ]]; then
             local target_dir
             target_dir=$(cat /tmp/cd-cs-result | tr -d '\n')
             rm -f /tmp/cd-cs-result
             if [[ -n "$target_dir" && -d "$target_dir" ]]; then
-              builtin cd "$target_dir"
+              if [[ "$print_only" == "true" ]]; then
+                echo "$target_dir"
+              else
+                builtin cd "$target_dir"
+              fi
             fi
           fi
           return 0
         fi
 
-        if [[ "$#" -eq 1 && "$1" == "-i" ]]; then
+        if [[ "$interactive" == "true" ]]; then
           local selected
           selected=$(zoxide query -l | while read -r path; do
             local display_path="$path"
@@ -179,24 +222,28 @@ in
 
           if [[ -n "$selected" ]]; then
             local target_dir="''${selected%%|*}"
-            builtin cd "$target_dir"
+            if [[ "$print_only" == "true" ]]; then
+              echo "$target_dir"
+            else
+              builtin cd "$target_dir"
+            fi
           fi
           return 0
         fi
 
-        if [[ "$#" -eq 0 ]]; then
+        local dest
+        if [[ "''${#args[@]}" -eq 0 ]]; then
           dest="$HOME"
-        elif [[ "$#" -eq 1 && "$1" == "-" ]]; then
+        elif [[ "''${#args[@]}" -eq 1 && "''${args[1]}" == "-" ]]; then
           dest="$OLDPWD"
-        elif [[ "$#" -eq 1 && -d "$1" ]]; then
-          dest="$1"
+        elif [[ "''${#args[@]}" -eq 1 && -d "''${args[1]}" ]]; then
+          dest="''${args[1]}"
         else
-          dest=$(zoxide query --exclude "$PWD" -- "$@" 2>/dev/null)
+          dest=$(zoxide query --exclude "$PWD" -- "''${args[@]}" 2>/dev/null)
           if [[ -z "$dest" ]]; then
             local prompt_codesearch=false
-            # Only try builtin cd if there is exactly 1 argument to avoid Zsh string replacement behavior
-            if [[ "$#" -eq 1 ]]; then
-              if ! builtin cd "$@" 2>/dev/null; then
+            if [[ "''${#args[@]}" -eq 1 ]]; then
+              if ! builtin cd "''${args[1]}" 2>/dev/null; then
                 prompt_codesearch=true
               fi
             else
@@ -209,28 +256,24 @@ in
                 echo -n "Search via CodeSearch? [y/N] "
                 read response
                 if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-                  cd --cs "$@"
-                  if [[ -f /tmp/cd-cs-result ]]; then
-                    local target_dir
-                    target_dir=$(cat /tmp/cd-cs-result | tr -d '\n')
-                    rm -f /tmp/cd-cs-result
-                    if [[ -n "$target_dir" && -d "$target_dir" ]]; then
-                      builtin cd "$target_dir"
-                      search_done=true
-                    fi
-                  fi
+                  cd --cs "''${args[@]}"
+                  search_done=true
                 fi
               fi
               
               if [[ "$search_done" == "false" ]]; then
-                echo "cd: no such file or directory: $@"
+                echo "cd: no such file or directory: ''${args[@]}"
               fi
             fi
             return
           fi
         fi
         
-        _fast_workspace_cd "$dest" "$1"
+        if [[ "$print_only" == "true" ]]; then
+          echo "$dest"
+        else
+          _fast_workspace_cd "$dest" "''${args[1]}"
+        fi
       }
 
       # Initialize Prompt
