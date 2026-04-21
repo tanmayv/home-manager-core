@@ -322,8 +322,16 @@ def handle_client(conn):
 
 def main():
     os.makedirs(os.path.dirname(SOCKET_PATH), exist_ok=True)
-    if os.path.exists(SOCKET_PATH):
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.connect(SOCKET_PATH)
+        logging.error(f"Another instance of agent-tracker is already listening on {SOCKET_PATH}")
+        sys.exit(1)
+    except ConnectionRefusedError:
+        logging.info(f"Stale socket found at {SOCKET_PATH}, removing it.")
         os.remove(SOCKET_PATH)
+    except FileNotFoundError:
+        pass
 
     init_state()
     # Start background monitor thread
