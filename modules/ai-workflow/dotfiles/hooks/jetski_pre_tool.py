@@ -9,8 +9,14 @@ try:
 except json.JSONDecodeError:
     input_data = None
 
+try:
+    with open(f"/proc/{os.getppid()}/comm", "r") as f:
+        caller_name = f.read().strip()
+except Exception:
+    caller_name = "unknown"
+
 with open("/tmp/hooks.log", "a") as f:
-    f.write(f"[HOOK] Event: JetskiPreTool, Input: {input_data}\n")
+    f.write(f"[HOOK] Event: JetskiPreTool, Caller: {caller_name}, Input: {input_data}\n")
 
 # Call the common pre_tool hook
 try:

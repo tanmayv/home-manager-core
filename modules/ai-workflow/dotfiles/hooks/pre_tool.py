@@ -9,8 +9,14 @@ try:
 except json.JSONDecodeError:
     input_data = None
 
+try:
+    with open(f"/proc/{os.getppid()}/comm", "r") as f:
+        caller_name = f.read().strip()
+except Exception:
+    caller_name = "unknown"
+
 with open("/tmp/hooks.log", "a") as f:
-    f.write(f"[HOOK] Event: PreTool, Input: {input_data}\n")
+    f.write(f"[HOOK] Event: PreTool, Caller: {caller_name}, Input: {input_data}\n")
 
 try:
     pane_id = os.environ.get("TMUX_PANE")

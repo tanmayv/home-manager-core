@@ -11,11 +11,18 @@ except json.JSONDecodeError:
 
 parent_pid = os.getppid()
 
+try:
+    with open(f"/proc/{os.getppid()}/comm", "r") as f:
+        caller_name = f.read().strip()
+except Exception:
+    caller_name = "unknown"
+
 with open("/tmp/hooks.log", "a") as f:
-    f.write(f"[HOOK] Event: AfterAgent, Parent PID: {parent_pid}, Input: {input_data}\n")
+    f.write(f"[HOOK] Event: AfterAgent, Caller: {caller_name}, Parent PID: {parent_pid}, Input: {input_data}\n")
 
 try:
-    agent_name = subprocess.check_output(["tmux", "display-message", "-p", "#{@agent_name}"]).decode().strip()
+    pane_id = os.environ.get("TMUX_PANE")
+    agent_name = subprocess.check_output(["tmux", "display-message", "-p", "-t", pane_id, "#{@agent_name}"]).decode().strip()
     if agent_name:
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.connect(os.path.expanduser("~/.cache/agent-tracker.sock"))
