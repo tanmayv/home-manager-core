@@ -6,6 +6,7 @@ import sys
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', stream=sys.stderr)
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", 5))
+BUFFER_SIZE = 4096
 import threading
 import queue
 import subprocess
@@ -35,6 +36,7 @@ def tmux_worker():
 threading.Thread(target=tmux_worker, daemon=True).start()
 
 def is_process_alive(pid):
+    """Checks if a process is alive. Note: This is Linux-specific due to /proc usage."""
     try:
         state_char = None
         ppid = None
@@ -54,7 +56,11 @@ def is_process_alive(pid):
         return True
     except FileNotFoundError:
         return False
-    except (IOError, ValueError):
+    except (IOError, ValueError) as e:
+        logging.debug(f"Error reading process status for PID {pid}: {e}")
+        return False
+    except Exception as e:
+        logging.debug(f"Unexpected error in is_process_alive for PID {pid}: {e}")
         return False
 
 def init_state():
@@ -145,7 +151,7 @@ def background_monitor():
 def handle_client(conn):
     try:
         conn.settimeout(2.0) # Safety timeout for reads
-        data = conn.recv(4096)
+        data = conn.recv(BUFFER_SIZE)
         if not data:
             return
         
