@@ -327,7 +327,8 @@ def handle_client(conn):
                         msg_obj = {
                             "sender": sender_name,
                             "timestamp": datetime.datetime.utcnow().isoformat(),
-                            "message": msg
+                            "message": msg,
+                            "read": False
                         }
                         if "inbox" not in state[agent_name]:
                             state[agent_name]["inbox"] = []
@@ -371,12 +372,30 @@ def handle_client(conn):
                         logging.info(f"Checking inbox file: {inbox_file}")
                         if os.path.exists(inbox_file):
                             try:
+                                all_messages = []
+                                unread_messages = []
                                 with open(inbox_file, "r") as f:
-                                    result = f.read()
+                                    for line in f:
+                                        if line.strip():
+                                            try:
+                                                msg_obj = json.loads(line)
+                                                if not msg_obj.get("read", False):
+                                                    unread_messages.append(msg_obj)
+                                                    msg_obj["read"] = True
+                                                all_messages.append(msg_obj)
+                                            except json.JSONDecodeError:
+                                                pass
+                                
+                                result = "".join([json.dumps(m) + "\n" for m in unread_messages])
+                                
                                 if clear:
                                     os.remove(inbox_file)
+                                else:
+                                    with open(inbox_file, "w") as f:
+                                        for m in all_messages:
+                                            f.write(json.dumps(m) + "\n")
                             except IOError as e:
-                                error = {"code": -32603, "message": f"Failed to read inbox: {e}"}
+                                error = {"code": -32603, "message": f"Failed to access inbox file: {e}"}
                         else:
                             result = "Inbox is empty."
                     else:

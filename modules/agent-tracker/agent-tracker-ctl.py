@@ -150,6 +150,8 @@ def main():
                             print(f"[{msg_obj['timestamp']}] From {msg_obj['sender']}: {msg_obj['message']}")
                         except json.JSONDecodeError:
                             print(f"Raw: {line}")
+        else:
+            print("No unread messages.")
     else:
         parser.print_help()
 
