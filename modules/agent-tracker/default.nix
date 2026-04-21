@@ -4,6 +4,14 @@ with lib;
 
 let
   cfg = config.services.agent-tracker;
+  agentTrackerFiles = pkgs.stdenv.mkDerivation {
+    name = "agent-tracker-files";
+    src = ./.;
+    installPhase = ''
+      mkdir -p $out
+      cp -r * $out/
+    '';
+  };
 in
 {
   options.services.agent-tracker = {
@@ -27,10 +35,7 @@ in
         Description = "Agent Tracker Daemon";
       };
       Service = {
-        ExecStart = "${pkgs.writeScriptBin "agent-tracker" ''
-          #!${pkgs.python3}/bin/python3
-          ${builtins.readFile ./agent-tracker.py}
-        ''}/bin/agent-tracker";
+        ExecStart = "${pkgs.python3}/bin/python3 ${agentTrackerFiles}/agent-tracker.py";
         Restart = "always";
       };
       Install = {

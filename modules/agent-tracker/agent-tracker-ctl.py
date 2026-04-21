@@ -5,7 +5,7 @@ import socket
 import subprocess
 import sys
 
-SOCKET_PATH = os.path.expanduser("~/.cache/agent-tracker.sock")
+SOCKET_PATH = os.environ.get("AGENT_TRACKER_SOCKET", os.path.expanduser("~/.cache/agent-tracker.sock"))
 
 def call_rpc(method, params={}):
     try:

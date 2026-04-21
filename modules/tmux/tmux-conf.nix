@@ -68,7 +68,7 @@ let
     # Dynamically set status lines and formats
     num_sessions=$(tmux list-sessions | wc -l)
     ${if enableAiWorkflow then ''
-    num_agents=$(python3 -c "import socket, json, os; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.connect(os.path.expanduser('~/.cache/agent-tracker.sock')); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'list', 'id': 1}).encode()); resp = s.recv(4096); data = json.loads(resp.decode()); print(len(data.get('result', {})))" 2>/dev/null || echo 0)
+    num_agents=$(agent-tracker-ctl list | python3 -c "import sys, json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo 0)
     '' else ''
     num_agents=0
     ''}
