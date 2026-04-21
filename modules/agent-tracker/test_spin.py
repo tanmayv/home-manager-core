@@ -35,8 +35,9 @@ def main():
 
     # Call spin_agent
     command = "sleep 5"
-    print(f"Calling spin_agent with command: {command}...")
-    agent_name = call_rpc("spin_agent", {"session": session, "command": command})
+    test_name = f"{session}-test-spin-agent"
+    print(f"Calling spin_agent with name: {test_name} and command: {command}...")
+    agent_name = call_rpc("spin_agent", {"session": session, "command": command, "name": test_name})
 
     if not agent_name:
         print("Failed to spin agent", file=sys.stderr)
@@ -57,10 +58,43 @@ def main():
     info = agents[agent_name]
     print(f"Agent info: {info}")
 
+    # Test conflict handling
+    print("Testing conflict handling...")
+    print(f"Calling spin_agent again with SAME name: {test_name}...")
+    agent_name_2 = call_rpc("spin_agent", {"session": session, "command": command, "name": test_name})
+    
+    if not agent_name_2:
+        print("Failed to spin second agent", file=sys.stderr)
+        sys.exit(1)
+    print(f"Spun second agent: {agent_name_2}")
+    
+    expected_name = f"{test_name}-1"
+    if agent_name_2 != expected_name:
+        print(f"Error: Expected name {expected_name}, got {agent_name_2}", file=sys.stderr)
+        sys.exit(1)
+    print("Conflict resolved successfully!")
+    
+    # Wait for second agent to register
+    print("Waiting for second agent to register...")
+    time.sleep(2)
+    
+    agents = call_rpc("list")
+    if agent_name_2 not in agents:
+        print(f"Error: {agent_name_2} not found in list after spinning", file=sys.stderr)
+        sys.exit(1)
+        
+    info_2 = agents[agent_name_2]
+    pane_2 = info_2.get("tmux_pane")
+    
+    # Cleanup both panes
     pane = info.get("tmux_pane")
     if pane:
-        print(f"Killing test pane {pane}...")
+        print(f"Killing first test pane {pane}...")
         subprocess.run(["tmux", "kill-pane", "-t", pane])
+        
+    if pane_2:
+        print(f"Killing second test pane {pane_2}...")
+        subprocess.run(["tmux", "kill-pane", "-t", pane_2])
 
     print("Test passed successfully!")
 

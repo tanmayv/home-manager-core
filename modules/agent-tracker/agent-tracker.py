@@ -166,11 +166,15 @@ def handle_client(conn):
             tmux_pane = params.get("tmux_pane")
             wrapper_pid = params.get("wrapper_pid")
             tmux_socket = params.get("tmux_socket")
-            suggested_name = params.get("suggested_name")
+            name = params.get("name")
             if session and tmux_pane and wrapper_pid and tmux_socket:
                 with state_lock:
-                    if suggested_name and suggested_name not in state:
-                        agent_name = suggested_name
+                    if name:
+                        num = 1
+                        agent_name = name
+                        while agent_name in state and state[agent_name].get("status") != "spawning":
+                            agent_name = f"{name}-{num}"
+                            num += 1
                     else:
                         num = 1
                         while f"{session}-agent-{num}" in state:
@@ -221,12 +225,17 @@ def handle_client(conn):
             session = params.get("session")
             command = params.get("command")
             target_pane = params.get("target_pane")
-            if session and command:
+            name = params.get("name")
+            if session and command and name:
                 with state_lock:
                     num = 1
-                    while f"{session}-agent-{num}" in state:
+                    agent_name = name
+                    while agent_name in state:
+                        agent_name = f"{name}-{num}"
                         num += 1
-                    agent_name = f"{session}-agent-{num}"
+                    
+                    # Reserve the name
+                    state[agent_name] = {"status": "spawning"}
                 
                 import shlex
                 tmux_cmd = ["tmux"]
@@ -245,9 +254,11 @@ def handle_client(conn):
                     subprocess.run(tmux_cmd, check=True, capture_output=True)
                     result = agent_name
                 except subprocess.CalledProcessError as e:
+                    with state_lock:
+                        del state[agent_name] # Remove reserved name on failure
                     error = {"code": -32603, "message": f"Failed to spin agent: {e.stderr.decode()}"}
             else:
-                error = {"code": -32602, "message": "Invalid params"}
+                error = {"code": -32602, "message": "Invalid params (name, session, and command are required)"}
         elif method == "send_message":
             sender_name = params.get("sender_name")
             agent_name = params.get("agent_name")
