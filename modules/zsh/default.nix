@@ -218,7 +218,7 @@ in
               display_path="google3"
             fi
             echo "$path|$display_path"
-          done | ${pkgs.fzf}/bin/fzf --delimiter="|" --with-nth 2 --prompt="Interactive cd> ")
+          done | awk -F'|' '!seen[$2]++' | ${pkgs.fzf}/bin/fzf --delimiter="|" --with-nth 2 --prompt="Interactive cd> ")
 
           if [[ -n "$selected" ]]; then
             local target_dir="''${selected%%|*}"
