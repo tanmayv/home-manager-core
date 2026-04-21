@@ -130,9 +130,13 @@ in
         ExecStart = "${pkgs.writeScriptBin "agent-tracker" ''
           #!${pkgs.python3}/bin/python3
           import json
+          import logging
           import os
           import socket
           import sys
+
+          logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', stream=sys.stderr)
+          POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", 5))
           import threading
           import queue
           import subprocess
@@ -154,7 +158,7 @@ in
                       # Use a reasonable timeout for tmux commands
                       subprocess.run(cmd, check=True, capture_output=True, timeout=5)
                   except Exception as e:
-                      print(f"Tmux worker error: {e}")
+                      logging.error(f"Tmux worker error: {e}")
                   finally:
                       task_queue.task_done()
 
@@ -187,10 +191,9 @@ in
           def background_monitor():
               """Periodically checks process health and scrapes panes for status."""
               while True:
-                  time.sleep(5)
+                  time.sleep(POLL_INTERVAL)
                   to_remove = []
                   
-                  # Snapshot state to minimize lock holding during slow scrapes
                   with state_lock:
                       agents_snapshot = {name: info.copy() for name, info in state.items()}
                       
@@ -212,30 +215,10 @@ in
                           except:
                               pass
 
-                      # Scrape pane for status (Slow task, but in background thread)
-                      pane = info.get("tmux_pane")
-                      socket_path = info.get("tmux_socket")
-                      if pane and socket_path:
-                          try:
-                              # capture-pane is relatively fast, but we do it in this bg thread
-                              out = subprocess.check_output(["tmux", "-S", socket_path, "capture-pane", "-t", pane, "-p"], timeout=2).decode("utf-8")
-                              lines = out.strip().split("\n")
-                              if lines:
-                                  last_line = lines[-1]
-                                  with state_lock:
-                                      if name in state:
-                                          if "? for shortcuts" in last_line:
-                                              state[name]["waiting_approval"] = False
-                                              state[name]["status"] = "idle"
-                                          elif "Esc to cancel" in last_line:
-                                              state[name]["waiting_approval"] = True
-                          except Exception:
-                              pass
-
                   if to_remove:
                       with state_lock:
                           for name in to_remove:
-                              print(f"Removing dead agent: {name}")
+                              logging.info(f"Removing dead agent: {name}")
                               if name in state:
                                   del state[name]
 
@@ -323,7 +306,7 @@ in
 
                   conn.sendall(json.dumps(resp).encode())
               except Exception as e:
-                  print(f"Error handling client: {e}")
+                  logging.error(f"Error handling client: {e}")
               finally:
                   conn.close()
 
@@ -339,7 +322,7 @@ in
               server.bind(SOCKET_PATH)
               server.listen(10)
               
-              print(f"Agent Tracker listening on {SOCKET_PATH}")
+              logging.info(f"Agent Tracker listening on {SOCKET_PATH}")
 
               while True:
                   try:
@@ -347,7 +330,7 @@ in
                       # Each connection gets its own thread for parallelism
                       threading.Thread(target=handle_client, args=(conn,), daemon=True).start()
                   except Exception as e:
-                      print(f"Server accept error: {e}")
+                      logging.error(f"Server accept error: {e}")
                       time.sleep(1)
 
           if __name__ == "__main__":
