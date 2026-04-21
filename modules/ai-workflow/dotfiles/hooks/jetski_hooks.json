@@ -1,66 +1,58 @@
 {
-  "hooks": {
-    "BeforeTool": [
+  "placeholder-jetski": {
+    "PreToolUse": [
       {
         "matcher": "*",
         "hooks": [
           {
-            "name": "pre-tool-placeholder",
             "type": "command",
-            "command": "python3 ~/.gemini/hooks/placeholders/pre_tool.py",
-            "timeout": 5000
+            "command": "python3 ~/.gemini/hooks/placeholders/jetski_pre_tool.py",
+            "timeout": 10
           }
         ]
       }
     ],
-    "AfterTool": [
+    "PostToolUse": [
       {
         "matcher": "*",
         "hooks": [
           {
-            "name": "post-tool-placeholder",
             "type": "command",
-            "command": "python3 ~/.gemini/hooks/placeholders/post_tool.py",
-            "timeout": 5000
+            "command": "python3 ~/.gemini/hooks/placeholders/jetski_post_tool.py",
+            "timeout": 10
           }
         ]
       }
     ],
-    "BeforeModel": [
+    "PreInvocation": [
       {
-        "matcher": "*",
         "hooks": [
           {
-            "name": "pre-invocation-placeholder",
             "type": "command",
             "command": "python3 ~/.gemini/hooks/placeholders/pre_invocation.py",
-            "timeout": 5000
+            "timeout": 10
           }
         ]
       }
     ],
-    "AfterModel": [
+    "PostInvocation": [
       {
-        "matcher": "*",
         "hooks": [
           {
-            "name": "post-invocation-placeholder",
             "type": "command",
             "command": "python3 ~/.gemini/hooks/placeholders/post_invocation.py",
-            "timeout": 5000
+            "timeout": 10
           }
         ]
       }
     ],
-    "SessionEnd": [
+    "Stop": [
       {
-        "matcher": "*",
         "hooks": [
           {
-            "name": "session-end-placeholder",
             "type": "command",
             "command": "python3 ~/.gemini/hooks/placeholders/session_end.py",
-            "timeout": 5000
+            "timeout": 10
           }
         ]
       }

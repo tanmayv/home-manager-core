@@ -55,6 +55,7 @@ in
     
     # Link hooks
     ".gemini/hooks.json".source = ./dotfiles/hooks/hooks.json;
+    ".agents/hooks.json".source = ./dotfiles/hooks/jetski_hooks.json;
     ".gemini/hooks".source = ./dotfiles/hooks;
 
   } // (if aiFeatures.enable_ai_ssa_creator_skill then {
