@@ -151,6 +151,20 @@ in
 
       function cd() {
         local dest
+        if [[ "$#" -ge 1 && "$1" == "--cs" ]]; then
+          shift
+          cd-cs "$@"
+          if [[ -f /tmp/cd-cs-result ]]; then
+            local target_dir
+            target_dir=$(cat /tmp/cd-cs-result | tr -d '\n')
+            rm -f /tmp/cd-cs-result
+            if [[ -n "$target_dir" && -d "$target_dir" ]]; then
+              builtin cd "$target_dir"
+            fi
+          fi
+          return 0
+        fi
+
         if [[ "$#" -eq 0 ]]; then
           dest="$HOME"
         elif [[ "$#" -eq 1 && "$1" == "-" ]]; then
@@ -158,9 +172,41 @@ in
         elif [[ "$#" -eq 1 && -d "$1" ]]; then
           dest="$1"
         else
-          dest=$(zoxide query --exclude "$PWD" -- "$@")
+          dest=$(zoxide query --exclude "$PWD" -- "$@" 2>/dev/null)
           if [[ -z "$dest" ]]; then
-            builtin cd "$@"
+            local prompt_codesearch=false
+            # Only try builtin cd if there is exactly 1 argument to avoid Zsh string replacement behavior
+            if [[ "$#" -eq 1 ]]; then
+              if ! builtin cd "$@" 2>/dev/null; then
+                prompt_codesearch=true
+              fi
+            else
+              prompt_codesearch=true
+            fi
+            
+            if [[ "$prompt_codesearch" == "true" ]]; then
+              local search_done=false
+              if [[ "${toString (userSettings.enable-auto-codesearch-with-cd or true)}" == "1" ]]; then
+                echo -n "Search via CodeSearch? [y/N] "
+                read response
+                if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+                  cd --cs "$@"
+                  if [[ -f /tmp/cd-cs-result ]]; then
+                    local target_dir
+                    target_dir=$(cat /tmp/cd-cs-result | tr -d '\n')
+                    rm -f /tmp/cd-cs-result
+                    if [[ -n "$target_dir" && -d "$target_dir" ]]; then
+                      builtin cd "$target_dir"
+                      search_done=true
+                    fi
+                  fi
+                fi
+              fi
+              
+              if [[ "$search_done" == "false" ]]; then
+                echo "cd: no such file or directory: $@"
+              fi
+            fi
             return
           fi
         fi

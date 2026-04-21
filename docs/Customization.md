@@ -66,6 +66,7 @@ To update, simply run `nix flake update` in your personal repository.
 | `local_agent_knowledge_dir` | Path where agent markdown notes are stored. | `"~/agent_knowledge"` |
 | `local_agent_knowledge_create_command` | Optional command override for creating new notes. | `""` |
 | `editor` | The default CLI editor used by all system tools. | `"nvim"` |
+| `preferred-scripting-language` | The preferred language for new CLI tools (NuShell, Python, Bash). | `"NuShell"` |
 
 ### Feature Toggles
 
@@ -76,6 +77,7 @@ To update, simply run `nix flake update` in your personal repository.
 | `enable-tmux-on-ssh` | Automatically starts/attaches tmux on SSH login (non-Cider). | Standard shell login without automatic tmux. |
 | `auto-switch-workspace-on-cd` | Automatically switches tmux session when `cd`-ing into a workspace. | Standard `cd` behavior; sessions stay unchanged. |
 | `auto-switch-workspace-on-hgd` | `hgd` command triggers an automatic tmux session switch. | `hgd` changes directory but doesn't switch sessions. |
+| `enable-auto-codesearch-with-cd` | Automatically prompts to search via CodeSearch when `cd` fails. | Suppresses the prompt on `cd` failure (but `cd --cs` still works). |
 
 ### AI Features (`ai_features` block)
 

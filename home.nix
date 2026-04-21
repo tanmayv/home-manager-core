@@ -8,7 +8,8 @@
     ./modules/scripts
   ] ++ (if userSettings.enable-ai-workflow then [ ./modules/ai-workflow ] else [])
     ++ (if userSettings.enable-neovim then [ ./modules/neovim/default.nix ] else [])
-    ++ (if userSettings.import-extras or false then [ ./modules/extras ] else []);
+    ++ (if userSettings.import-extras or false then [ ./modules/extras ] else [])
+    ++ (if userSettings.enable-smart-cd or false then [ ./modules/smart-cd ] else []);
 
   home.username = username;
   home.homeDirectory = "/usr/local/google/home/${username}";
@@ -23,6 +24,9 @@
 
   # You can customize the status bar position here
   programs.tmux.statusBarPosition = "bottom";
+
+  programs.smart-cd.enable = userSettings.enable-smart-cd or false;
+  programs.smart-cd.maxParents = userSettings.smart-cd-max-parents or 4;
 
   home.packages = with pkgs; [
     fzf

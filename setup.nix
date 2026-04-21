@@ -10,6 +10,10 @@
   auto-switch-workspace-on-hgd = true;
   enable-cd-verbose = true;
   import-extras = true;
+  enable-smart-cd = true;
+  smart-cd-max-parents = 4;
+  enable-auto-codesearch-with-cd = true;
+  preferred-scripting-language = "NuShell";
   ai_features = {
     enable_agent_knowledge = true;
     enable_ai_ssa_creator_skill = true;

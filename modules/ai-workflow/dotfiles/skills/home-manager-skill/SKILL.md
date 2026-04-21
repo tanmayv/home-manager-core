@@ -67,3 +67,21 @@ This skill provides procedures and standards for modifying the Minimal Cloudtop 
 - **Nix Scripting:** Use absolute paths to binaries from the Nix store (e.g., `${pkgs.fzf}/bin/fzf`).
 - **Theming:** Use `modules/palette.nix` for colors to maintain the Tokyo Night aesthetic.
 - **No Hacks:** Avoid suppressing warnings or using non-idiomatic Nix patterns.
+
+## Guide on Developing CLI Tools
+
+### Language Preference
+- Check the `preferred-scripting-language` option in `setup.nix`.
+- Follow the defined language for new scripts (NuShell, Python, or Bash). NuShell is the default.
+
+### Modularity and Options
+- Whenever possible, encapsulate new CLI tools or significant features in their own **Nix module** (e.g., in `modules/{feature_name}/default.nix`).
+- Provide module options (using `mkOption`) to customize the behavior of the tool.
+- **CRITICAL**: Always provide an `enable` option to allow the user to disable the tool/feature completely.
+
+### Testing Iterations in Tmux
+When testing interactive tools or scripts:
+1. Create a new pane: `tmux split-window -h -P -F '#{pane_id}'`
+2. Send command keys: `tmux send-keys -t %XX 'your-command' C-m`
+3. Verify by capturing pane text: `tmux capture-pane -t %XX -p`
+4. **CRITICAL**: Remember to kill the pane after each testing iteration to avoid clutter: `tmux kill-pane -t %XX`
