@@ -36,6 +36,10 @@ def main():
     focus_parser = subparsers.add_parser("focus", help="Focus agent pane")
     focus_parser.add_argument("agent_name", help="Agent name to focus")
 
+    rename_parser = subparsers.add_parser("rename", help="Rename agent")
+    rename_parser.add_argument("old_name", help="Current agent name")
+    rename_parser.add_argument("new_name", help="New agent name")
+
     args = parser.parse_args()
 
     if args.command == "list":
@@ -94,6 +98,9 @@ def main():
         else:
             print(f"Agent {args.agent_name} not found.", file=sys.stderr)
             sys.exit(1)
+    elif args.command == "rename":
+        call_rpc("rename", {"old_name": args.old_name, "new_name": args.new_name})
+        print("Agent renamed.")
     else:
         parser.print_help()
 

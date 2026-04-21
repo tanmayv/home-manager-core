@@ -198,6 +198,21 @@ def handle_client(conn):
                     result = True
                 else:
                     error = {"code": -32602, "message": "Agent not found"}
+        elif method == "rename":
+            old_name = params.get("old_name")
+            new_name = params.get("new_name")
+            if old_name and new_name:
+                with state_lock:
+                    if old_name in state:
+                        if new_name not in state:
+                            state[new_name] = state.pop(old_name)
+                            result = True
+                        else:
+                            error = {"code": -32602, "message": "New name already exists"}
+                    else:
+                        error = {"code": -32602, "message": "Agent not found"}
+            else:
+                error = {"code": -32602, "message": "Invalid params"}
         elif method == "send_message":
             sender_name = params.get("sender_name")
             agent_name = params.get("agent_name")
