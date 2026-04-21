@@ -165,6 +165,25 @@ in
           return 0
         fi
 
+        if [[ "$#" -eq 1 && "$1" == "-i" ]]; then
+          local selected
+          selected=$(zoxide query -l | while read -r path; do
+            local display_path="$path"
+            if [[ "$path" == */google3/* ]]; then
+              display_path="google3/''${path#*/google3/}"
+            elif [[ "$path" == */google3 ]]; then
+              display_path="google3"
+            fi
+            echo "$path|$display_path"
+          done | ${pkgs.fzf}/bin/fzf --delimiter="|" --with-nth 2 --prompt="Interactive cd> ")
+
+          if [[ -n "$selected" ]]; then
+            local target_dir="''${selected%%|*}"
+            builtin cd "$target_dir"
+          fi
+          return 0
+        fi
+
         if [[ "$#" -eq 0 ]]; then
           dest="$HOME"
         elif [[ "$#" -eq 1 && "$1" == "-" ]]; then

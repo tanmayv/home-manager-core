@@ -79,6 +79,9 @@ This skill provides procedures and standards for modifying the Minimal Cloudtop 
 - Provide module options (using `mkOption`) to customize the behavior of the tool.
 - **CRITICAL**: Always provide an `enable` option to allow the user to disable the tool/feature completely.
 
+### Implementation Plans
+- Whenever possible, include **examples** of usage or configuration in the implementation plan to make it clearer for the user.
+
 ### Testing Iterations in Tmux
 When testing interactive tools or scripts:
 1. Create a new pane: `tmux split-window -h -P -F '#{pane_id}'`

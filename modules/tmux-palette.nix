@@ -303,5 +303,13 @@ in
     description = "List all agents and run the selected agent in zsh or new window"
     command = "new-gemini-agent"
     group = "AI"
+
+    ${if userSettings.enable-smart-cd or false then ''
+    [[commands]]
+    name = "Search directory with CodeSearch"
+    description = "Interactive CodeSearch for directories and switch to it in a new window"
+    command = 'TARGET_PANE=$(tmux display-message -p "#{last_pane_id}") && TARGET_PATH=$(tmux display-message -t "$TARGET_PANE" -p "#{pane_current_path}") && read -p "Query: " query && [[ -n "$query" ]] && tmux new-window -c "$TARGET_PATH" -n "cs-cd" "cd --cs $query; zsh"'
+    group = "Navigation"
+    '' else ""}
   '';
 }
