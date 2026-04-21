@@ -7,7 +7,7 @@
           {
             "name": "pre-tool-placeholder",
             "type": "command",
-            "command": "python3 ~/.gemini/hooks/placeholders/pre_tool.py",
+            "command": "python3 ~/.gemini/hooks/pre_tool.py",
             "timeout": 5000
           }
         ]
@@ -20,7 +20,7 @@
           {
             "name": "post-tool-placeholder",
             "type": "command",
-            "command": "python3 ~/.gemini/hooks/placeholders/post_tool.py",
+            "command": "python3 ~/.gemini/hooks/post_tool.py",
             "timeout": 5000
           }
         ]
@@ -33,7 +33,7 @@
           {
             "name": "pre-invocation-placeholder",
             "type": "command",
-            "command": "python3 ~/.gemini/hooks/placeholders/pre_invocation.py",
+            "command": "python3 ~/.gemini/hooks/pre_invocation.py",
             "timeout": 5000
           }
         ]
@@ -46,7 +46,33 @@
           {
             "name": "post-invocation-placeholder",
             "type": "command",
-            "command": "python3 ~/.gemini/hooks/placeholders/post_invocation.py",
+            "command": "python3 ~/.gemini/hooks/post_invocation.py",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "after-agent-placeholder",
+            "type": "command",
+            "command": "python3 ~/.gemini/hooks/after_agent.py",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "ToolPermission|Allow Tool|Run Command|Confirm Edit",
+        "hooks": [
+          {
+            "name": "notify-approval-placeholder",
+            "type": "command",
+            "command": "python3 ~/.gemini/hooks/notify_approval.py",
             "timeout": 5000
           }
         ]
@@ -59,7 +85,7 @@
           {
             "name": "session-end-placeholder",
             "type": "command",
-            "command": "python3 ~/.gemini/hooks/placeholders/session_end.py",
+            "command": "python3 ~/.gemini/hooks/session_end.py",
             "timeout": 5000
           }
         ]

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.gemini/hooks/placeholders/jetski_pre_tool.py",
+            "command": "python3 ~/.gemini/hooks/jetski_pre_tool.py",
             "timeout": 10
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.gemini/hooks/placeholders/jetski_post_tool.py",
+            "command": "python3 ~/.gemini/hooks/jetski_post_tool.py",
             "timeout": 10
           }
         ]
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.gemini/hooks/placeholders/pre_invocation.py",
+            "command": "python3 ~/.gemini/hooks/pre_invocation.py",
             "timeout": 10
           }
         ]
@@ -40,7 +40,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.gemini/hooks/placeholders/post_invocation.py",
+            "command": "python3 ~/.gemini/hooks/post_invocation.py",
             "timeout": 10
           }
         ]
@@ -51,7 +51,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ~/.gemini/hooks/placeholders/session_end.py",
+            "command": "python3 ~/.gemini/hooks/stop.py",
             "timeout": 10
           }
         ]

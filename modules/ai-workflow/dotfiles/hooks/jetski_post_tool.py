@@ -9,7 +9,7 @@ except json.JSONDecodeError:
     input_data = None
 
 try:
-    script_path = os.path.expanduser("~/.gemini/hooks/placeholders/post_tool.py")
+    script_path = os.path.expanduser("~/.gemini/hooks/post_tool.py")
     process = subprocess.run(
         ["python3", script_path],
         input=json.dumps(input_data).encode(),

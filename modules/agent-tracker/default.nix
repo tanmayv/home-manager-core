@@ -75,13 +75,16 @@ in
                 formatted = []
                 for name, info in agents.items():
                     pane = info.get("tmux_pane")
-                    running_tool = info.get("running_tool", False)
+                    waiting_approval = info.get("waiting_approval", False)
+                    status = info.get("status", "")
                     
-                    color = "#414868" # Default inactive (gray)
-                    if running_tool:
-                        color = "#db4b4b" # Red for running tool
+                    color = "#414868" # Fallback (Gray)
+                    if waiting_approval:
+                        color = "#db4b4b" # Red for Waiting for Approval
                     elif pane == current_pane:
-                        color = "#e0af68" # Yellow for active pane
+                        color = "#e0af68" # Yellow for Active Pane
+                    elif status == "idle":
+                        color = "#9ece6a" # Green for Idle
 
                     range_arg = f"agent:{pane}"
                     formatted.append(f"#[range=user|{range_arg}]#[fg={color},bold]{name}#[fg=#414868,nobold]#[norange]")
@@ -154,14 +157,19 @@ in
                   error = None
 
                   if method == "register":
-                      agent_name = params.get("agent_name")
                       session = params.get("session")
                       tmux_pane = params.get("tmux_pane")
-                      pid = params.get("pid")
+                      wrapper_pid = params.get("wrapper_pid")
                       tmux_socket = params.get("tmux_socket")
-                      if agent_name and session and tmux_pane and pid and tmux_socket:
-                          state[agent_name] = {"session": session, "tmux_pane": tmux_pane, "pid": pid, "tmux_socket": tmux_socket}
-                          result = True
+                      if session and tmux_pane and wrapper_pid and tmux_socket:
+                          # Compute next available name atomically
+                          num = 1
+                          while f"{session}-agent-{num}" in state:
+                              num += 1
+                          agent_name = f"{session}-agent-{num}"
+                          
+                          state[agent_name] = {"session": session, "tmux_pane": tmux_pane, "wrapper_pid": wrapper_pid, "tmux_socket": tmux_socket, "pid": None}
+                          result = agent_name
                       else:
                           error = {"code": -32602, "message": "Invalid params"}
                   elif method == "list":
@@ -239,9 +247,37 @@ in
                   await asyncio.sleep(5)
                   to_remove = []
                   for name, info in state.items():
-                      pid = info.get("pid")
-                      if pid and not is_process_alive(pid):
+                      wrapper_pid = info.get("wrapper_pid")
+                      
+                      if wrapper_pid and not is_process_alive(wrapper_pid):
                           to_remove.append(name)
+                          continue
+                          
+                      if wrapper_pid:
+                          try:
+                              import subprocess
+                              out = subprocess.check_output(["pgrep", "-P", str(wrapper_pid)]).decode("utf-8").strip()
+                              if out:
+                                  pid = int(out.split()[0])
+                                  info["pid"] = pid
+                                  
+                                  pane = info.get("tmux_pane")
+                                  socket_path = info.get("tmux_socket")
+                                  if pane and socket_path:
+                                      out = subprocess.check_output(["tmux", "-S", socket_path, "capture-pane", "-t", pane, "-p"]).decode("utf-8")
+                                      lines = out.strip().split("\n")
+                                      if lines:
+                                          last_line = lines[-1]
+                                          if "? for shortcuts" in last_line:
+                                              info["waiting_approval"] = False
+                                              info["status"] = "idle"
+                                          elif "Esc to cancel" in last_line:
+                                              info["waiting_approval"] = True
+                          except subprocess.CalledProcessError:
+                              pass
+                          except Exception as e:
+                              pass
+                              
                   for name in to_remove:
                       print(f"Removing dead agent: {name}")
                       del state[name]
