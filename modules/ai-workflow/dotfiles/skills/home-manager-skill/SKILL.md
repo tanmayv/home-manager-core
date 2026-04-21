@@ -54,7 +54,14 @@ When requested to make changes by the user:
 3.  (Optional) Add a toggle in `setup.nix` and `modules/ai-workflow/default.nix` if it should be optional.
 4.  Run `build-and-switch`.
 
-### 4. Updating the Configuration
+### 4. Adding Custom Hooks for Gemini and Jetski
+1.  Create hook scripts in `modules/ai-workflow/dotfiles/hooks/placeholders/` (or a specific directory for the feature).
+2.  Ensure scripts read JSON from stdin and output valid JSON to stdout (strictly JSON for Gemini!).
+3.  Update `modules/ai-workflow/dotfiles/hooks/hooks.json` for Gemini hooks.
+4.  Update `modules/ai-workflow/dotfiles/hooks/jetski_hooks.json` for Jetski hooks.
+5.  Run `build-and-switch` to apply changes and link files.
+
+### 5. Updating the Configuration
 1.  Run `check-for-update` to check for new stable versions.
 2.  If prompted, confirm to update. The script will automatically rebase your branch and run `build-and-switch`.
 3.  To update manually:
@@ -63,7 +70,7 @@ When requested to make changes by the user:
     - Resolve any conflicts if they arise.
     - Apply changes: `build-and-switch`
 
-### 5. Creating a New Release
+### 6. Creating a New Release
 1.  Ensure all changes are merged into the main branch (e.g., `master` or `main`).
 2.  Create a new SemVer tag: `git tag vX.Y.Z` (replace with actual version).
 3.  Update the floating `stable` tag to point to the new release:
@@ -94,7 +101,7 @@ When requested to make changes by the user:
 
 ### Testing Iterations in Tmux
 When testing interactive tools or scripts:
-1. Create a new pane: `tmux split-window -h -P -F '#{pane_id}'`
+1. Create a new pane in the window the agent is running (to avoid affecting the user's workflow in other windows): `tmux split-window -h -P -F '#{pane_id}' -t "$TMUX_PANE"`
 2. Send command keys: `tmux send-keys -t %XX 'your-command' C-m`
 3. Verify by capturing pane text: `tmux capture-pane -t %XX -p`
 4. **CRITICAL**: Remember to kill the pane after each testing iteration to avoid clutter: `tmux kill-pane -t %XX`

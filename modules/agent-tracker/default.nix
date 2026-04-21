@@ -67,11 +67,24 @@ in
                 if not agents:
                     sys.exit(0)
 
+                try:
+                    current_pane = subprocess.check_output(["tmux", "display-message", "-p", "#{pane_id}"]).decode("utf-8").strip()
+                except:
+                    current_pane = ""
+
                 formatted = []
                 for name, info in agents.items():
                     pane = info.get("tmux_pane")
+                    running_tool = info.get("running_tool", False)
+                    
+                    color = "#414868" # Default inactive (gray)
+                    if running_tool:
+                        color = "#db4b4b" # Red for running tool
+                    elif pane == current_pane:
+                        color = "#e0af68" # Yellow for active pane
+
                     range_arg = f"agent:{pane}"
-                    formatted.append(f"#[range=user|{range_arg}]#[fg=#e0af68,bold]{name}#[fg=#414868,nobold]#[norange]")
+                    formatted.append(f"#[range=user|{range_arg}]#[fg={color},bold]{name}#[fg=#414868,nobold]#[norange]")
 
                 print(" · ".join(formatted))
 
@@ -153,6 +166,15 @@ in
                           error = {"code": -32602, "message": "Invalid params"}
                   elif method == "list":
                       result = state
+                  elif method == "update_agent":
+                      agent_name = params.get("agent_name")
+                      if agent_name in state:
+                          for k, v in params.items():
+                              if k != "agent_name":
+                                  state[agent_name][k] = v
+                          result = True
+                      else:
+                          error = {"code": -32602, "message": "Agent not found"}
                   elif method == "send_message":
                       sender_name = params.get("sender_name")
                       agent_name = params.get("agent_name")
