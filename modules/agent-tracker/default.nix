@@ -187,6 +187,50 @@ in
                   return False
               except Exception:
                   return False
+          def init_state():
+              """Recovers existing agents by querying tmux panes."""
+              logging.info("Initializing state from tmux panes...")
+              try:
+                  out = subprocess.check_output(["tmux", "list-panes", "-a", "-F", "#{pane_id} #{@agent_name}"]).decode("utf-8").strip()
+                  for line in out.split("\n"):
+                      parts = line.split()
+                      if len(parts) >= 2:
+                          pane_id = parts[0]
+                          agent_name = parts[1]
+                          if agent_name and agent_name.startswith("minimal-cloudtop-agent-"):
+                              logging.info(f"Found recovered agent: {agent_name} in pane {pane_id}")
+                              try:
+                                  tty = subprocess.check_output(["tmux", "display-message", "-p", "-t", pane_id, "#{pane_tty}"]).decode("utf-8").strip()
+                                  session = subprocess.check_output(["tmux", "display-message", "-p", "-t", pane_id, "#S"]).decode("utf-8").strip()
+                                  
+                                  pts_name = tty.replace("/dev/", "")
+                                  out_pids = subprocess.check_output(["pgrep", "-t", pts_name]).decode("utf-8").strip()
+                                  pids = [int(p) for p in out_pids.split("\n") if p]
+                                  
+                                  shell_pid = int(subprocess.check_output(["tmux", "display-message", "-p", "-t", pane_id, "#{pane_pid}"]).decode("utf-8").strip())
+                                  
+                                  agent_pid = None
+                                  for p in pids:
+                                      if p != shell_pid:
+                                          agent_pid = p
+                                          break
+                                          
+                                  if agent_pid:
+                                      with state_lock:
+                                          state[agent_name] = {
+                                              "session": session,
+                                              "tmux_pane": pane_id,
+                                              "pid": agent_pid,
+                                              "tmux_socket": "", # Fallback to default
+                                              "wrapper_pid": None,
+                                              "status": "idle",
+                                              "waiting_approval": False
+                                          }
+                                      logging.info(f"Recovered agent {agent_name} with PID {agent_pid}")
+                              except Exception as e:
+                                  logging.error(f"Error recovering agent {agent_name}: {e}")
+              except Exception as e:
+                  logging.error(f"Error during init_state: {e}")
 
           def background_monitor():
               """Periodically checks process health and scrapes panes for status."""
@@ -202,6 +246,12 @@ in
                       if wrapper_pid and not is_process_alive(wrapper_pid):
                           to_remove.append(name)
                           continue
+                      elif not wrapper_pid:
+                          # Recovered agent fallback! Check PID directly!
+                          pid = info.get("pid")
+                          if pid and not is_process_alive(pid):
+                              to_remove.append(name)
+                              continue
 
                       # Update child PID if not already known
                       if not info.get("pid") and wrapper_pid:
@@ -315,6 +365,7 @@ in
               if os.path.exists(SOCKET_PATH):
                   os.remove(SOCKET_PATH)
 
+              init_state()
               # Start background monitor thread
               threading.Thread(target=background_monitor, daemon=True).start()
 
