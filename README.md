@@ -95,3 +95,8 @@ To learn how to personalize your configuration and toggle features in `setup.nix
 | Ghostty | ✅ |
 | Kitty | ✅ |
 
+## Screenshots
+
+![Screenshot 2](assets/screenshot2.png)
+![Screenshot 3](assets/screenshot3.png)
+
