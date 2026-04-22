@@ -34,6 +34,18 @@ To maintain persistent memory across sessions, agents have access to a dedicated
  - **CRITICAL**: Use the `tmux-agent-comms` skill when you are asked to change your name, talk to another agent, send a message, or ask a question to another agent. This skill contains all the necessary steps and guidelines for effective communication.
  - If you receive a message of format `From <agent-name> | <message>` Use `tmux-agent-comms` to reply to the agent.
 '';
+
+  # Logic for handling external extensions (Piper or local)
+  extraExtensions = userSettings.extra-ai-extensions or [ ];
+  personalPiperConfig = "/google/src/files/head/depot/configs/users/${userSettings.username}/_agents";
+  allExtensions = (if userSettings.enable-skill-publishing or false then [ personalPiperConfig ] else [ ]) ++ extraExtensions;
+
+  # Format inherits for jetski/skills.json
+  # We assume each extension directory has a skills.json
+  jetskiSkills = {
+    inherits = map (path: { path = "${path}/skills.json"; }) allExtensions;
+    entries = [ ];
+  };
 in
 {
   home.file = {
@@ -44,18 +56,7 @@ in
     "${lib.removePrefix "~/" userSettings.local_agent_knowledge_dir}/.keep".text = "";
 
     ".gemini/jetski/mcp_config.json".source = ./dotfiles/mcp_config.json;
-    ".gemini/jetski/skills.json".text = if userSettings.enable-skill-publishing or false then ''
-{
-  "inherits": [
-    { "path": "/google/src/head/depot/configs/users/${userSettings.username}/_agents/skills.json" }
-  ],
-  "entries": []
-}
-'' else ''
-{
-  "entries": []
-}
-'';
+    ".gemini/jetski/skills.json".text = builtins.toJSON jetskiSkills;
     ".gemini/gemini-extension.json".source = ./dotfiles/gemini-extension.json;
 
     # Link directories
@@ -81,12 +82,11 @@ in
     # Link the local configuration directory
     /google/bin/releases/gemini-cli/tools/gemini -- extensions link $HOME/.gemini --consent || true
     
-    # Link the personal Piper configuration directory if it exists at head and skill publishing is enabled
-    ${if userSettings.enable-skill-publishing or false then ''
-    PIPER_CONFIG="/google/src/files/head/depot/configs/users/${userSettings.username}/_agents"
-    if [[ -d "$PIPER_CONFIG" ]]; then
-      /google/bin/releases/gemini-cli/tools/gemini -- extensions link "$PIPER_CONFIG" --consent || true
-    fi
-    '' else ""}
+    # Link additional extensions
+    ${lib.concatMapStringsSep "\n" (path: ''
+      if [[ -d "${path}" ]]; then
+        /google/bin/releases/gemini-cli/tools/gemini -- extensions link "${path}" --consent || true
+      fi
+    '') allExtensions}
   '';
 }
