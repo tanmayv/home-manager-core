@@ -10,7 +10,8 @@ import uuid
 
 BUFFER_SIZE = 4096
 
-def handle_register(params):
+def handle_register(params: dict) -> str:
+    """Handles agent registration. Generates a UUID for the agent."""
     session = params.get("session")
     tmux_pane = params.get("tmux_pane")
     wrapper_pid = params.get("wrapper_pid")
@@ -47,10 +48,12 @@ def handle_register(params):
     })
     return agent_name
 
-def handle_list(params):
+def handle_list(params: dict) -> dict:
+    """Returns all agents in state."""
     return state.get_all_agents()
 
-def handle_update_agent(params):
+def handle_update_agent(params: dict) -> bool:
+    """Updates agent state fields."""
     agent_name = params.get("agent_name")
     if not agent_name:
         raise ValueError("Agent not found")
@@ -60,7 +63,8 @@ def handle_update_agent(params):
         return True
     raise ValueError("Agent not found")
 
-def handle_rename(params):
+def handle_rename(params: dict) -> bool:
+    """Renames an agent and updates tmux options."""
     old_name = params.get("old_name")
     new_name = params.get("new_name")
     if not (old_name and new_name):
@@ -76,7 +80,8 @@ def handle_rename(params):
         return True
     raise ValueError("Agent not found or new name exists")
 
-def handle_spin_agent(params):
+def handle_spin_agent(params: dict) -> str:
+    """Spins a new agent in a new tmux pane."""
     session = params.get("session")
     command = params.get("command")
     target_pane = params.get("target_pane")
@@ -101,7 +106,8 @@ def handle_spin_agent(params):
         state.delete_agent(agent_name)
         raise RuntimeError(f"Failed to spin agent: {e}")
 
-def handle_send_message(params):
+def handle_send_message(params: dict) -> bool:
+    """Sends a message to an agent by adding it to its inbox."""
     sender_name = params.get("sender_name")
     agent_name = params.get("agent_name")
     msg = params.get("message")
@@ -123,7 +129,40 @@ def handle_send_message(params):
         return True
     raise ValueError("Target agent not found")
 
-def handle_get_inbox(params):
+def _read_and_update_inbox_file(inbox_file: str, clear: bool) -> str:
+    """Reads the inbox file, filters unread messages, marks them as read, and rewrites the file."""
+    if not os.path.exists(inbox_file):
+        return "Inbox is empty."
+        
+    try:
+        all_messages = []
+        unread_messages = []
+        with open(inbox_file, "r") as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        msg_obj = json.loads(line)
+                        if not msg_obj.get("read", False):
+                            unread_messages.append(msg_obj)
+                            msg_obj["read"] = True
+                        all_messages.append(msg_obj)
+                    except json.JSONDecodeError:
+                        pass
+        
+        result = "".join([json.dumps(m) + "\n" for m in unread_messages])
+        
+        if clear:
+            os.remove(inbox_file)
+        else:
+            with open(inbox_file, "w") as f:
+                for m in all_messages:
+                    f.write(json.dumps(m) + "\n")
+        return result
+    except IOError as e:
+        raise RuntimeError(f"Failed to access inbox file: {e}")
+
+def handle_get_inbox(params: dict) -> str:
+    """Handles get_inbox RPC call. Flushes in-memory messages first."""
     agent_name = params.get("agent_name")
     clear = params.get("clear", False)
     
@@ -148,35 +187,7 @@ def handle_get_inbox(params):
         except IOError as e:
             logging.error(f"Failed to flush inbox on demand for {agent_name}: {e}")
             
-    if os.path.exists(inbox_file):
-        try:
-            all_messages = []
-            unread_messages = []
-            with open(inbox_file, "r") as f:
-                for line in f:
-                    if line.strip():
-                        try:
-                            msg_obj = json.loads(line)
-                            if not msg_obj.get("read", False):
-                                unread_messages.append(msg_obj)
-                                msg_obj["read"] = True
-                            all_messages.append(msg_obj)
-                        except json.JSONDecodeError:
-                            pass
-            
-            result = "".join([json.dumps(m) + "\n" for m in unread_messages])
-            
-            if clear:
-                os.remove(inbox_file)
-            else:
-                with open(inbox_file, "w") as f:
-                    for m in all_messages:
-                        f.write(json.dumps(m) + "\n")
-            return result
-        except IOError as e:
-            raise RuntimeError(f"Failed to access inbox file: {e}")
-    else:
-        return "Inbox is empty."
+    return _read_and_update_inbox_file(inbox_file, clear)
 
 dispatcher = {
     "register": handle_register,
@@ -188,7 +199,8 @@ dispatcher = {
     "get_inbox": handle_get_inbox
 }
 
-def handle_client(conn):
+def handle_client(conn: socket.socket) -> None:
+    """Handles a single client connection, reading JSON-RPC request and sending response."""
     try:
         conn.settimeout(2.0)
         data = b""

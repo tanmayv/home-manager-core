@@ -9,7 +9,7 @@ import tmux_util
 state = {}
 state_lock = threading.Lock()
 
-def init_state():
+def init_state() -> None:
     """Recovers existing agents by querying tmux panes."""
     logging.info("Initializing state from tmux panes...")
     panes = tmux_util.list_panes()
@@ -55,24 +55,29 @@ def init_state():
             except Exception as e:
                 logging.error(f"Error recovering agent {agent_name}: {e}")
 
-def get_all_agents():
+def get_all_agents() -> dict:
+    """Returns a copy of all agents in state."""
     with state_lock:
         return {k: v.copy() for k, v in state.items()}
 
-def get_agent(name):
+def get_agent(name: str) -> dict | None:
+    """Returns the state of a specific agent."""
     with state_lock:
         return state.get(name, None)
 
-def set_agent(name, info):
+def set_agent(name: str, info: dict) -> None:
+    """Sets the state of a specific agent."""
     with state_lock:
         state[name] = info
 
-def delete_agent(name):
+def delete_agent(name: str) -> None:
+    """Deletes an agent from state."""
     with state_lock:
         if name in state:
             del state[name]
 
-def update_agent(name, **kwargs):
+def update_agent(name: str, **kwargs) -> bool:
+    """Updates specific fields of an agent's state."""
     with state_lock:
         if name in state:
             for k, v in kwargs.items():
@@ -80,14 +85,16 @@ def update_agent(name, **kwargs):
             return True
         return False
 
-def rename_agent(old_name, new_name):
+def rename_agent(old_name: str, new_name: str) -> bool:
+    """Renames an agent in state."""
     with state_lock:
         if old_name in state and new_name not in state:
             state[new_name] = state.pop(old_name)
             return True
         return False
 
-def add_message(agent_name, msg_obj):
+def add_message(agent_name: str, msg_obj: dict) -> bool:
+    """Adds a message to an agent's inbox."""
     with state_lock:
         if agent_name in state:
             if "inbox" not in state[agent_name]:
@@ -96,7 +103,8 @@ def add_message(agent_name, msg_obj):
             return True
         return False
 
-def clear_inbox(agent_name):
+def clear_inbox(agent_name: str) -> bool:
+    """Clears an agent's inbox."""
     with state_lock:
         if agent_name in state:
             state[agent_name]["inbox"] = []
