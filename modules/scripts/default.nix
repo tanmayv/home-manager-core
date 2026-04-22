@@ -18,9 +18,9 @@ in
     ./knowledge-manager.nix
     ./check-for-update.nix
     ./new-gemini-agent.nix
-    ./ai-wrappers.nix
+  ] ++ (if userSettings.enable-skill-publishing or false then [
     ./skill-ctl.nix
-  ] ++ (if enableAgentComms then [
+  ] else []) ++ (if enableAgentComms then [
     ./iamdone.nix
     ./waiting.nix
     ./send-message-to-agent.nix

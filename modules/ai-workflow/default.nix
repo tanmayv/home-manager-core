@@ -44,11 +44,15 @@ in
     "${lib.removePrefix "~/" userSettings.local_agent_knowledge_dir}/.keep".text = "";
 
     ".gemini/jetski/mcp_config.json".source = ./dotfiles/mcp_config.json;
-    ".gemini/jetski/skills.json".text = ''
+    ".gemini/jetski/skills.json".text = if userSettings.enable-skill-publishing or false then ''
 {
   "inherits": [
     { "path": "/google/src/head/depot/configs/users/${userSettings.username}/_agents/skills.json" }
   ],
+  "entries": []
+}
+'' else ''
+{
   "entries": []
 }
 '';
@@ -77,10 +81,12 @@ in
     # Link the local configuration directory
     /google/bin/releases/gemini-cli/tools/gemini -- extensions link $HOME/.gemini --consent || true
     
-    # Link the personal Piper configuration directory if it exists at head
+    # Link the personal Piper configuration directory if it exists at head and skill publishing is enabled
+    ${if userSettings.enable-skill-publishing or false then ''
     PIPER_CONFIG="/google/src/files/head/depot/configs/users/${userSettings.username}/_agents"
     if [[ -d "$PIPER_CONFIG" ]]; then
       /google/bin/releases/gemini-cli/tools/gemini -- extensions link "$PIPER_CONFIG" --consent || true
     fi
+    '' else ""}
   '';
 }

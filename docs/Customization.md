@@ -79,6 +79,7 @@ To update, simply run `nix flake update` in your personal repository.
 | `auto-switch-workspace-on-hgd` | `hgd` command triggers an automatic tmux session switch. | `hgd` changes directory but doesn't switch sessions. |
 | `enable-auto-codesearch-with-cd` | Automatically prompts to search via CodeSearch when `cd` fails. | Suppresses the prompt on `cd` failure (but `cd --cs` still works). |
 | `enable-agent-tracker` | Enables the background agent-tracker daemon. | The daemon is not started. |
+| `enable-skill-publishing` | Enables the `skill-ctl` tool and Piper-native skill integration. | Disables skill publishing and Piper inheritance logic. |
 
 ### Skill Publishing (`skill-publishing` block)
 
