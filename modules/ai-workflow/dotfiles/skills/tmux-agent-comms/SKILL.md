@@ -11,7 +11,11 @@ Use this skill when:
 ## Guidelines for Effective Communication
 
 1.  **Identify Yourself**:
-    *   Your agent name is stored in the tmux pane option `@agent_name`. You can read it with:
+    *   Your agent name is stored in the tmux pane option `@agent_name`. You can read it for your current pane with:
+        ```bash
+        tmux display-message -t "$TMUX_PANE" -p '#{@agent_name}'
+        ```
+    *   Alternatively, to fetch the name of the agent in the pane the user is currently on, use:
         ```bash
         tmux display-message -p '#{@agent_name}'
         ```
