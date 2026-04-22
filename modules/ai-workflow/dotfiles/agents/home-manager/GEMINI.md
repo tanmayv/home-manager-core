@@ -8,6 +8,8 @@ Follow these rules when helping the user:
 
 ## Skills and Agents
 - To add new skills, create a directory in `~/.gemini/skills/{skill_name}/` with a `SKILL.md` file containing YAML frontmatter (name and description).
+- To publish a local skill to Piper (Fig), use the **`skill-ctl publish {skill_name}`** command. This will create a CitC workspace, copy the files, and create a CL.
+- Use **`skill-ctl list`** to see which skills are Local, Managed by Home Manager, or backed by Piper.
 - To add new agents, create a directory in `~/.gemini/agents/{agent_name}/` with an `agent.json` file.
 
 ## Agent Knowledge

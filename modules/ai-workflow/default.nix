@@ -44,10 +44,17 @@ in
     "${lib.removePrefix "~/" userSettings.local_agent_knowledge_dir}/.keep".text = "";
 
     ".gemini/jetski/mcp_config.json".source = ./dotfiles/mcp_config.json;
+    ".gemini/jetski/skills.json".text = ''
+{
+  "inherits": [
+    { "path": "/google/src/head/depot/configs/users/${userSettings.username}/_agents/skills.json" }
+  ],
+  "entries": []
+}
+'';
     ".gemini/gemini-extension.json".source = ./dotfiles/gemini-extension.json;
 
     # Link directories
-    ".gemini/skills/test-skill".source = ./dotfiles/skills/test-skill;
     ".gemini/agents/home-manager".source = ./dotfiles/agents/home-manager;
 
     ".gemini/skills/extract-skill".source = ./dotfiles/skills/extract-skill;
@@ -67,7 +74,13 @@ in
   } else { });
 
   home.activation.geminiLinkExtensions = lib.hm.dag.entryAfter ["linkGeneration"] ''
-    /google/bin/releases/gemini-cli/tools/gemini -- extensions uninstall mcp-extension || true
-    /google/bin/releases/gemini-cli/tools/gemini -- extensions link $HOME/.gemini --consent
+    # Link the local configuration directory
+    /google/bin/releases/gemini-cli/tools/gemini -- extensions link $HOME/.gemini --consent || true
+    
+    # Link the personal Piper configuration directory if it exists at head
+    PIPER_CONFIG="/google/src/files/head/depot/configs/users/${userSettings.username}/_agents"
+    if [[ -d "$PIPER_CONFIG" ]]; then
+      /google/bin/releases/gemini-cli/tools/gemini -- extensions link "$PIPER_CONFIG" --consent || true
+    fi
   '';
 }

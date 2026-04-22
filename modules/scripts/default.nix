@@ -19,6 +19,7 @@ in
     ./check-for-update.nix
     ./new-gemini-agent.nix
     ./ai-wrappers.nix
+    ./skill-ctl.nix
   ] ++ (if enableAgentComms then [
     ./iamdone.nix
     ./waiting.nix

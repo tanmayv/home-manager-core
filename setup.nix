@@ -15,6 +15,10 @@
   enable-auto-codesearch-with-cd = true;
   preferred-scripting-language = "NuShell";
   enable-agent-tracker = true;
+  skill-publishing = {
+    # Target path in piper. $USER will be replaced with your LDAP.
+    target-path = "//depot/configs/users/$USER/_agents/skills";
+  };
   ai_features = {
     enable_agent_knowledge = true;
     enable_ai_ssa_creator_skill = true;

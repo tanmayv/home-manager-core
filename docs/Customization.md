@@ -80,6 +80,12 @@ To update, simply run `nix flake update` in your personal repository.
 | `enable-auto-codesearch-with-cd` | Automatically prompts to search via CodeSearch when `cd` fails. | Suppresses the prompt on `cd` failure (but `cd --cs` still works). |
 | `enable-agent-tracker` | Enables the background agent-tracker daemon. | The daemon is not started. |
 
+### Skill Publishing (`skill-publishing` block)
+
+| Option | Description | Default |
+| :--- | :--- | :--- |
+| `target-path` | The Piper path where skills will be published. `$USER` is replaced by LDAP. | `//depot/google3/experimental/$USER/minimal-cloudtop/skills` |
+
 ### AI Features (`ai_features` block)
 
 | Flag | Behavior if `true` | Behavior if `false` |

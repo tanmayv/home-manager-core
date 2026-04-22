@@ -337,7 +337,7 @@ in
       if [[ -z "$TMUX" ]]; then
         check-for-update
       fi
-
+      
       # Autostart tmux only if not in Cider terminal
       ${if enableTmuxOnSsh then ''
       if [[ "$TERM_PROGRAM" != "cider" ]]; then

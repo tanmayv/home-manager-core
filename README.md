@@ -79,6 +79,7 @@ To learn how to personalize your configuration and toggle features in `setup.nix
 ## Key Features (Technical List)
 
 *   **Intelligent Navigation**: Fig/CitC aware `cd` and `hgd` wrappers.
+*   **Skill Management**: `skill-ctl` for discovering, publishing to Piper, and syncing skills across workspaces.
 *   **Mouse-Centric Tmux**: Clickable status bar, context menus, and smart pane switching (`Ctrl+h/j/k/l`).
 *   **Command Palette**: LRU-ranked search for system and AI commands.
 *   **AI Orchestration**: Protocol tools (`iamdone`, `waiting`, `send-message-to-agent`) for multi-agent workflows.
