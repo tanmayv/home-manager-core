@@ -38,7 +38,7 @@ To maintain persistent memory across sessions, agents have access to a dedicated
   # Logic for handling external extensions (Piper or local)
   extraExtensions = userSettings.extra-ai-extensions or [ ];
   personalPiperConfig = "/google/src/files/head/depot/configs/users/${userSettings.username}/_agents";
-  allExtensions = (if userSettings.enable-skill-publishing or false then [ personalPiperConfig ] else [ ]) ++ extraExtensions;
+  allExtensions = [ personalPiperConfig ] ++ extraExtensions;
 
   # Format inherits for jetski/skills.json
   # We assume each extension directory has a skills.json
