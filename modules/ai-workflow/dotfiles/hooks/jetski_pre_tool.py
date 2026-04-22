@@ -37,22 +37,24 @@ except Exception as e:
 # Jetski specific logic for approval
 try:
     pane_id = os.environ.get("TMUX_PANE")
-    agent_name = subprocess.check_output(["tmux", "display-message", "-p", "-t", pane_id, "#{@agent_name}"]).decode().strip()
-    if agent_name and input_data:
-        tool_call = input_data.get("toolCall", {})
-        args = tool_call.get("args", {})
-        safe_to_auto_run = args.get("SafeToAutoRun", True)
-        with open("/tmp/hooks.log", "a") as f:
-            f.write(f"[HOOK] JetskiPreTool: agent_name={agent_name}, safe_to_auto_run={safe_to_auto_run}\n")
-        
-        # Assume requires approval if SafeToAutoRun is missing or false
-        if "SafeToAutoRun" not in args or not args.get("SafeToAutoRun"):
-            # Requires approval!
-            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            s.connect(os.path.expanduser("~/.cache/agent-tracker.sock"))
-            s.sendall(json.dumps({"jsonrpc": "2.0", "method": "update_agent", "params": {"agent_name": agent_name, "waiting_approval": True}, "id": 1}).encode())
-            s.close()
-            subprocess.run(["tmux-status-refresh"])
+    if pane_id and input_data:
+        agent_name = subprocess.check_output(["tmux", "display-message", "-p", "-t", pane_id, "#{@agent_name}"]).decode().strip()
+        if agent_name:
+            tool_call = input_data.get("toolCall", {})
+            args = tool_call.get("args", {})
+            safe_to_auto_run = args.get("SafeToAutoRun", True)
+            with open("/tmp/hooks.log", "a") as f:
+                f.write(f"[HOOK] JetskiPreTool: agent_name={agent_name}, safe_to_auto_run={safe_to_auto_run}\n")
+            
+            # Assume requires approval if SafeToAutoRun is missing or false
+            if "SafeToAutoRun" not in args or not args.get("SafeToAutoRun"):
+                # Requires approval!
+                s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                s.settimeout(1.0)
+                s.connect(os.path.expanduser("~/.cache/agent-tracker.sock"))
+                s.sendall(json.dumps({"jsonrpc": "2.0", "method": "update_agent", "params": {"agent_name": agent_name, "waiting_approval": True}, "id": 1}).encode())
+                s.close()
+                subprocess.run(["tmux-status-refresh"], capture_output=True)
 except Exception as e:
     with open("/tmp/hooks.log", "a") as f:
         f.write(f"[HOOK] Error in Jetski approval check: {e}\n")
