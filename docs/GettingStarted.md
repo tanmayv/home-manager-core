@@ -1,51 +1,50 @@
 # Getting Started with Minimal Cloudtop
 
-Follow these steps to set up your environment from scratch.
+Follow these steps to transform your terminal into a powerful, AI-integrated workspace.
 
 ## 1. Prerequisites
 
 ### Internet Exception
-Before you begin, ensure your Cloudtop has an internet exception. This is required to fetch Nix packages and other dependencies.
-- Request an exception via the internal portal (search for "Internet Exception" or follow your team's specific guidance).
+Minimal Cloudtop requires an internet exception to download Nix packages and AI dependencies.
+- Request an exception via the internal portal (search for **"Internet Exception"**).
 
-### Install Nix and Home Manager
-We rely on Nix for package management and Home Manager for configuration.
-- Follow the official Google guide at **go/nix** to install Nix.
-  - You need to ensure that nix binary is avaiable and you are part of nix-users group
-  - (Optional: Setup channels)
+### Install Nix
+We use Nix for robust package management.
+- Follow the guide at **go/nix** to install and configure Nix.
+- **Verification**: Ensure `nix --version` works and you are in the `nix-users` group.
 
 
 ## 2. Repository Setup
 
 ### Clone the Configuration
-Clone this repository to the expected location on your Cloudtop:
+Clone the repository to the standard configuration path. We recommend starting with the `stable` branch:
 
 ```bash
 git clone -b stable --single-branch sso://user/tanmayvijay/home-manager-minimal-ai ~/.config/minimal-cloudtop
 cd ~/.config/minimal-cloudtop
 ```
 
-### Create Your Personal Branch (Important!)
-Before editing configuration files, create a personal branch. This allows the automatic updater to seamlessly rebase your customizations over new stable releases without conflicts.
+### Create Your Personal Branch (CRITICAL)
+**Do not skip this step.** Creating a personal branch allows the system to update the core logic while preserving your personal settings in `setup.nix`.
 
 ```bash
 git checkout -b my-config
 ```
 
-### Personalize your Configuration
-Open `setup.nix` and update the `username` to match your LDAP:
+### Personalize `setup.nix`
+Open `setup.nix` and update the `username` to your LDAP. You can also toggle features like Neovim or AI orchestration here.
 
 ```nix
 # setup.nix
 {
-  username = "your-ldap-here";
-  # ... other settings
+  username = "your-ldap";
+  # Explore other feature toggles below!
 }
 ```
 
-Commit your changes:
+Commit your initial configuration:
 ```bash
-git commit -am "chore: personalize setup.nix"
+git commit -am "chore: initial setup.nix personalization"
 ```
 
 *For a full list of configuration options and feature toggles, please see the [Customization Guide](Customization.md).*
@@ -66,3 +65,34 @@ Once the build finishes, restart your shell or start a new Tmux session:
 - Your Zsh prompt should now show your CitC workspace (if applicable).
 - Press `Ctrl+p` to open the Command Palette.
 - Clickable session indicators should appear in the Tmux status bar.
+
+---
+
+## 5. Updating the Configuration
+
+This repository is actively maintained. When a new stable version is released, you can easily pull the updates without losing your personal settings in `setup.nix`.
+
+### Automatic Update Checks
+Every time you start a new shell, a background check (`check-for-update`) runs once per day.
+- If a new version is available, you will be prompted: `🎉 A new stable version of Minimal Cloudtop is available! Would you like to update now? [y/N]`
+- If you select `y`, the tool will automatically fetch the latest `stable` tag, **rebase** your personal branch onto it, and run `build-and-switch`.
+
+### Manual Update
+If you want to trigger an update check manually, simply run:
+```bash
+check-for-update
+```
+
+Alternatively, you can perform a manual Git update:
+```bash
+# 1. Fetch the latest stable tag
+git fetch origin tag stable --no-tags
+
+# 2. Rebase your current branch onto the new stable version
+git rebase origin/stable
+
+# 3. Apply the changes
+build-and-switch
+```
+
+*Note: If a rebase conflict occurs (rare if you only edit `setup.nix`), resolve the conflicts manually and then run `build-and-switch` to complete the update.*

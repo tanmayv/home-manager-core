@@ -69,6 +69,9 @@ We support a **User-Visible Knowledge Base** (markdown notes in `~/agent_knowled
 
 Please refer to [docs/GettingStarted.md](docs/GettingStarted.md) for detailed installation instructions.
 
+### Keeping Up to Date
+Minimal Cloudtop includes an automatic update checker. Once a day, it will notify you if a new `stable` version is available and offer to automatically rebase your changes and rebuild your environment. You can also run `check-for-update` manually at any time.
+
 ## Customization
 
 To learn how to personalize your configuration and toggle features in `setup.nix`, please read the [Customization Guide](docs/Customization.md).
