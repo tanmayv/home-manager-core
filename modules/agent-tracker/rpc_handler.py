@@ -141,48 +141,68 @@ def handle_send_message(params: dict) -> bool:
     
     if state.add_message(agent_name, msg_obj):
         info = state.get_agent(agent_name)
-        notify_msg = f"[New message in inbox! Use agent-tracker-ctl read-inbox]"
+        notify_msg = f"New message in inbox.Use agent-tracker-ctl read-inbox]"
         tmux_util.send_keys(info["tmux_pane"], notify_msg, info["tmux_socket"])
         return True
     raise ValueError("Target agent not found")
 
-def _read_and_update_inbox_file(inbox_file: str, clear: bool) -> str:
-    """Reads the inbox file, filters unread messages, marks them as read, and rewrites the file."""
+def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None) -> dict:
+    """Reads the inbox file, handles unread/history/last_n messages, marks them as read, and rewrites the file."""
     if not os.path.exists(inbox_file):
-        return "Inbox is empty."
+        return {"mode": "history", "messages": []}
         
     try:
         all_messages = []
-        unread_messages = []
         with open(inbox_file, "r") as f:
             for line in f:
                 if line.strip():
                     try:
-                        msg_obj = json.loads(line)
-                        if not msg_obj.get("read", False):
-                            unread_messages.append(msg_obj)
-                            msg_obj["read"] = True
-                        all_messages.append(msg_obj)
+                        all_messages.append(json.loads(line))
                     except json.JSONDecodeError:
                         pass
         
-        result = "".join([json.dumps(m) + "\n" for m in unread_messages])
+        mode = "unread"
+        result_messages = []
         
+        if last_n is not None:
+            mode = "last_n"
+            result_messages = all_messages[-last_n:] if last_n > 0 else []
+            for msg in result_messages:
+                msg["read"] = True
+        else:
+            unread_messages = [m for m in all_messages if not m.get("read", False)]
+            if unread_messages:
+                mode = "unread"
+                result_messages = unread_messages
+                for msg in unread_messages:
+                    msg["read"] = True
+            else:
+                mode = "history"
+                result_messages = all_messages[-5:]
+                
         if clear:
             os.remove(inbox_file)
         else:
             with open(inbox_file, "w") as f:
                 for m in all_messages:
                     f.write(json.dumps(m) + "\n")
-        return result
+        return {"mode": mode, "messages": result_messages}
     except IOError as e:
         raise RuntimeError(f"Failed to access inbox file: {e}")
 
-def handle_get_inbox(params: dict) -> str:
+
+def handle_get_inbox(params: dict) -> dict:
     """Handles get_inbox RPC call. Flushes in-memory messages first."""
     agent_name = params.get("agent_name")
     clear = params.get("clear", False)
+    last_n = params.get("last_n")
     
+    if last_n is not None:
+        try:
+            last_n = int(last_n)
+        except ValueError:
+            raise ValueError("last_n must be an integer")
+            
     if not agent_name:
         raise ValueError("Invalid params")
         
@@ -204,7 +224,8 @@ def handle_get_inbox(params: dict) -> str:
         except IOError as e:
             logging.error(f"Failed to flush inbox on demand for {agent_name}: {e}")
             
-    return _read_and_update_inbox_file(inbox_file, clear)
+    return _read_and_update_inbox_file(inbox_file, clear, last_n)
+
 
 dispatcher = {
     "register": handle_register,

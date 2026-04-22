@@ -47,11 +47,13 @@ def main():
 
     spin_parser = subparsers.add_parser("spin", help="Spin a new agent")
     spin_parser.add_argument("name", help="Name for the new agent")
-    spin_parser.add_argument("command", help="Command to run in the new agent")
+    spin_parser.add_argument("command", choices=["jetski", "gemini"], help="Command to run in the new agent")
 
     read_inbox_parser = subparsers.add_parser("read-inbox", help="Read agent inbox")
     read_inbox_parser.add_argument("--clear", action="store_true", help="Clear inbox after reading")
     read_inbox_parser.add_argument("--name", help="Agent name to read inbox for (defaults to current agent)")
+    read_inbox_parser.add_argument("--last", "-l", type=int, help="Read last N messages")
+
 
     args = parser.parse_args()
 
@@ -138,20 +140,38 @@ def main():
                 print("Error: @agent_name option is empty. Are you in an agent pane?", file=sys.stderr)
                 sys.exit(1)
             
-        inbox_content = call_rpc("get_inbox", {"agent_name": agent_name, "clear": args.clear})
-        if inbox_content:
-            if inbox_content == "Inbox is empty.":
-                print(inbox_content)
+        params = {"agent_name": agent_name, "clear": args.clear}
+        if args.last is not None:
+            params["last_n"] = args.last
+            
+        inbox_data = call_rpc("get_inbox", params)
+        
+        if inbox_data:
+            mode = inbox_data.get("mode")
+            messages = inbox_data.get("messages", [])
+            
+            if mode == "history" and not args.last:
+                if not messages:
+                    print("No unread messages.")
+                else:
+                    for msg in messages:
+                        read_str = "Read" if msg.get("read", False) else "Unread"
+                        msg_text = msg.get('message', '')
+                        truncated = msg_text[:50] + "..." if len(msg_text) > 50 else msg_text
+                        print(f"{msg.get('timestamp')}, {read_str}, {msg.get('sender')}, {truncated}")
+                    print("use agent-tracker-ctl read-inbox --last n to print last n messages.")
             else:
-                for line in inbox_content.splitlines():
-                    if line:
-                        try:
-                            msg_obj = json.loads(line)
-                            print(f"[{msg_obj['timestamp']}] From {msg_obj['sender']}: {msg_obj['message']}")
-                        except json.JSONDecodeError:
-                            print(f"Raw: {line}")
+                if not messages:
+                    if mode == "last_n":
+                        print("No messages found.")
+                    else:
+                        print("No unread messages.")
+                else:
+                    for msg in messages:
+                        print(f"[{msg.get('timestamp')}] From {msg.get('sender')}: {msg.get('message')}")
         else:
-            print("No unread messages.")
+            print("No messages found.")
+
     else:
         parser.print_help()
 
