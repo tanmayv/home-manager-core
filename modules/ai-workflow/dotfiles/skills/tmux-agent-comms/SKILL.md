@@ -16,7 +16,14 @@ Use this skill when:
         tmux display-message -p '#{@agent_name}'
         ```
 
-2.  **Sending Messages**:
+2.  **Discovering Other Agents**:
+    *   To know which agents are available and their names, use the command:
+        ```bash
+        agent-tracker-ctl list
+        ```
+    *   This will return a JSON object with all registered agents and their details.
+
+3.  **Sending Messages**:
     *   Use the `agent-tracker-ctl` tool to send messages to another agent's inbox.
     *   Command:
         ```bash
@@ -24,7 +31,7 @@ Use this skill when:
         ```
     *   The tracker will store the message and send a short notification to the target agent's pane.
 
-3.  **Receiving and Replying**:
+4.  **Receiving and Replying**:
     *   When you see the notification `[New message in inbox! Use agent-tracker-ctl read-inbox]`, run the command to read your messages:
         ```bash
         agent-tracker-ctl read-inbox
@@ -32,7 +39,7 @@ Use this skill when:
     *   The output will show messages in the format: `[Timestamp] From Sender: Message`.
     *   To reply, use the `send-message` command described above, targeting the sender's name.
 
-4.  **Naming and Renaming**:
+5.  **Naming and Renaming**:
     *   If you need to rename yourself, use the command:
         ```bash
         agent-tracker-ctl rename <old_name> <new_name>
