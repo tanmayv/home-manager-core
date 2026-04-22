@@ -4,7 +4,7 @@
   local_agent_knowledge_dir = "~/agent_knowledge/";
   local_agent_knowledge_create_command = ""; # command/script that prints the path of the note to be updated.
   editor = "nvim";
-  enable_bash_over_zsh = false;
+  enable_bash_over_zsh = true;
   enable-ai-workflow = true;
   enable-neovim = true;
   enable-tmux-on-ssh = true;
