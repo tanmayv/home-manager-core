@@ -72,6 +72,7 @@ To update, simply run `nix flake update` in your personal repository.
 
 | Flag | Behavior if `true` | Behavior if `false` |
 | :--- | :--- | :--- |
+| `enable_bash_over_zsh` | Uses Bash as the primary shell with custom CitC-aware functions. | Uses Zsh as the primary shell (default). |
 | `enable-ai-workflow` | Loads agents, skills, inter-agent communication tools, AI status bar elements, and wraps AI CLI tools. | Disables all AI-specific logic, removes agent tracking from the status bar, and uses raw CLI binaries. |
 | `enable-neovim` | Loads custom Neovim config with plugins and keybindings. | Uses the default system Neovim without custom setup. |
 | `enable-tmux-on-ssh` | Automatically starts/attaches tmux on SSH login (non-Cider). | Standard shell login without automatic tmux. |

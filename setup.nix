@@ -1,9 +1,10 @@
 {
   username = "tanmayvijay";
   config-location = "~/minimal-cloudtop";
-  local_agent_knowledge_dir = "~/pkm/dots";
-  local_agent_knowledge_create_command = "nn --print-path"; # e.g., "nn"
+  local_agent_knowledge_dir = "~/agent_knowledge/";
+  local_agent_knowledge_create_command = ""; # command/script that prints the path of the note to be updated.
   editor = "nvim";
+  enable_bash_over_zsh = false;
   enable-ai-workflow = true;
   enable-neovim = true;
   enable-tmux-on-ssh = true;
@@ -23,6 +24,7 @@
   skill-publishing = {
     # Target path in piper. $USER will be replaced with your LDAP.
     target-path = "//depot/configs/users/$USER/_agents/skills";
+    # target-path = "//depot/configs/users/<ldap>/_agents/skills";
   };
   ai_features = {
     enable_agent_knowledge = true;

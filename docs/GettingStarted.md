@@ -13,6 +13,17 @@ We use Nix for robust package management.
 - Follow the guide at **go/nix** to install and configure Nix.
 - **Verification**: Ensure `nix --version` works and you are in the `nix-users` group.
 
+```bash
+sudo apt install nix-setup-systemd
+sudo tee -a /etc/nix/nix.conf <<< 'experimental-features = nix-command flakes'
+```
+- Logout and ssh into the cloudtop again.
+
+```bash
+sudo usermod -a -G nix-users $USER
+nix-channel --add https://nixos.org/channels/nixpkgs-unstable && nix-channel --update nixpkgs
+```
+
 
 ## 2. Repository Setup
 
@@ -20,7 +31,7 @@ We use Nix for robust package management.
 Clone the repository to the standard configuration path. We recommend starting with the `stable` branch:
 
 ```bash
-git clone -b stable --single-branch sso://user/tanmayvijay/home-manager-minimal-ai ~/.config/minimal-cloudtop
+git clone -b stable --single-branch sso://user/tanmayvijay/home-manager-minimal-ai ~/minimal-cloudtop
 cd ~/.config/minimal-cloudtop
 ```
 
@@ -54,7 +65,7 @@ git commit -am "chore: initial setup.nix personalization"
 Apply the configuration for the first time:
 
 ```bash
-nix run home-manager -- switch --backup backup --flake ".#your-ldap-here"
+nix run home-manager -- switch -b backup --flake ".#your-ldap-here"
 ```
 
 *Note: After the initial successful build, you can use the `build-and-switch` command (or the Command Palette shortcut) to apply future updates.*
