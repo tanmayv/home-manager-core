@@ -88,6 +88,8 @@ def update_agent(name: str, **kwargs) -> bool:
 def rename_agent(old_name: str, new_name: str) -> bool:
     """Renames an agent in state."""
     with state_lock:
+        if old_name == new_name:
+            return True
         if old_name in state and new_name not in state:
             state[new_name] = state.pop(old_name)
             return True

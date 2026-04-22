@@ -76,12 +76,26 @@ def set_agent_name(pane_id, name, socket_path=None):
     cmd.extend(["set-option", "-p", "-t", pane_id, "@agent_name", name])
     enqueue_tmux_cmd(cmd)
 
+def set_agent_name_sync(pane_id, name, socket_path=None):
+    cmd = ["set-option", "-p", "-t", pane_id, "@agent_name", name]
+    if socket_path:
+        run_tmux_cmd(["-S", socket_path] + cmd)
+    else:
+        run_tmux_cmd(cmd)
+
 def set_pane_title(pane_id, title, socket_path=None):
     cmd = ["tmux"]
     if socket_path:
         cmd.extend(["-S", socket_path])
     cmd.extend(["select-pane", "-t", pane_id, "-T", title])
     enqueue_tmux_cmd(cmd)
+
+def set_pane_title_sync(pane_id, title, socket_path=None):
+    cmd = ["select-pane", "-t", pane_id, "-T", title]
+    if socket_path:
+        run_tmux_cmd(["-S", socket_path] + cmd)
+    else:
+        run_tmux_cmd(cmd)
 
 def send_keys(pane_id, keys, socket_path=None):
     cmd = ["tmux"]

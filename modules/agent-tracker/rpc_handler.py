@@ -7,6 +7,7 @@ import datetime
 import time
 import os
 import uuid
+import subprocess
 
 BUFFER_SIZE = 4096
 
@@ -23,6 +24,14 @@ def handle_register(params: dict) -> str:
         
     agents = state.get_all_agents()
     
+    # Remove any existing agent for the same pane to prevent duplicates
+    for existing_name, info in agents.items():
+        if info.get("tmux_pane") == tmux_pane:
+            logging.info(f"Removing existing agent {existing_name} for pane {tmux_pane} before re-registering")
+            state.delete_agent(existing_name)
+            # Refresh agents list after deletion
+            agents = state.get_all_agents()
+
     if name:
         num = 1
         agent_name = name
@@ -70,14 +79,22 @@ def handle_rename(params: dict) -> bool:
     if not (old_name and new_name):
         raise ValueError("Invalid params")
         
+    logging.info(f"Attempting to rename agent from {old_name} to {new_name}")
     if state.rename_agent(old_name, new_name):
         info = state.get_agent(new_name)
         tmux_pane = info.get("tmux_pane")
         tmux_socket = info.get("tmux_socket")
+        logging.info(f"Renamed {old_name} to {new_name} in state. Updating tmux pane {tmux_pane}")
         if tmux_pane:
-            tmux_util.set_agent_name(tmux_pane, new_name, tmux_socket)
-            tmux_util.set_pane_title(tmux_pane, new_name, tmux_socket)
+            try:
+                tmux_util.set_agent_name_sync(tmux_pane, new_name, tmux_socket)
+                tmux_util.set_pane_title_sync(tmux_pane, new_name, tmux_socket)
+                # Force status bar refresh
+                subprocess.run(["tmux-status-refresh"], check=False)
+            except Exception as e:
+                logging.error(f"Failed to update tmux pane for {new_name}: {e}")
         return True
+    logging.error(f"Failed to rename {old_name} to {new_name}. Agent not found or new name exists.")
     raise ValueError("Agent not found or new name exists")
 
 def handle_spin_agent(params: dict) -> str:
