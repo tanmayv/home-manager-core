@@ -2,6 +2,8 @@
 
 This repository provides a modern, AI-focused Home Manager configuration tailored for Googlers setting up a new Cloudtop. It bridges the gap between powerful CLI tools and an accessible, interactive terminal interface.
 
+![Screenshot](assets/screenshot.png)
+
 ## Motivation & Philosophy
 
 ### Why the CLI for AI?
