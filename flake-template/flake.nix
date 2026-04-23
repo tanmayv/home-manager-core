@@ -2,9 +2,9 @@
   description = "Example flake using minimal-cloudtop as a library";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
     home-manager = {
-      url = "github:nix-community/home-manager";
+      url = "github:nix-community/home-manager/release-25.11";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     
@@ -50,7 +50,7 @@
             # IMPORTANT: Set your LDAP/username here!
             home.username = "your-username";
             home.homeDirectory = "/usr/local/google/home/your-username";
-            home.stateVersion = "23.11";
+            home.stateVersion = "25.11";
             
             # Add your own Home Manager configuration here...
           })

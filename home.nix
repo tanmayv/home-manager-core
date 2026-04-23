@@ -11,7 +11,7 @@
     ++ (if userSettings.enable-smart-cd or false then [ ./modules/smart-cd ] else [])
     ++ (if userSettings.enable-agent-tracker or false then [ ./modules/agent-tracker ] else []);
 
-  home.stateVersion = "23.11";
+  home.stateVersion = "25.11";
 
   programs.home-manager.enable = true;
 
