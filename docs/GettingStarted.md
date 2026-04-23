@@ -43,15 +43,20 @@ git checkout -b my-config
 ```
 
 ### Personalize Configuration
-Open `home.nix` and update `home.username` to your LDAP. 
+Open `flake.nix` and update `home.username` to your LDAP in the `cloudtop` configuration. 
 
 ```nix
-# home.nix
-{
-  # IMPORTANT: Set your LDAP/username here!
-  home.username = "your-ldap"; 
-  home.homeDirectory = "/usr/local/google/home/your-ldap";
-}
+# flake.nix
+homeConfigurations.cloudtop = home-manager.lib.homeManagerConfiguration {
+  # ...
+  modules = [ 
+    # ...
+    ({ pkgs, ... }: {
+      home.username = "your-ldap";
+      home.homeDirectory = "/usr/local/google/home/your-ldap";
+    })
+  ];
+};
 ```
 
 Then, open `setup.nix` to toggle features like Neovim or AI orchestration.

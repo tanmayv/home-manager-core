@@ -33,6 +33,12 @@
           modules = [ 
             # Use the Home Manager module from the Git input
             minimal-cloudtop.homeManagerModules.default
+
+            # Define your user identity here
+            ({ pkgs, ... }: {
+              home.username = "your-ldap";
+              home.homeDirectory = "/usr/local/google/home/your-ldap";
+            })
           ];
         };
       };
