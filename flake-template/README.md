@@ -9,7 +9,7 @@ This directory contains an example `flake.nix` for integrating Minimal Cloudtop 
    inputs.minimal-cloudtop = {
      type = "git";
      url = "sso://user/tanmayvijay/minimal-cloudtop";
-     ref = "stable";
+     ref = "refs/tags/stable";
    };
    ```
 

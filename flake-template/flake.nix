@@ -12,7 +12,7 @@
     minimal-cloudtop = {
       type = "git";
       url = "sso://user/tanmayvijay/minimal-cloudtop";
-      ref = "stable";
+      ref = "refs/tags/stable";
     };
   };
 
