@@ -8,13 +8,19 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    minimal-cloudtop = {
+      type = "git";
+      url = "sso://user/tanmayvijay/home-manager-minimal-ai";
+      ref = "refs/tags/stable";
+    };
+
     astronvim-template = {
       url = "github:AstroNvim/template";
       flake = false;
     };
   };
 
-  outputs = { nixpkgs, home-manager, ... }@inputs:
+  outputs = { nixpkgs, home-manager, minimal-cloudtop, ... }@inputs:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
@@ -25,11 +31,13 @@
           inherit pkgs;
           extraSpecialArgs = { inherit inputs userSettings; };
           modules = [ 
-            ./home.nix 
+            # Use the Home Manager module from the Git input
+            minimal-cloudtop.homeManagerModules.default
           ];
         };
       };
 
+      # Export the local home.nix as the module source
       homeManagerModules.default = ./home.nix;
     };
 }
