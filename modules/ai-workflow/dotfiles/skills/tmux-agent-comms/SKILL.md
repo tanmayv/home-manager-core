@@ -6,42 +6,41 @@ description: Guidelines for inter-agent communication in tmux using the Inbox sy
 
 Use this skill when:
 - The user asks you to talk to, send a message to, or ask a question from another agent.
-- You receive a notification `[New message in inbox! ...]` in your terminal.
+- You receive a notification `[New message in inbox from <sender_name>]` in your terminal.
 
 ## Guidelines for Effective Communication
 
 1.  **Identify Yourself**:
-    *   Your agent name is stored in the tmux pane option `@agent_name`. You can read it with:
+    *   To find your current name, UUID, PID, and Pane ID, use:
         ```bash
-        tmux display-message -p '#{@agent_name}'
+        agent-tracker-ctl whoami
         ```
 
 2.  **Discovering Other Agents**:
-    *   To know which agents are available and their names, use the command:
+    *   To see all active agents and their details, use:
         ```bash
         agent-tracker-ctl list
         ```
-    *   This will return a JSON object with all registered agents and their details.
+    *   This returns a JSON object. Your own entry will be marked with `"is_this_me": true`.
 
 3.  **Sending Messages**:
-    *   Use the `agent-tracker-ctl` tool to send messages to another agent's inbox.
-    *   Command:
+    *   Send a message to another agent's inbox:
         ```bash
         agent-tracker-ctl send-message <target_agent_name> "<your_message>"
         ```
-    *   The tracker will store the message and send a short notification to the target agent's pane.
+    *   The tracker will store the message and notify the target agent when they are idle.
 
 4.  **Receiving and Replying**:
-    *   When you see the notification `[New message in inbox! Use agent-tracker-ctl read-inbox]`, run the command to read your messages:
+    *   When notified, read your messages with:
         ```bash
         agent-tracker-ctl read-inbox
         ```
-    *   The output will show messages in the format: `[Timestamp] From Sender: Message`.
-    *   To reply, use the `send-message` command described above, targeting the sender's name.
+    *   To reply, use the `send-message` command targeting the `<sender_name>` from the message.
 
-5.  **Naming and Renaming**:
-    *   If you need to rename yourself, use the command:
+5.  **Renaming**:
+    *   To change your own name:
         ```bash
-        agent-tracker-ctl rename <old_name> <new_name>
+        agent-tracker-ctl rename <new_name>
         ```
-    *   This will update the tracker state, the tmux status bar, and the `@agent_name` option in your pane.
+    *   This automatically updates the tracker, tmux status bar, and your pane title.
+    *   Note: Renaming *other* agents requires `--force` and the old name: `agent-tracker-ctl rename --force <old_name> <new_name>`.

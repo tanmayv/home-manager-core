@@ -16,6 +16,7 @@ def init_state() -> None:
     for pane in panes:
         pane_id = pane["pane_id"]
         agent_name = pane["agent_name"]
+        agent_uuid = pane["agent_uuid"]
         if agent_name:
             logging.info(f"Found recovered agent: {agent_name} in pane {pane_id}")
             try:
@@ -39,6 +40,7 @@ def init_state() -> None:
                             break
                             
                     if agent_pid:
+                        resolved_uuid = agent_uuid or str(uuid.uuid4())
                         with state_lock:
                             state[agent_name] = {
                                 "session": session,
@@ -48,10 +50,16 @@ def init_state() -> None:
                                 "wrapper_pid": None,
                                 "status": "idle",
                                 "waiting_approval": False,
-                                "uuid": str(uuid.uuid4()),
-                                "inbox": []
+                                "uuid": resolved_uuid,
+                                "pending_notifications": []
                             }
-                        logging.info(f"Recovered agent {agent_name} with PID {agent_pid}")
+                        
+                        # If we didn't have a UUID in tmux, persist the new one
+                        if not agent_uuid:
+                            logging.info(f"Generated new UUID {resolved_uuid} for recovered agent {agent_name}")
+                            tmux_util.set_agent_uuid(pane_id, resolved_uuid)
+                            
+                        logging.info(f"Recovered agent {agent_name} with PID {agent_pid} and UUID {resolved_uuid}")
             except Exception as e:
                 logging.error(f"Error recovering agent {agent_name}: {e}")
 
@@ -92,23 +100,5 @@ def rename_agent(old_name: str, new_name: str) -> bool:
             return True
         if old_name in state and new_name not in state:
             state[new_name] = state.pop(old_name)
-            return True
-        return False
-
-def add_message(agent_name: str, msg_obj: dict) -> bool:
-    """Adds a message to an agent's inbox."""
-    with state_lock:
-        if agent_name in state:
-            if "inbox" not in state[agent_name]:
-                state[agent_name]["inbox"] = []
-            state[agent_name]["inbox"].append(msg_obj)
-            return True
-        return False
-
-def clear_inbox(agent_name: str) -> bool:
-    """Clears an agent's inbox."""
-    with state_lock:
-        if agent_name in state:
-            state[agent_name]["inbox"] = []
             return True
         return False

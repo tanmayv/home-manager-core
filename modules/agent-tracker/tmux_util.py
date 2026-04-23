@@ -41,18 +41,27 @@ def run_tmux_cmd(cmd, timeout=5):
         logging.error(f"Unexpected error running tmux command: {e}")
         raise
 
+def set_agent_uuid(pane_id, uuid, socket_path=None):
+    cmd = ["tmux"]
+    if socket_path:
+        cmd.extend(["-S", socket_path])
+    cmd.extend(["set-option", "-p", "-t", pane_id, "@agent_uuid", uuid])
+    enqueue_tmux_cmd(cmd)
+
 def list_panes():
-    """Lists panes with ID and agent name."""
+    """Lists panes with ID, agent name, and UUID."""
     try:
-        out = run_tmux_cmd(["list-panes", "-a", "-F", "#{pane_id} #{@agent_name}"])
+        out = run_tmux_cmd(["list-panes", "-a", "-F", "#{pane_id} #{@agent_name} #{@agent_uuid}"])
         panes = []
         if out:
             for line in out.split("\n"):
                 parts = line.split()
-                if len(parts) >= 2:
-                    panes.append({"pane_id": parts[0], "agent_name": parts[1]})
-                elif len(parts) == 1:
-                    panes.append({"pane_id": parts[0], "agent_name": None})
+                pane_info = {"pane_id": parts[0], "agent_name": None, "agent_uuid": None}
+                if len(parts) >= 2 and parts[1]:
+                    pane_info["agent_name"] = parts[1]
+                if len(parts) >= 3 and parts[2]:
+                    pane_info["agent_uuid"] = parts[2]
+                panes.append(pane_info)
         return panes
     except Exception as e:
         logging.error(f"Failed to list panes: {e}")
@@ -83,6 +92,13 @@ def set_agent_name_sync(pane_id, name, socket_path=None):
     else:
         run_tmux_cmd(cmd)
 
+def unset_agent_name(pane_id, socket_path=None):
+    cmd = ["tmux"]
+    if socket_path:
+        cmd.extend(["-S", socket_path])
+    cmd.extend(["set-option", "-p", "-u", "-t", pane_id, "@agent_name"])
+    enqueue_tmux_cmd(cmd)
+
 def set_pane_title(pane_id, title, socket_path=None):
     cmd = ["tmux"]
     if socket_path:
@@ -97,12 +113,27 @@ def set_pane_title_sync(pane_id, title, socket_path=None):
     else:
         run_tmux_cmd(cmd)
 
-def send_keys(pane_id, keys, socket_path=None):
+def unset_pane_title(pane_id, socket_path=None):
     cmd = ["tmux"]
     if socket_path:
         cmd.extend(["-S", socket_path])
-    cmd.extend(["send-keys", "-t", pane_id, keys, "Enter"])
+    cmd.extend(["select-pane", "-t", pane_id, "-T", ""])
     enqueue_tmux_cmd(cmd)
+
+def send_keys(pane_id, keys, socket_path=None):
+    """Sends keys followed by a short delay and Enter to ensure submission."""
+    cmd_base = ["tmux"]
+    if socket_path:
+        cmd_base.extend(["-S", socket_path])
+    
+    # 1. Send the actual message keys
+    enqueue_tmux_cmd(cmd_base + ["send-keys", "-t", pane_id, keys])
+    
+    # 2. Enqueue a short sleep to allow the terminal/app to process the input buffer
+    enqueue_tmux_cmd(["sleep", "0.5"])
+    
+    # 3. Send the Enter key to submit
+    enqueue_tmux_cmd(cmd_base + ["send-keys", "-t", pane_id, "Enter"])
 
 def spin_agent(agent_name, command, target_pane=None):
     import shlex

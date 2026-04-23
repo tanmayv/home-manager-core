@@ -42,8 +42,8 @@ def main():
     focus_parser.add_argument("agent_name", help="Agent name to focus")
 
     rename_parser = subparsers.add_parser("rename", help="Rename agent")
-    rename_parser.add_argument("old_name", help="Current agent name")
-    rename_parser.add_argument("new_name", help="New agent name")
+    rename_parser.add_argument("names", nargs="+", help="New name (or old_name new_name with --force)")
+    rename_parser.add_argument("--force", action="store_true", help="Force rename of another agent")
 
     spin_parser = subparsers.add_parser("spin", help="Spin a new agent")
     spin_parser.add_argument("name", help="Name for the new agent")
@@ -54,6 +54,7 @@ def main():
     read_inbox_parser.add_argument("--name", help="Agent name to read inbox for (defaults to current agent)")
     read_inbox_parser.add_argument("--last", "-l", type=int, help="Read last N messages")
 
+    subparsers.add_parser("whoami", help="Show current agent identity")
 
     args = parser.parse_args()
 
@@ -93,7 +94,8 @@ def main():
         print(" · ".join(formatted))
 
     elif args.subcommand == "send-message":
-        call_rpc("send_message", {"sender_name": "cli-user", "agent_name": args.agent_name, "message": args.message})
+        params = {"agent_name": args.agent_name, "message": args.message}
+        call_rpc("send_message", params)
         print("Message sent.")
 
     elif args.subcommand == "focus":
@@ -114,7 +116,20 @@ def main():
             print(f"Agent {args.agent_name} not found.", file=sys.stderr)
             sys.exit(1)
     elif args.subcommand == "rename":
-        call_rpc("rename", {"old_name": args.old_name, "new_name": args.new_name})
+        force = args.force
+        if force:
+            if len(args.names) != 2:
+                print("Error: --force requires <old_name> <new_name>", file=sys.stderr)
+                sys.exit(1)
+            old_name, new_name = args.names
+        else:
+            if len(args.names) != 1:
+                print("Error: rename requires <new_name> (use --force to rename someone else)", file=sys.stderr)
+                sys.exit(1)
+            old_name = None
+            new_name = args.names[0]
+            
+        call_rpc("rename", {"old_name": old_name, "new_name": new_name, "force": force})
         print("Agent renamed.")
     elif args.subcommand == "spin":
         try:
@@ -127,20 +142,12 @@ def main():
         if resolved_name:
             print(f"Agent spun successfully as: {resolved_name}")
     elif args.subcommand == "read-inbox":
-        if args.name:
-            agent_name = args.name
-        else:
-            try:
-                agent_name = subprocess.check_output(["tmux", "display-message", "-p", "#{@agent_name}"]).decode("utf-8").strip()
-            except subprocess.CalledProcessError:
-                print("Error: Failed to get agent name from tmux option. Are you in an agent pane?", file=sys.stderr)
-                sys.exit(1)
-                
-            if not agent_name:
-                print("Error: @agent_name option is empty. Are you in an agent pane?", file=sys.stderr)
-                sys.exit(1)
+        agent_name = args.name
+        params = {"clear": args.clear}
+        
+        if agent_name:
+            params["agent_name"] = agent_name
             
-        params = {"agent_name": agent_name, "clear": args.clear}
         if args.last is not None:
             params["last_n"] = args.last
             
@@ -171,6 +178,14 @@ def main():
                         print(f"[{msg.get('timestamp')}] From {msg.get('sender')}: {msg.get('message')}")
         else:
             print("No messages found.")
+
+    elif args.subcommand == "whoami":
+        info = call_rpc("whoami")
+        if info:
+            print(f"Name:    {info.get('name')}")
+            print(f"UUID:    {info.get('uuid')}")
+            print(f"PID:     {info.get('pid')}")
+            print(f"Pane ID: {info.get('pane_id')}")
 
     else:
         parser.print_help()

@@ -4,6 +4,7 @@ import os
 import json
 import subprocess
 import state
+import tmux_util
 
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", 5))
 
@@ -22,8 +23,10 @@ def is_process_alive(pid):
         if state_char is None or ppid is None:
             return False
             
-        # Consider dead if zombie or orphaned (PPid == 1)
-        if state_char == "Z" or ppid == 1:
+        # Consider dead only if it's a zombie. 
+        # We don't care about PPID=1 (orphans) because agents might persist 
+        # even if their wrapper dies, and we want to keep tracking them.
+        if state_char == "Z":
             return False
         return True
     except FileNotFoundError:
