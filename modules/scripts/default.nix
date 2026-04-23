@@ -19,6 +19,7 @@ in
     ./knowledge-manager.nix
     ./check-for-update.nix
     ./new-gemini-agent.nix
+    ./twatch.nix
   ] ++ (if userSettings.enable-skill-publishing or false then [
     ./skill-ctl.nix
   ] else []) ++ (if enableAgentComms then [

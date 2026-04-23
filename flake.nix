@@ -8,38 +8,36 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    minimal-cloudtop = {
-      type = "git";
-      url = "sso://user/tanmayvijay/home-manager-minimal-ai";
-      ref = "refs/tags/stable";
-    };
-
     astronvim-template = {
       url = "github:AstroNvim/template";
       flake = false;
     };
   };
 
-  outputs = { nixpkgs, home-manager, minimal-cloudtop, ... }@inputs:
+  outputs = { nixpkgs, home-manager, ... }@inputs:
     let
-      user = "your-ldap";
+      user = "tanmayvijay";
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       userSettings = import ./setup.nix;
     in {
-      homeConfigurations = {
+      homeConfigurations = rec {
         cloudtop = home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
           extraSpecialArgs = { inherit inputs userSettings; };
           modules = [ 
-            minimal-cloudtop.homeManagerModules.default
+            ./home.nix 
 
+            # Temporary override for local build
             ({ pkgs, ... }: {
               home.username = user;
               home.homeDirectory = "/usr/local/google/home/${user}";
             })
           ];
         };
+
+        # Expose the configuration under the specific user's name as well
+        "${user}" = cloudtop;
       };
 
       homeManagerModules.default = ./home.nix;
