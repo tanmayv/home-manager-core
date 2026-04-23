@@ -107,3 +107,41 @@ build-and-switch
 ```
 
 *Note: If a rebase conflict occurs (rare if you only edit `setup.nix`), resolve the conflicts manually and then run `build-and-switch` to complete the update.*
+
+---
+
+## 6. Advanced: Using as a Library
+
+If you already have an existing Nix Flake for your Home Manager configuration, you can use Minimal Cloudtop as a library/module instead of cloning the whole repository.
+
+### Add Flake Input
+In your `flake.nix`, add this repository as an input:
+
+```nix
+inputs.minimal-cloudtop.url = "github:tanmayvijay/minimal-cloudtop/stable";
+```
+
+### Configure Module
+1.  **Arguments**: Minimal Cloudtop requires `username` and `userSettings` to be passed via `extraSpecialArgs`.
+2.  **Import**: Add the exported module to your `modules` list.
+
+```nix
+outputs = { nixpkgs, home-manager, minimal-cloudtop, ... }@inputs: {
+  homeConfigurations."your-user" = home-manager.lib.homeManagerConfiguration {
+    pkgs = nixpkgs.legacyPackages.x86_64-linux;
+    extraSpecialArgs = { 
+      inherit username inputs; 
+      userSettings = { 
+        inherit username; 
+        enable-ai-workflow = true; # ... other settings
+      };
+    };
+    modules = [ 
+      minimal-cloudtop.homeManagerModules.default 
+      # ... your existing modules
+    ];
+  };
+};
+```
+
+*For a complete example, see the `flake-template/` directory in this repository.*
