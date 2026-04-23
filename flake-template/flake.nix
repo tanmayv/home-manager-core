@@ -17,14 +17,18 @@
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       
-      # Define your username and settings here
-      # You can also import them from a separate setup.nix file
-      username = "your-username";
-      userSettings = {
-        inherit username;
-        enable-ai-workflow = true;
-        enable-agent-tracker = true;
-        # Add other settings from setup.nix as needed
+      # 1. Option A: Define settings directly in the flake
+      # username = "your-username";
+      # userSettings = { inherit username; enable-ai-workflow = true; };
+
+      # 2. Option B: Import from a local setup.nix and optionally override values
+      baseSettings = import ./setup.nix;
+      username = baseSettings.username;
+      
+      # You can override any setting from setup.nix here
+      userSettings = baseSettings // {
+        enable-ai-workflow = true; 
+        # enable-agent-tracker = false;
       };
     in {
       homeConfigurations."${username}" = home-manager.lib.homeManagerConfiguration {
