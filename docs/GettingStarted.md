@@ -42,20 +42,31 @@ cd ~/.config/minimal-cloudtop
 git checkout -b my-config
 ```
 
-### Personalize `setup.nix`
-Open `setup.nix` and update the `username` to your LDAP. You can also toggle features like Neovim or AI orchestration here.
+### Personalize Configuration
+Open `home.nix` and update `home.username` to your LDAP. 
+
+```nix
+# home.nix
+{
+  # IMPORTANT: Set your LDAP/username here!
+  home.username = "your-ldap"; 
+  home.homeDirectory = "/usr/local/google/home/your-ldap";
+}
+```
+
+Then, open `setup.nix` to toggle features like Neovim or AI orchestration.
 
 ```nix
 # setup.nix
 {
-  username = "your-ldap";
+  enable-ai-workflow = true;
   # Explore other feature toggles below!
 }
 ```
 
 Commit your initial configuration:
 ```bash
-git commit -am "chore: initial setup.nix personalization"
+git commit -am "chore: initial personalization"
 ```
 
 *For a full list of configuration options and feature toggles, please see the [Customization Guide](Customization.md).*
@@ -126,22 +137,25 @@ inputs.minimal-cloudtop = {
 ```
 
 ### Configure Module
-1.  **Arguments**: Minimal Cloudtop requires `username` and `userSettings` to be passed via `extraSpecialArgs`.
-2.  **Import**: Add the exported module to your `modules` list.
+1.  **Arguments**: Minimal Cloudtop requires `userSettings` to be passed via `extraSpecialArgs`.
+2.  **Import**: Add the exported module to your `modules` list and configure your `home.username`.
 
 ```nix
 outputs = { nixpkgs, home-manager, minimal-cloudtop, ... }@inputs: {
   homeConfigurations."your-user" = home-manager.lib.homeManagerConfiguration {
     pkgs = nixpkgs.legacyPackages.x86_64-linux;
     extraSpecialArgs = { 
-      inherit username inputs; 
+      inherit inputs; 
       userSettings = { 
-        inherit username; 
         enable-ai-workflow = true; # ... other settings
       };
     };
     modules = [ 
       minimal-cloudtop.homeManagerModules.default 
+      ({ pkgs, ... }: {
+        home.username = "your-user";
+        home.homeDirectory = "/usr/local/google/home/your-user";
+      })
       # ... your existing modules
     ];
   };

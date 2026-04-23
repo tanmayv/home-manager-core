@@ -66,7 +66,6 @@ To update, simply run `nix flake update` in your personal repository.
 
 | Option | Description | Default |
 | :--- | :--- | :--- |
-| `username` | Your Google LDAP. Sets home path and prompt context. | `"tanmayvijay"` |
 | `config-location` | Path where this repo is cloned. | `"~/.config/minimal-cloudtop"` |
 | `local_agent_knowledge_dir` | Path where agent markdown notes are stored. | `"~/agent_knowledge"` |
 | `local_agent_knowledge_create_command` | Optional command override for creating new notes. | `""` |

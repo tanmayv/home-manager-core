@@ -2,7 +2,6 @@
   imports = [
     ./modules/tmux
     ./modules/hg.nix
-    ./modules/test.nix
     ./modules/tmux-palette.nix
     ./modules/scripts
   ] ++ (if userSettings.enable_bash_over_zsh or false then [ ./modules/bash ] else [ ./modules/zsh ])
