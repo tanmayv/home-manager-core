@@ -120,7 +120,7 @@ In your `flake.nix`, add this repository as an input:
 ```nix
 inputs.minimal-cloudtop = {
   type = "git";
-  url = "sso://user/tanmayvijay/minimal-cloudtop";
+  url = "sso://user/tanmayvijay/home-manager-minimal-ai";
   ref = "refs/tags/stable";
 };
 ```

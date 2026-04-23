@@ -11,7 +11,7 @@
     # Use the stable version of minimal-cloudtop
     minimal-cloudtop = {
       type = "git";
-      url = "sso://user/tanmayvijay/minimal-cloudtop";
+      url = "sso://user/tanmayvijay/home-manager-minimal-ai";
       ref = "refs/tags/stable";
     };
   };

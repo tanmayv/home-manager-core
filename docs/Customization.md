@@ -21,18 +21,22 @@ In your personal `flake.nix`, import minimal-cloudtop as an input:
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     home-manager.url = "github:nix-community/home-manager";
     # Import minimal-cloudtop as a module
-    minimal-cloudtop.url = "git+sso://user/tanmayvijay/home-manager-minimal-ai?ref=stable";
+    minimal-cloudtop = {
+      type = "git";
+      url = "sso://user/tanmayvijay/home-manager-minimal-ai";
+      ref = "refs/tags/stable";
+    };
   };
 
   outputs = { self, nixpkgs, home-manager, minimal-cloudtop, ... }: {
     homeConfigurations."your-ldap" = home-manager.lib.homeManagerConfiguration {
       modules = [
         # Load all base configurations
-        minimal-cloudtop.homeModules.default 
+        minimal-cloudtop.homeManagerModules.default 
         
         # Your personal overrides
         ({ config, pkgs, ... }: {
-           setup.username = "your-ldap";
+           home.username = "your-ldap";
            # Add your own packages or override settings here
         })
       ];
