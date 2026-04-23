@@ -9,7 +9,11 @@
     };
     
     # Use the stable version of minimal-cloudtop
-    minimal-cloudtop.url = "github:tanmayvijay/minimal-cloudtop/stable";
+    minimal-cloudtop = {
+      type = "git";
+      url = "sso://user/tanmayvijay/minimal-cloudtop";
+      ref = "stable";
+    };
   };
 
   outputs = { nixpkgs, home-manager, minimal-cloudtop, ... }@inputs:

@@ -6,7 +6,11 @@ This directory contains an example `flake.nix` for integrating Minimal Cloudtop 
 
 1. Add Minimal Cloudtop as an input to your `flake.nix`:
    ```nix
-   inputs.minimal-cloudtop.url = "github:tanmayvijay/minimal-cloudtop/stable";
+   inputs.minimal-cloudtop = {
+     type = "git";
+     url = "sso://user/tanmayvijay/minimal-cloudtop";
+     ref = "stable";
+   };
    ```
 
 2. Pass the required `extraSpecialArgs` to your `homeManagerConfiguration`:

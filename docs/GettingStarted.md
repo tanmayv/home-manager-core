@@ -118,7 +118,11 @@ If you already have an existing Nix Flake for your Home Manager configuration, y
 In your `flake.nix`, add this repository as an input:
 
 ```nix
-inputs.minimal-cloudtop.url = "github:tanmayvijay/minimal-cloudtop/stable";
+inputs.minimal-cloudtop = {
+  type = "git";
+  url = "sso://user/tanmayvijay/minimal-cloudtop";
+  ref = "stable";
+};
 ```
 
 ### Configure Module
