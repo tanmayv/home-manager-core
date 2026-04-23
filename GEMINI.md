@@ -38,6 +38,10 @@ This `GEMINI.md` provides context and instructions for AI agents working within 
 - **Localized Instructions**: Use localized `GEMINI.md` files within specific skill or agent directories to provide sub-agent context.
 - **Building Changes**: Always advise or use the `build-and-switch` command to apply Nix configuration changes to the system.
 
+## Library Usage
+- **Flake Module**: This repository exports its main configuration as `homeManagerModules.default`. Other flakes can import this to integrate Minimal Cloudtop features.
+- **Template**: See the `flake-template/` directory for an example of how to use this repo as a Nix flake library in an existing Home Manager setup.
+
 ## Agent Knowledge & Note Management
 - **Knowledge Directory**: Persistent agent knowledge (markdown notes) is stored in the directory specified by `local_agent_knowledge_dir` in `setup.nix` (default: `~/agent_knowledge`).
 - **Creating Notes**: Use the command specified by `local_agent_knowledge_create_command` (e.g., `nn`) to create new persistent notes.

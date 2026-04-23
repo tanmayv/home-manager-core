@@ -29,5 +29,7 @@
           ./home.nix 
         ];
       };
+
+      homeManagerModules.default = ./home.nix;
     };
 }
