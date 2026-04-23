@@ -19,21 +19,24 @@
   outputs = { nixpkgs, home-manager, minimal-cloudtop, ... }@inputs:
     let
       system = "x86_64-linux";
-      # 2. Option B: Import from a local setup.nix and optionally override values
+      pkgs = nixpkgs.legacyPackages.${system};
+
+      # Import from a local setup.nix and optionally override values
+      # Note: Ensure setup.nix exists in the same directory!
       baseSettings = import ./setup.nix;
 
       # You can override any setting from setup.nix here
       userSettings = baseSettings // {
-        # Add Overrides here
+        # Add Overrides here, look at setup.nix for available options.
         enable-ai-workflow = true; 
         # enable-agent-tracker = false;
       };
-      in {
+    in {
       # The configuration name (e.g. .#cloudtop)
       homeConfigurations.cloudtop = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
 
-        # minimal-cloudtop Home Manager module requires userSettings
+        # minimal-cloudtop Home Manager module requires userSettings and inputs
         extraSpecialArgs = { 
           inherit inputs userSettings; 
         };
@@ -42,17 +45,16 @@
           # Import the minimal-cloudtop Home Manager module
           minimal-cloudtop.homeManagerModules.default
 
-          # Your own Home Manager configuration
+          # Your own configuration block
           ({ pkgs, ... }: {
-            # Set your username here. Minimal Cloudtop will pick it up!
+            # IMPORTANT: Set your LDAP/username here!
             home.username = "your-username";
             home.homeDirectory = "/usr/local/google/home/your-username";
             home.stateVersion = "23.11";
-
-            # Additional configuration...
+            
+            # Add your own Home Manager configuration here...
           })
         ];
-      };
       };
     };
 }
