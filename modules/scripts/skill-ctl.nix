@@ -1,8 +1,8 @@
-{ pkgs, userSettings, ... }:
+{ pkgs, config, userSettings, ... }:
 
 let
   defaultTargetPath = userSettings.skill-publishing.target-path or "//depot/configs/users/$USER/_agents/skills";
-  username = userSettings.username;
+  username = config.home.username;
 in
 {
   home.packages = [

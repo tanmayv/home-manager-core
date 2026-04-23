@@ -12,18 +12,21 @@ This directory contains an example `flake.nix` for integrating Minimal Cloudtop 
 2. Pass the required `extraSpecialArgs` to your `homeManagerConfiguration`:
    ```nix
    extraSpecialArgs = { 
-     inherit username inputs userSettings; 
+     inherit inputs userSettings; 
    };
    ```
 
-3. Import the module in your `modules` list:
+3. Import the module in your `modules` list and set `home.username`:
    ```nix
    modules = [ 
      minimal-cloudtop.homeManagerModules.default
-     # ... your other modules
+     {
+       home.username = "your-username";
+       home.homeDirectory = "/usr/local/google/home/your-username";
+     }
    ];
    ```
 
 ## Note on Arguments
 
-The Minimal Cloudtop module expects `username` and `userSettings` to be available. Ensure these are defined and passed through `extraSpecialArgs` as shown in the example.
+The Minimal Cloudtop module expects `userSettings` to be available. The `username` is automatically picked up from `config.home.username`.

@@ -1,6 +1,7 @@
-{ pkgs, userSettings, lib, ... }:
+{ pkgs, userSettings, lib, config, ... }:
 
 let
+  username = config.home.username;
   aiFeatures = userSettings.ai_features or {
     enable_ai_ssa_creator_skill = false;
     enable_tmux_based_agent_comms = false;
@@ -37,7 +38,7 @@ To maintain persistent memory across sessions, agents have access to a dedicated
 
   # Logic for handling external extensions (Piper or local)
   extraExtensions = userSettings.extra-ai-extensions or [ ];
-  personalPiperConfig = "/google/src/files/head/depot/configs/users/${userSettings.username}/_agents";
+  personalPiperConfig = "/google/src/files/head/depot/configs/users/${username}/_agents";
   allExtensions = [ personalPiperConfig ] ++ extraExtensions;
 
   # Format inherits for jetski/skills.json

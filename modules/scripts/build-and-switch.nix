@@ -1,11 +1,11 @@
-{ pkgs, userSettings, ... }:
+{ pkgs, config, userSettings, ... }:
 
 let
   build-and-switch = pkgs.writeScriptBin "build-and-switch" ''
     #!/usr/bin/env bash
 
     config_location="${userSettings.config-location}"
-    username="${userSettings.username}"
+    username="${config.home.username}"
 
     # Expand ~ if present
     config_location="''${config_location/#\~/$HOME}"

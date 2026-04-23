@@ -1,5 +1,6 @@
-{ pkgs, username, ... }:
+{ pkgs, config, ... }:
 let
+  username = config.home.username;
   nn = import ./nn.nix { inherit pkgs username; };
   nmn = import ./nmn.nix { inherit pkgs; };
   tmux-notes-window = import ./tmux-notes-window.nix { inherit pkgs; };

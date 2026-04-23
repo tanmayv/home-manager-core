@@ -21,13 +21,14 @@
       userSettings = import ./setup.nix;
       username = userSettings.username;
     in {
-      homeConfigurations."${username}" = home-manager.lib.homeManagerConfiguration {
-        inherit pkgs;
-        extraSpecialArgs = { inherit username inputs userSettings; };
-        modules = [ 
-
-          ./home.nix 
-        ];
+      homeConfigurations = {
+        "${username}" = home-manager.lib.homeManagerConfiguration {
+          inherit pkgs;
+          extraSpecialArgs = { inherit inputs userSettings; };
+          modules = [ 
+            ./home.nix 
+          ];
+        };
       };
 
       homeManagerModules.default = ./home.nix;

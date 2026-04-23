@@ -1,6 +1,7 @@
-{ pkgs, config, username, userSettings, ... }:
+{ pkgs, config, userSettings, ... }:
 let
   palette = import ../palette.nix;
+  username = config.home.username;
   enableTmuxOnSsh = userSettings.enable-tmux-on-ssh or true;
   autoSwitchHg = userSettings.auto-switch-workspace-on-hgd or true;
   enableCdVerbose = userSettings.enable-cd-verbose or true;

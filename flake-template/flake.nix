@@ -17,26 +17,23 @@
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       
-      # 1. Option A: Define settings directly in the flake
-      # username = "your-username";
-      # userSettings = { inherit username; enable-ai-workflow = true; };
-
-      # 2. Option B: Import from a local setup.nix and optionally override values
       baseSettings = import ./setup.nix;
       username = baseSettings.username;
       
       # You can override any setting from setup.nix here
       userSettings = baseSettings // {
+        # Add Overrides here
         enable-ai-workflow = true; 
         # enable-agent-tracker = false;
       };
     in {
+      # The configuration name (e.g. .#your-username)
       homeConfigurations."${username}" = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
         
-        # minimal-cloudtop expects these arguments to be passed
+        # minimal-cloudtop Home Manager module requires userSettings
         extraSpecialArgs = { 
-          inherit username inputs userSettings; 
+          inherit inputs userSettings; 
         };
         
         modules = [ 
@@ -45,6 +42,7 @@
           
           # Your own Home Manager configuration
           ({ pkgs, ... }: {
+            # Set your username here. Minimal Cloudtop will pick it up!
             home.username = username;
             home.homeDirectory = "/usr/local/google/home/${username}";
             home.stateVersion = "23.11";

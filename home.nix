@@ -1,4 +1,4 @@
-{ pkgs, username, userSettings, ... }: {
+{ pkgs, lib, config, userSettings, ... }: {
   imports = [
     ./modules/tmux
     ./modules/hg.nix
@@ -12,8 +12,8 @@
     ++ (if userSettings.enable-smart-cd or false then [ ./modules/smart-cd ] else [])
     ++ (if userSettings.enable-agent-tracker or false then [ ./modules/agent-tracker ] else []);
 
-  home.username = username;
-  home.homeDirectory = "/usr/local/google/home/${username}";
+  home.username = lib.mkDefault userSettings.username;
+  home.homeDirectory = lib.mkDefault "/usr/local/google/home/${config.home.username}";
   home.stateVersion = "23.11";
 
   programs.home-manager.enable = true;
