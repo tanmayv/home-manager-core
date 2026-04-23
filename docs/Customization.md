@@ -29,7 +29,7 @@ In your personal `flake.nix`, import minimal-cloudtop as an input:
   };
 
   outputs = { self, nixpkgs, home-manager, minimal-cloudtop, ... }: {
-    homeConfigurations."your-ldap" = home-manager.lib.homeManagerConfiguration {
+    homeConfigurations."cloudtop" = home-manager.lib.homeManagerConfiguration {
       modules = [
         # Load all base configurations
         minimal-cloudtop.homeManagerModules.default 
@@ -37,6 +37,7 @@ In your personal `flake.nix`, import minimal-cloudtop as an input:
         # Your personal overrides
         ({ config, pkgs, ... }: {
            home.username = "your-ldap";
+           home.homeDirectory = "/usr/local/google/home/your-ldap";
            # Add your own packages or override settings here
         })
       ];

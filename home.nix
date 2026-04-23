@@ -12,7 +12,8 @@
     ++ (if userSettings.enable-smart-cd or false then [ ./modules/smart-cd ] else [])
     ++ (if userSettings.enable-agent-tracker or false then [ ./modules/agent-tracker ] else []);
 
-  home.username = lib.mkDefault userSettings.username;
+  # IMPORTANT: Set your LDAP/username here!
+  home.username = lib.mkDefault "change-me"; 
   home.homeDirectory = lib.mkDefault "/usr/local/google/home/${config.home.username}";
   home.stateVersion = "23.11";
 

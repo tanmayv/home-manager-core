@@ -5,14 +5,13 @@ let
     #!/usr/bin/env bash
 
     config_location="${userSettings.config-location}"
-    username="${config.home.username}"
 
     # Expand ~ if present
     config_location="''${config_location/#\~/$HOME}"
 
-    echo "Switching to configuration at $config_location for user $username..."
+    echo "Switching to configuration at $config_location..."
     cd "$config_location" || exit 1
-    home-manager switch --flake ".#$username"
+    home-manager switch --flake ".#cloudtop"
   '';
 in
 {

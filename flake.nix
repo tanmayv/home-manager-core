@@ -19,10 +19,9 @@
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
       userSettings = import ./setup.nix;
-      username = userSettings.username;
     in {
       homeConfigurations = {
-        "${username}" = home-manager.lib.homeManagerConfiguration {
+        cloudtop = home-manager.lib.homeManagerConfiguration {
           inherit pkgs;
           extraSpecialArgs = { inherit inputs userSettings; };
           modules = [ 

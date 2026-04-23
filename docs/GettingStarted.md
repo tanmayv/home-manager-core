@@ -65,7 +65,7 @@ git commit -am "chore: initial setup.nix personalization"
 Apply the configuration for the first time:
 
 ```bash
-nix run home-manager -- switch -b backup --flake ".#your-ldap-here"
+nix run home-manager -- switch -b backup --flake ".#cloudtop"
 ```
 
 *Note: After the initial successful build, you can use the `build-and-switch` command (or the Command Palette shortcut) to apply future updates.*
