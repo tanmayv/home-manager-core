@@ -49,18 +49,20 @@ def set_agent_uuid(pane_id, uuid, socket_path=None):
     enqueue_tmux_cmd(cmd)
 
 def list_panes():
-    """Lists panes with ID, agent name, and UUID."""
+    """Lists panes with ID, agent name, UUID, and type."""
     try:
-        out = run_tmux_cmd(["list-panes", "-a", "-F", "#{pane_id} #{@agent_name} #{@agent_uuid}"])
+        out = run_tmux_cmd(["list-panes", "-a", "-F", "#{pane_id} #{@agent_name} #{@agent_uuid} #{@agent_type}"])
         panes = []
         if out:
             for line in out.split("\n"):
                 parts = line.split()
-                pane_info = {"pane_id": parts[0], "agent_name": None, "agent_uuid": None}
+                pane_info = {"pane_id": parts[0], "agent_name": None, "agent_uuid": None, "agent_type": "unknown"}
                 if len(parts) >= 2 and parts[1]:
                     pane_info["agent_name"] = parts[1]
                 if len(parts) >= 3 and parts[2]:
                     pane_info["agent_uuid"] = parts[2]
+                if len(parts) >= 4 and parts[3]:
+                    pane_info["agent_type"] = parts[3]
                 panes.append(pane_info)
         return panes
     except Exception as e:

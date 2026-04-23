@@ -19,6 +19,7 @@ def handle_register(params: dict) -> str:
     wrapper_pid = params.get("wrapper_pid")
     tmux_socket = params.get("tmux_socket")
     name = params.get("name")
+    agent_type = params.get("agent_type", "unknown")
     
     if not (session and tmux_pane and wrapper_pid and tmux_socket):
         raise ValueError("Invalid params")
@@ -55,6 +56,7 @@ def handle_register(params: dict) -> str:
         "status": "idle",
         "waiting_approval": False,
         "uuid": agent_uuid,
+        "agent_type": agent_type,
         "pending_notifications": []
     })
     

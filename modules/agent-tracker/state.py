@@ -17,8 +17,9 @@ def init_state() -> None:
         pane_id = pane["pane_id"]
         agent_name = pane["agent_name"]
         agent_uuid = pane["agent_uuid"]
+        agent_type = pane.get("agent_type", "unknown")
         if agent_name:
-            logging.info(f"Found recovered agent: {agent_name} in pane {pane_id}")
+            logging.info(f"Found recovered agent: {agent_name} of type {agent_type} in pane {pane_id}")
             try:
                 info = tmux_util.get_pane_info(pane_id)
                 if info:
@@ -51,6 +52,7 @@ def init_state() -> None:
                                 "status": "idle",
                                 "waiting_approval": False,
                                 "uuid": resolved_uuid,
+                                "agent_type": agent_type,
                                 "pending_notifications": []
                             }
                         
