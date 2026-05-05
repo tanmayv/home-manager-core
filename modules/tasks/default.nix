@@ -47,12 +47,23 @@ let
       fi
     '';
   };
+  tmux-task-stats = pkgs.writeShellApplication {
+    name = "tmux-task-stats";
+    runtimeInputs = with pkgs; [ coreutils bash ];
+    text = ''
+      workspace="$1"
+      # Placeholder: The user is adding query "@workspace #tag" functionality.
+      # For now, output 0/0/0 with color coding.
+      echo "#[fg=red]0#[fg=default]/#[fg=yellow]0#[fg=default]/#[fg=green]0"
+    '';
+  };
 in
 {
   home.packages = [
     inputs.tasks-nvim.packages.${pkgs.system}.default
     tmux-create-task
     tmux-create-note
+    tmux-task-stats
   ];
 
   xdg.configFile."task-manager-tui/config.json".text = ''
@@ -69,6 +80,9 @@ in
   programs.tmux.extraConfig = ''
     bind-key C-c display-popup -w 95% -h 80% -E "${tmux-create-note}/bin/tmux-create-note || sleep 5000"
     bind-key T display-popup -w 95% -h 80% -E "${tmux-create-task}/bin/tmux-create-task || sleep 5000"
-    bind-key t display-popup -w 95% -h 80% -E "task-manager-tui"
+    bind-key t display-popup -w 95% -h 80% -E "task"
+    bind-key -T root MouseDown1StatusLeft display-popup -w 95% -h 80% -E "task"
+    set -g status-left-length 60
+    set -g status-left "[#S] #(tmux-task-stats '#S') "
   '';
 }
