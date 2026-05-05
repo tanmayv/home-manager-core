@@ -3,26 +3,47 @@
 let
   tmux-create-task = pkgs.writeShellApplication {
     name = "tmux-create-task";
-    runtimeInputs = with pkgs; [ coreutils bash neovim ];
+    runtimeInputs = with pkgs; [ coreutils bash neovim fzf findutils gnugrep ];
     text = ''
-      workspace=""
-      if [[ -n "$TMUX" ]]; then
-        workspace=$(tmux display-message -p '#S')
+      workspace_list=""
+      if [ -d "/google/src/cloud/$USER" ]; then
+        workspace_list=$(find "/google/src/cloud/$USER" -mindepth 1 -maxdepth 1 -type d -printf '%f\n')
+      fi
+      if command -v tmux &>/dev/null; then
+        workspace_list=$(printf "%s\n%s" "$workspace_list" "$(tmux list-sessions -F '#S' 2>/dev/null)")
+      fi
+      
+      workspace=$(echo "$workspace_list" | grep -v '^$' | sort -u | fzf --prompt="Select Workspace: ")
+
+      if [[ -z "$workspace" ]]; then
+        echo "No workspace selected. Aborting."
+        exit 1
       fi
 
-      if [[ -n "$workspace" ]]; then
-        ${pkgs.neovim}/bin/nvim ~/pkm/tasks.md -c "TaskAdd $workspace"
-      else
-        ${pkgs.neovim}/bin/nvim ~/pkm/tasks.md -c "TaskAdd"
-      fi
+      ${pkgs.neovim}/bin/nvim ~/pkm/tasks.md -c "TaskAdd $workspace"
     '';
   };
 
   tmux-create-note = pkgs.writeShellApplication {
     name = "tmux-create-note";
-    runtimeInputs = with pkgs; [ coreutils bash neovim ripgrep ];
+    runtimeInputs = with pkgs; [ coreutils bash neovim ripgrep fzf findutils gnugrep ];
     text = ''
-      note_path=$(nn --print-path)
+      workspace_list=""
+      if [ -d "/google/src/cloud/$USER" ]; then
+        workspace_list=$(find "/google/src/cloud/$USER" -mindepth 1 -maxdepth 1 -type d -printf '%f\n')
+      fi
+      if command -v tmux &>/dev/null; then
+        workspace_list=$(printf "%s\n%s" "$workspace_list" "$(tmux list-sessions -F '#S' 2>/dev/null)")
+      fi
+      
+      workspace=$(echo "$workspace_list" | grep -v '^$' | sort -u | fzf --prompt="Select Workspace: ")
+
+      if [[ -z "$workspace" ]]; then
+        echo "No workspace selected. Aborting."
+        exit 1
+      fi
+
+      note_path=$(nn --print-path --workspace="$workspace")
       
       if [[ -z "$note_path" ]]; then
         exit 1
@@ -84,8 +105,8 @@ in
   programs.tmux.extraConfig = ''
     bind-key C-c display-popup -w 95% -h 80% -E "${tmux-create-note}/bin/tmux-create-note || sleep 5000"
     bind-key T display-popup -w 95% -h 80% -E "${tmux-create-task}/bin/tmux-create-task || sleep 5000"
-    bind-key t display-popup -w 95% -h 80% -E "echo Running: task -p '#S' && sleep 2 && task -p '#S'"
-    bind-key -T root MouseDown1StatusLeft display-popup -w 95% -h 80% -E "echo Running: task -p '#S' && sleep 2 && task -p '#S'"
+    bind-key t display-popup -w 95% -h 80% -E "bash -c 'S=\$(tmux display-message -p \"#S\"); echo Running: task -p \"\$S\"; sleep 2; task -p \"\$S\"'"
+    bind-key -T root MouseDown1StatusLeft display-popup -w 95% -h 80% -E "bash -c 'S=\$(tmux display-message -p \"#S\"); echo Running: task -p \"\$S\"; sleep 2; task -p \"\$S\"'"
     set -g status-left-length 60
     set -g status-left "#{?client_prefix,#[reverse],#[fg=#bb9af7]}[#S]#[default] #(tmux-task-stats '#S') "
   '';
