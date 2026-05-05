@@ -146,11 +146,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1773589238,
-        "narHash": "sha256-sGqw1B9pv+Vh816YPEhco3FHCbuh9Q23XVsvIF1ndhI=",
+        "lastModified": 1777966976,
+        "narHash": "sha256-wwV1hHtqddx6RzvxIi4cTkk2ZFmKppcsR9ipDq/EdcM=",
         "owner": "tanmayv",
         "repo": "tasks.nvim",
-        "rev": "450a0ec814c7121760f7bbc8fb1ccf3cd03dd2e2",
+        "rev": "789c07619912acc272cb2f3fbffd2e6e8d9d4380",
         "type": "github"
       },
       "original": {

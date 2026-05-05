@@ -49,12 +49,16 @@ let
   };
   tmux-task-stats = pkgs.writeShellApplication {
     name = "tmux-task-stats";
-    runtimeInputs = with pkgs; [ coreutils bash ];
+    runtimeInputs = with pkgs; [ coreutils bash jq ];
     text = ''
       workspace="$1"
-      # Placeholder: The user is adding query "@workspace #tag" functionality.
-      # For now, output 0/0/0 with color coding.
-      echo "#[fg=red]0#[fg=default]/#[fg=yellow]0#[fg=default]/#[fg=green]0"
+      stats=$(task stats "@$workspace #urgent" --json)
+      
+      due=$(echo "$stats" | jq -r '.due // 0')
+      open=$(echo "$stats" | jq -r '.open // 0')
+      closed=$(echo "$stats" | jq -r '.closed // 0')
+
+      echo "#[fg=red]$due#[fg=default]/#[fg=yellow]$open#[fg=default]/#[fg=green]$closed"
     '';
   };
 in
