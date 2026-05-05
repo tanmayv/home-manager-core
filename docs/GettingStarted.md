@@ -25,56 +25,64 @@ nix-channel --add https://nixos.org/channels/nixpkgs-unstable && nix-channel --u
 ```
 
 
-## 2. Repository Setup
+## 2. Installation as a Flake Input (Recommended)
 
-### Clone the Configuration
-Clone the repository to the standard configuration path. We recommend starting with the `stable` branch:
+The recommended way to use Minimal Cloudtop is to import it as a module into your personal dotfiles Flake. This keeps your personal configurations neatly separated from the upstream core logic.
 
-```bash
-git clone -b stable --single-branch sso://user/tanmayvijay/home-manager-minimal-ai ~/minimal-cloudtop
-cd ~/.config/minimal-cloudtop
-```
-
-### Create Your Personal Branch (CRITICAL)
-**Do not skip this step.** Creating a personal branch allows the system to update the core logic while preserving your personal settings in `setup.nix`.
+### Create your Personal Flake
+Create a new directory for your configuration and create a `flake.nix`:
 
 ```bash
-git checkout -b my-config
+mkdir -p ~/my-nix-config
+cd ~/my-nix-config
 ```
 
-### Personalize Configuration
-Open `flake.nix` and update `home.username` to your LDAP in the `cloudtop` configuration. 
+Create a `flake.nix` with the following content, replacing `your-ldap` with your LDAP:
 
 ```nix
-# flake.nix
-homeConfigurations.cloudtop = home-manager.lib.homeManagerConfiguration {
-  # ...
-  modules = [ 
-    # ...
-    ({ pkgs, ... }: {
-      home.username = "your-ldap";
-      home.homeDirectory = "/usr/local/google/home/your-ldap";
-    })
-  ];
-};
-```
-
-Then, open `setup.nix` to toggle features like Neovim or AI orchestration.
-
-```nix
-# setup.nix
 {
-  enable-ai-workflow = true;
-  # Explore other feature toggles below!
+  description = "My personal Home Manager configuration";
+
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
+    home-manager = {
+      url = "github:nix-community/home-manager/release-25.11";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    minimal-cloudtop = {
+      url = "sso://user/tanmayvijay/home-manager-minimal-ai";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
+
+  outputs = { nixpkgs, home-manager, minimal-cloudtop, ... }@inputs:
+    let
+      user = "your-ldap";
+      system = "x86_64-linux";
+      pkgs = nixpkgs.legacyPackages.${system};
+    in {
+      homeConfigurations."cloudtop" = home-manager.lib.homeManagerConfiguration {
+        inherit pkgs;
+        extraSpecialArgs = { 
+          inherit inputs; 
+          userSettings = { 
+            # Toggle features here
+            enable-ai-workflow = true;
+            enable-neovim = true;
+            enable-tasks = true;
+          };
+        };
+        modules = [ 
+          minimal-cloudtop.homeManagerModules.default 
+          ({ pkgs, ... }: {
+            home.username = user;
+            home.homeDirectory = "/usr/local/google/home/${user}";
+          })
+        ];
+      };
+    };
 }
 ```
-
-Commit your initial configuration:
-```bash
-git commit -am "chore: initial personalization"
-```
-
-*For a full list of configuration options and feature toggles, please see the [Customization Guide](Customization.md).*
 
 ## 3. Initial Build
 
@@ -95,76 +103,6 @@ Once the build finishes, restart your shell or start a new Tmux session:
 
 ---
 
-## 5. Updating the Configuration
+## Alternative: Standalone Installation
+If you prefer to not use your own Flake and would rather clone the configuration directly, you can check the legacy installation methods by looking at the `stable` branch documentation.
 
-This repository is actively maintained. When a new stable version is released, you can easily pull the updates without losing your personal settings in `setup.nix`.
-
-### Automatic Update Checks
-Every time you start a new shell, a background check (`check-for-update`) runs once per day.
-- If a new version is available, you will be prompted: `🎉 A new stable version of Minimal Cloudtop is available! Would you like to update now? [y/N]`
-- If you select `y`, the tool will automatically fetch the latest `stable` tag, **rebase** your personal branch onto it, and run `build-and-switch`.
-
-### Manual Update
-If you want to trigger an update check manually, simply run:
-```bash
-check-for-update
-```
-
-Alternatively, you can perform a manual Git update:
-```bash
-# 1. Fetch the latest stable tag
-git fetch origin tag stable --no-tags
-
-# 2. Rebase your current branch onto the new stable version
-git rebase origin/stable
-
-# 3. Apply the changes
-build-and-switch
-```
-
-*Note: If a rebase conflict occurs (rare if you only edit `setup.nix`), resolve the conflicts manually and then run `build-and-switch` to complete the update.*
-
----
-
-## 6. Advanced: Using as a Library
-
-If you already have an existing Nix Flake for your Home Manager configuration, you can use Minimal Cloudtop as a library/module instead of cloning the whole repository.
-
-### Add Flake Input
-In your `flake.nix`, add this repository as an input:
-
-```nix
-inputs.minimal-cloudtop = {
-  type = "git";
-  url = "sso://user/tanmayvijay/home-manager-minimal-ai";
-  ref = "refs/tags/stable";
-};
-```
-
-### Configure Module
-1.  **Arguments**: Minimal Cloudtop requires `userSettings` to be passed via `extraSpecialArgs`.
-2.  **Import**: Add the exported module to your `modules` list and configure your `home.username`.
-
-```nix
-outputs = { nixpkgs, home-manager, minimal-cloudtop, ... }@inputs: {
-  homeConfigurations."your-user" = home-manager.lib.homeManagerConfiguration {
-    pkgs = nixpkgs.legacyPackages.x86_64-linux;
-    extraSpecialArgs = { 
-      inherit inputs; 
-      userSettings = { 
-        enable-ai-workflow = true; # ... other settings
-      };
-    };
-    modules = [ 
-      minimal-cloudtop.homeManagerModules.default 
-      ({ pkgs, ... }: {
-        home.username = "your-user";
-        home.homeDirectory = "/usr/local/google/home/your-user";
-      })
-      # ... your existing modules
-    ];
-  };
-};
-```
-
-*For a complete example, see the `flake-template/` directory in this repository.*
