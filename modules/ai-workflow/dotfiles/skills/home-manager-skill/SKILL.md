@@ -83,6 +83,7 @@ When requested to make changes by the user:
 
 - **Nix Scripting:** Use absolute paths to binaries from the Nix store (e.g., `${pkgs.fzf}/bin/fzf`).
 - **Theming:** Use `modules/palette.nix` for colors to maintain the Tokyo Night aesthetic.
+- **Tmux Popups (`display-popup`):** When creating bindings that launch a popup (`display-popup -E`), tmux format variables like `#S` may not expand automatically. Instead, wrap the command in a shell and fetch the variable dynamically (e.g., `display-popup -E "bash -c 'S=\$(tmux display-message -p \"#S\"); command \"\$S\"'"`).
 - **No Hacks:** Avoid suppressing warnings or using non-idiomatic Nix patterns.
 
 ## Guide on Developing CLI Tools
