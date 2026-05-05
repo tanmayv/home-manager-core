@@ -60,8 +60,8 @@
         ]
       },
       "locked": {
-        "lastModified": 1777960006,
-        "narHash": "sha256-FGNJQvAdrIVhOy5kRZzvBH/4921PJDv7vly5D+qWf1s=",
+        "lastModified": 1777960591,
+        "narHash": "sha256-OxSXWWYatbM+FqpoDU3faKoG7gUu/iD2BbsEWfetT04=",
         "path": "/usr/local/google/home/tanmayvijay/.gemini/jetski/scratch/nvim-nix",
         "type": "path"
       },
