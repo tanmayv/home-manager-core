@@ -103,14 +103,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1777960591,
-        "narHash": "sha256-OxSXWWYatbM+FqpoDU3faKoG7gUu/iD2BbsEWfetT04=",
-        "path": "/usr/local/google/home/tanmayvijay/.gemini/jetski/scratch/nvim-nix",
-        "type": "path"
+        "lastModified": 1777960590,
+        "narHash": "sha256-oQS//dVd0pySHreKxY7gzl/lYvL7dCiGqLDleRP4IWk=",
+        "ref": "refs/heads/main",
+        "rev": "14c2a9b7d3ccf10071a39deb177a73e5cb4cf6cf",
+        "revCount": 2,
+        "type": "git",
+        "url": "sso://user/tanmayvijay/nvim-nix"
       },
       "original": {
-        "path": "/usr/local/google/home/tanmayvijay/.gemini/jetski/scratch/nvim-nix",
-        "type": "path"
+        "type": "git",
+        "url": "sso://user/tanmayvijay/nvim-nix"
       }
     },
     "root": {

@@ -14,7 +14,8 @@
     };
 
     nvim-nix = {
-      url = "path:/usr/local/google/home/tanmayvijay/.gemini/jetski/scratch/nvim-nix";
+      type = "git";
+      url = "sso://user/tanmayvijay/nvim-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
