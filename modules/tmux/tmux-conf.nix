@@ -147,7 +147,7 @@ in
         bind-key C-t display-popup -w 95% -h 80% -E "tmux-sessionizer"
         
         # Tmux Command Palette
-        bind-key C-p display-popup -T "Command Palette" -w 90% -h 70% -E "tmux-palette"
+        bind-key C-p display-popup -T "Command Palette" -w 90% -h 70% -E "tmux-palette #{pane_id}"
         
         # Status Bar Position
         set -g status-position ${config.programs.tmux.statusBarPosition}
@@ -204,9 +204,15 @@ in
                     { if-shell -F '#{m:agent:*,#{mouse_status_range}}' \
                         { 
                             # Extract pane_id from agent:pane_id
-                            run-shell "target_id=$(echo '#{mouse_status_range}' | cut -d: -f2); \
-                                       tmux switch-client -t \$target_id; \
-                                       tmux select-pane -t \$target_id"
+                            run-shell "echo 'range=#{mouse_status_range}' >> /tmp/click-debug.log; \
+                                       target_id=$(echo '#{mouse_status_range}' | cut -d: -f2); \
+                                       if tmux list-panes -a -F '##{pane_id}' | grep -q \"^\$target_id\$\"; then \
+                                           tmux switch-client -t \"\$target_id\"; \
+                                           tmux select-pane -t \"\$target_id\"; \
+                                       else \
+                                           agent-tracker-ctl unregister --pane \"\$target_id\"; \
+                                           tmux display-message \"Agent pane not found, entry removed\"; \
+                                       fi"
                         } \
                         { select-window -t = } \
                     } \

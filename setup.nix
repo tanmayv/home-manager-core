@@ -7,6 +7,7 @@
   enable_bash_over_zsh = false;
   enable-ai-workflow = true;
   enable-neovim = true;
+  enable-tasks = true;
   enable-tmux-on-ssh = true;
   auto-switch-workspace-on-hgd = true;
   enable-cd-verbose = true;
@@ -14,7 +15,7 @@
   enable-smart-cd = true;
   smart-cd-max-parents = 4;
   enable-auto-codesearch-with-cd = true;
-  preferred-scripting-language = "NuShell";
+  preferred-scripting-language = "Python";
   enable-agent-tracker = true;
   enable-skill-publishing = false;
   extra-ai-extensions = [

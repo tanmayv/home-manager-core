@@ -8,6 +8,8 @@ let
     import subprocess
     import json
 
+    original_pane = sys.argv[1] if len(sys.argv) > 1 else ""
+
     try:
         import tomllib
     except ImportError:
@@ -104,12 +106,16 @@ let
             with open(history_file, "w") as f:
                 json.dump(history, f)
                 
+            if original_pane:
+                command = command.replace("$ORIGINAL_PANE", original_pane)
+                
             subprocess.run(command, shell=True)
             sys.exit(0)
 
     print(f"Command not found for: {name}")
     sys.exit(1)
   '';
+
 in
 {
   home.packages = [
@@ -129,6 +135,7 @@ in
     command = "tmux-palette"
     group = "General"
     mapping = "C-p"
+
 
     [[commands]]
     name = "List Windows"
@@ -213,11 +220,6 @@ in
     group = "Panes"
     mapping = "x"
 
-    [[commands]]
-    name = "Rename Pane"
-    description = "Rename current pane"
-    command = 'read -p "New pane name: " name && tmux select-pane -T "$name"'
-    group = "Panes"
 
     [[commands]]
     name = "Zoom Pane"

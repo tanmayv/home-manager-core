@@ -43,7 +43,7 @@
         "--alsologtostderr",
         "--abort_on_connection_failure"
       ],
-      "disabled": true
+      "disabled": false
     },
     "production-agent": {
       "command": "/google/bin/releases/production-agent-mcp/mcp_server.par",

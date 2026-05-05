@@ -56,6 +56,11 @@ def main():
 
     subparsers.add_parser("whoami", help="Show current agent identity")
 
+    unregister_parser = subparsers.add_parser("unregister", help="Unregister agent")
+    group = unregister_parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--name", help="Agent name to unregister")
+    group.add_argument("--pane", help="Tmux pane ID to unregister")
+
     args = parser.parse_args()
 
     if args.subcommand == "list":
@@ -186,6 +191,15 @@ def main():
             print(f"UUID:    {info.get('uuid')}")
             print(f"PID:     {info.get('pid')}")
             print(f"Pane ID: {info.get('pane_id')}")
+
+    elif args.subcommand == "unregister":
+        params = {}
+        if args.name:
+            params["agent_name"] = args.name
+        if args.pane:
+            params["tmux_pane"] = args.pane
+        call_rpc("unregister", params)
+        print("Agent unregistered.")
 
     else:
         parser.print_help()
