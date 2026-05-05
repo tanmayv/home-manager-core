@@ -15,6 +15,14 @@ Use this skill when:
         ```bash
         agent-tracker-ctl whoami
         ```
+    *   Alternatively, you can read the tmux pane option `@agent_name` directly. For your current pane:
+        ```bash
+        tmux display-message -t "$TMUX_PANE" -p '#{@agent_name}'
+        ```
+    *   For the pane the user is currently on:
+        ```bash
+        tmux display-message -p '#{@agent_name}'
+        ```
 
 2.  **Discovering Other Agents**:
     *   To see all active agents and their details, use:
