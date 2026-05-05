@@ -69,5 +69,6 @@ in
   programs.tmux.extraConfig = ''
     bind-key C-c display-popup -w 95% -h 80% -E "${tmux-create-note}/bin/tmux-create-note || sleep 5000"
     bind-key T display-popup -w 95% -h 80% -E "${tmux-create-task}/bin/tmux-create-task || sleep 5000"
+    bind-key t display-popup -w 95% -h 80% -E "task-manager-tui"
   '';
 }
