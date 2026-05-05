@@ -7,6 +7,7 @@
   enable_bash_over_zsh = false;
   enable-ai-workflow = true;
   enable-neovim = true;
+  enable-tasks = true;
   enable-tmux-on-ssh = true;
   auto-switch-workspace-on-hgd = true;
   enable-cd-verbose = true;
