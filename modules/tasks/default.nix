@@ -52,7 +52,7 @@ let
     runtimeInputs = with pkgs; [ coreutils bash jq ];
     text = ''
       workspace="$1"
-      stats=$(task stats "@$workspace #urgent" --json)
+      stats=$(task stats "@$workspace" --json)
       
       due=$(echo "$stats" | jq -r '.due // 0')
       open=$(echo "$stats" | jq -r '.open // 0')
