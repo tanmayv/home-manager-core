@@ -87,6 +87,6 @@ in
     bind-key t display-popup -w 95% -h 80% -E "task"
     bind-key -T root MouseDown1StatusLeft display-popup -w 95% -h 80% -E "task"
     set -g status-left-length 60
-    set -g status-left "[#S] #(tmux-task-stats '#S') "
+    set -g status-left "#{?client_prefix,#[reverse],#[fg=#bb9af7]}[#S]#[default] #(tmux-task-stats '#S') "
   '';
 }
