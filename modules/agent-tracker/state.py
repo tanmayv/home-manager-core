@@ -18,6 +18,7 @@ def init_state() -> None:
         agent_name = pane["agent_name"]
         agent_uuid = pane["agent_uuid"]
         agent_type = pane.get("agent_type", "unknown")
+        agent_cmd = pane.get("agent_cmd")
         if agent_name:
             logging.info(f"Found recovered agent: {agent_name} of type {agent_type} in pane {pane_id}")
             try:
@@ -29,16 +30,32 @@ def init_state() -> None:
                     
                     pts_name = tty.replace("/dev/", "")
                     try:
-                        out_pids = subprocess.check_output(["pgrep", "-t", pts_name]).decode("utf-8").strip()
-                        pids = [int(p) for p in out_pids.split("\n") if p]
+                        out = subprocess.check_output(["ps", "-t", pts_name, "-o", "pid=,comm="]).decode("utf-8").strip()
+                        lines = [line.strip().split(None, 1) for line in out.split("\n") if line.strip()]
+                        proc_list = [(int(parts[0]), parts[1]) for parts in lines if len(parts) == 2]
                     except subprocess.CalledProcessError:
-                        pids = []
+                        proc_list = []
+                        out = "ERROR: ps failed"
                         
                     agent_pid = None
-                    for p in pids:
-                        if p != shell_pid:
-                            agent_pid = p
-                            break
+                    discovered_cmd = None
+                    transient_comms = ["ps", "grep", "pgrep", "ls", "cat", "sleep", "which", "sh", "bash", "home-manager", "nix"]
+                    
+                    cmd_mapping = {"jetski": ["cli"], "gemini": ["gemini"]}
+                    expected_comms = cmd_mapping.get(agent_cmd, []) if agent_cmd else []
+                    
+                    for pid, comm in proc_list:
+                        if pid != shell_pid and comm not in transient_comms:
+                            if expected_comms:
+                                if comm in expected_comms:
+                                    agent_pid = pid
+                                    discovered_cmd = comm
+                                    break
+                            else:
+                                # Fallback to heuristic if no expected commands defined
+                                agent_pid = pid
+                                discovered_cmd = comm
+                                break
                             
                     if agent_pid:
                         resolved_uuid = agent_uuid or str(uuid.uuid4())
@@ -53,6 +70,7 @@ def init_state() -> None:
                                 "waiting_approval": False,
                                 "uuid": resolved_uuid,
                                 "agent_type": agent_type,
+                                "agent_cmd": agent_cmd or discovered_cmd or "unknown",
                                 "pending_notifications": []
                             }
                         

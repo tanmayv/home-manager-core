@@ -46,8 +46,24 @@ def background_monitor():
         to_remove = []
         
         agents_snapshot = state.get_all_agents()
+        active_panes = tmux_util.list_panes()
+        active_pane_ids = [p["pane_id"] for p in active_panes]
             
         for name, info in agents_snapshot.items():
+            pane_id = info.get("tmux_pane")
+            
+            # Acknowledgment logic
+            if info.get("status") == "waiting":
+                pane_info = next((p for p in active_panes if p["pane_id"] == pane_id), None)
+                if pane_info and pane_info.get("pane_active"):
+                    logging.info(f"Agent {name} acknowledged by user (pane active). Transitioning to idle.")
+                    state.update_agent(name, status="idle")
+                    info["status"] = "idle"
+                    
+            if pane_id and pane_id not in active_pane_ids:
+                logging.info(f"Pane {pane_id} for agent {name} no longer exists.")
+                to_remove.append(name)
+                continue
             wrapper_pid = info.get("wrapper_pid")
             pid = info.get("pid")
             

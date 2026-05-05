@@ -20,6 +20,7 @@ def handle_register(params: dict) -> str:
     tmux_socket = params.get("tmux_socket")
     name = params.get("name")
     agent_type = params.get("agent_type", "unknown")
+    agent_cmd = params.get("agent_cmd", "unknown")
     
     if not (session and tmux_pane and wrapper_pid and tmux_socket):
         raise ValueError("Invalid params")
@@ -57,6 +58,7 @@ def handle_register(params: dict) -> str:
         "waiting_approval": False,
         "uuid": agent_uuid,
         "agent_type": agent_type,
+        "agent_cmd": agent_cmd,
         "pending_notifications": []
     })
     
@@ -150,6 +152,40 @@ def handle_rename(params: dict, caller_pid: int = None) -> bool:
         return True
     logging.error(f"Failed to rename {old_name} to {new_name}. Agent not found or new name exists.")
     raise ValueError("Agent not found or new name exists")
+
+def handle_unregister(params: dict, caller_pid: int = None) -> bool:
+    """Unregisters an agent from state."""
+    agent_name = _identify_agent(params, caller_pid)
+    if not agent_name:
+        # Try to find by tmux_pane if provided
+        tmux_pane = params.get("tmux_pane")
+        if tmux_pane:
+            agents = state.get_all_agents()
+            for name, info in agents.items():
+                if info.get("tmux_pane") == tmux_pane:
+                    agent_name = name
+                    break
+                    
+    if not agent_name:
+        raise ValueError("Agent not identified")
+        
+    info = state.get_agent(agent_name)
+    if not info:
+        raise ValueError(f"Agent '{agent_name}' not found")
+        
+    logging.info(f"Unregistering agent: {agent_name}")
+    
+    # Remove inbox file
+    uuid_str = info.get("uuid") or agent_name
+    inbox_file = os.path.join("/tmp/agent-inboxes", f"{uuid_str}.inbox")
+    if os.path.exists(inbox_file):
+        try:
+            os.remove(inbox_file)
+        except OSError as e:
+            logging.error(f"Failed to remove inbox file for {agent_name}: {e}")
+            
+    state.delete_agent(agent_name)
+    return True
 
 def handle_spin_agent(params: dict) -> str:
     """Spins a new agent in a new tmux pane."""
@@ -354,7 +390,8 @@ dispatcher = {
     "spin_agent": handle_spin_agent,
     "send_message": handle_send_message,
     "get_inbox": handle_get_inbox,
-    "whoami": handle_whoami
+    "whoami": handle_whoami,
+    "unregister": handle_unregister
 }
 
 def handle_client(conn: socket.socket) -> None:

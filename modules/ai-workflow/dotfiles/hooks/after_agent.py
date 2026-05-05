@@ -34,7 +34,7 @@ try:
                     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                     s.settimeout(1.0)
                     s.connect(os.path.expanduser("~/.cache/agent-tracker.sock"))
-                    s.sendall(json.dumps({"jsonrpc": "2.0", "method": "update_agent", "params": {"agent_name": agent_name, "waiting_approval": False, "status": "idle"}, "id": 1}).encode())
+                    s.sendall(json.dumps({"jsonrpc": "2.0", "method": "update_agent", "params": {"agent_name": agent_name, "waiting_approval": False, "status": "waiting"}, "id": 1}).encode())
                     s.close()
                     subprocess.run(["tmux-status-refresh"], capture_output=True)
                     break

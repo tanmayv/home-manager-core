@@ -4,44 +4,56 @@ import socket
 import subprocess
 import sys
 
-try:
-    input_data = json.load(sys.stdin)
-except json.JSONDecodeError:
-    input_data = None
-
-try:
-    with open(f"/proc/{os.getppid()}/comm", "r") as f:
-        caller_name = f.read().strip()
-except Exception:
-    caller_name = "unknown"
-
-with open("/tmp/hooks.log", "a") as f:
-    f.write(f"[HOOK] Event: PostTool, Caller: {caller_name}, Input: {input_data}\n")
-try:
-    pane_id = os.environ.get("TMUX_PANE")
-    if not pane_id:
+def log_event(message):
+    try:
         with open("/tmp/hooks.log", "a") as f:
-            f.write("[HOOK] No TMUX_PANE found in environment. Skipping tracker update.\n")
-    else:
-        agent_name = subprocess.check_output(["tmux", "display-message", "-p", "-t", pane_id, "#{@agent_name}"]).decode().strip()
-        if agent_name:
-            import time
-            for _ in range(3):
-                try:
-                    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                    s.settimeout(1.0)
-                    s.connect(os.path.expanduser("~/.cache/agent-tracker.sock"))
-                    s.sendall(json.dumps({"jsonrpc": "2.0", "method": "update_agent", "params": {"agent_name": agent_name, "waiting_approval": False, "status": "idle"}, "id": 1}).encode())
-                    s.close()
-                    subprocess.run(["tmux-status-refresh"], capture_output=True)
-                    break
-                except Exception as e:
-                    with open("/tmp/hooks.log", "a") as f:
-                        f.write(f"[HOOK] Retry failed: {e}\n")
-                    time.sleep(0.1)
+            f.write(message + "\n")
+    except Exception as e:
+        sys.stderr.write(f"[HOOK] Failed to write to log file: {e}\n")
+        sys.stderr.write(message + "\n")
+
+try:
+    try:
+        input_data = json.load(sys.stdin)
+    except json.JSONDecodeError:
+        input_data = None
+    except Exception as e:
+        log_event(f"[HOOK] Error reading stdin: {e}")
+        input_data = None
+
+    try:
+        with open(f"/proc/{os.getppid()}/comm", "r") as f:
+            caller_name = f.read().strip()
+    except Exception:
+        caller_name = "unknown"
+
+    log_event(f"[HOOK] Event: PostTool, Caller: {caller_name}, Input: {input_data}")
+
+    try:
+        pane_id = os.environ.get("TMUX_PANE")
+        if not pane_id:
+            log_event("[HOOK] No TMUX_PANE found in environment. Skipping tracker update.")
+        else:
+            agent_name = subprocess.check_output(["tmux", "display-message", "-p", "-t", pane_id, "#{@agent_name}"]).decode().strip()
+            if agent_name:
+                import time
+                for _ in range(3):
+                    try:
+                        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                        s.settimeout(1.0)
+                        s.connect(os.path.expanduser("~/.cache/agent-tracker.sock"))
+                        s.sendall(json.dumps({"jsonrpc": "2.0", "method": "update_agent", "params": {"agent_name": agent_name, "waiting_approval": False, "status": "waiting"}, "id": 1}).encode())
+                        s.close()
+                        subprocess.run(["tmux-status-refresh"], capture_output=True)
+                        break
+                    except Exception as e:
+                        log_event(f"[HOOK] Retry failed: {e}")
+                        time.sleep(0.1)
+    except Exception as e:
+        log_event(f"[HOOK] Error notifying tracker: {e}")
+
 except Exception as e:
-    with open("/tmp/hooks.log", "a") as f:
-        f.write(f"[HOOK] Error notifying tracker: {e}\n")
+    log_event(f"[HOOK] Uncaught exception in hook script: {e}")
 
-
+# Always print empty JSON as expected by framework
 print(json.dumps({}))

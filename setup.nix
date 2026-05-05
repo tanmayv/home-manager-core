@@ -14,7 +14,7 @@
   enable-smart-cd = true;
   smart-cd-max-parents = 4;
   enable-auto-codesearch-with-cd = true;
-  preferred-scripting-language = "NuShell";
+  preferred-scripting-language = "Python";
   enable-agent-tracker = true;
   enable-skill-publishing = false;
   extra-ai-extensions = [
