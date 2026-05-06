@@ -55,7 +55,8 @@ def main():
     print(f"Renaming {assigned_name} to {new_name}...")
 
     # Call agent-tracker-ctl.py directly to test the changes without needing to build/install
-    ctl_script = "/usr/local/google/home/tanmayvijay/minimal-cloudtop/modules/agent-tracker/agent-tracker-ctl.py"
+    dir_path = os.path.dirname(os.path.abspath(__file__))
+    ctl_script = os.path.join(dir_path, "agent-tracker-ctl.py")
     try:
         subprocess.run(["python3", ctl_script, "rename", assigned_name, new_name], check=True, capture_output=True)
     except subprocess.CalledProcessError as e:

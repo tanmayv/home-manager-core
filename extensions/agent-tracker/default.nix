@@ -14,13 +14,9 @@ let
   };
 in
 {
-  options.services.agent-tracker = {
-    enable = mkOption {
-      type = types.bool;
-      default = false;
-      description = "Enable agent-tracker daemon";
-    };
-  };
+  imports = [
+    ./options.nix
+  ];
 
   config = mkIf cfg.enable {
     home.packages = [
@@ -42,5 +38,12 @@ in
         WantedBy = [ "default.target" ];
       };
     };
+
+    # Contribute tmux configuration if enabled
+    programs.tmux.extraConfig = mkIf cfg.enableTmuxIntegration ''
+      # Agent navigation contributed by agent-tracker extension
+      bind-key N run-shell "agent-tracker-ctl focus --next"
+      bind-key P run-shell "agent-tracker-ctl focus --prev"
+    '';
   };
 }

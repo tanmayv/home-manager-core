@@ -85,7 +85,6 @@ To update, simply run `nix flake update` in your personal repository.
 | `enable-auto-codesearch-with-cd` | Automatically prompts to search via CodeSearch when `cd` fails. | Suppresses the prompt on `cd` failure (but `cd --cs` still works). |
 | `enable-agent-tracker` | Enables the background agent-tracker daemon. | The daemon is not started. |
 | `enable-skill-publishing` | Enables the `skill-ctl` tool and Piper-native skill integration. | Disables skill publishing and Piper inheritance logic. |
-| `extra-ai-extensions` | A list of paths to additional Gemini extensions (local or Piper). | `[]` |
 
 ### Skill Publishing (`skill-publishing` block)
 

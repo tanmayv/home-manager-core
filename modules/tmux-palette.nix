@@ -10,6 +10,8 @@ let
 
     original_pane = sys.argv[1] if len(sys.argv) > 1 else ""
 
+    current_pane_id = subprocess.check_output(["tmux", "display-message", "-p", "#{pane_id}"], text=True).strip()
+
     try:
         import tomllib
     except ImportError:
@@ -106,8 +108,8 @@ let
             with open(history_file, "w") as f:
                 json.dump(history, f)
                 
-            if original_pane:
-                command = command.replace("$ORIGINAL_PANE", original_pane)
+            target_pane = original_pane if original_pane else current_pane_id
+            command = command.replace("$ORIGINAL_PANE", target_pane)
                 
             subprocess.run(command, shell=True)
             sys.exit(0)
@@ -304,6 +306,12 @@ in
     name = "Run Agent in Current Directory"
     description = "List all agents and run the selected agent in zsh or new window"
     command = "new-gemini-agent"
+    group = "AI"
+
+    [[commands]]
+    name = "Rename Agent"
+    description = "Rename the agent in the current pane"
+    command = 'read -p "New agent name: " new_name && [[ -n "$new_name" ]] && tmux-rename-agent "$ORIGINAL_PANE" "$new_name"'
     group = "AI"
 
     ${if userSettings.enable-smart-cd or false then ''

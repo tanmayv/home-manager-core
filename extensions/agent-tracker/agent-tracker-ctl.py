@@ -39,7 +39,10 @@ def main():
     send_parser.add_argument("message", help="Message text")
 
     focus_parser = subparsers.add_parser("focus", help="Focus agent pane")
-    focus_parser.add_argument("agent_name", help="Agent name to focus")
+    focus_group = focus_parser.add_mutually_exclusive_group(required=True)
+    focus_group.add_argument("agent_name", nargs="?", help="Agent name to focus")
+    focus_group.add_argument("--next", action="store_true", help="Focus next agent")
+    focus_group.add_argument("--prev", action="store_true", help="Focus previous agent")
 
     rename_parser = subparsers.add_parser("rename", help="Rename agent")
     rename_parser.add_argument("names", nargs="+", help="New name (or old_name new_name with --force)")
@@ -105,8 +108,39 @@ def main():
 
     elif args.subcommand == "focus":
         agents = call_rpc("list")
-        if args.agent_name in agents:
-            info = agents[args.agent_name]
+        if not agents:
+            print("No active agents.", file=sys.stderr)
+            sys.exit(1)
+
+        agent_names = list(agents.keys())
+
+        if args.next or args.prev:
+            try:
+                current_pane = subprocess.check_output(["tmux", "display-message", "-p", "#{pane_id}"]).decode("utf-8").strip()
+            except subprocess.CalledProcessError:
+                current_pane = ""
+
+            current_agent = None
+            for name, info in agents.items():
+                if info.get("tmux_pane") == current_pane:
+                    current_agent = name
+                    break
+
+            if not current_agent:
+                # Fallback: just pick the first one if we can't find current
+                target_agent = agent_names[0]
+            else:
+                current_index = agent_names.index(current_agent)
+                if args.next:
+                    target_index = (current_index + 1) % len(agent_names)
+                else:
+                    target_index = (current_index - 1) % len(agent_names)
+                target_agent = agent_names[target_index]
+        else:
+            target_agent = args.agent_name
+
+        if target_agent in agents:
+            info = agents[target_agent]
             session = info.get("session")
             pane = info.get("tmux_pane")
             socket_path = info.get("tmux_socket")
@@ -116,9 +150,10 @@ def main():
                 tmux_cmd.extend(["-S", socket_path])
 
             subprocess.run(tmux_cmd + ["switch-client", "-t", session])
+            subprocess.run(tmux_cmd + ["select-window", "-t", pane])
             subprocess.run(tmux_cmd + ["select-pane", "-t", pane])
         else:
-            print(f"Agent {args.agent_name} not found.", file=sys.stderr)
+            print(f"Agent {target_agent} not found.", file=sys.stderr)
             sys.exit(1)
     elif args.subcommand == "rename":
         force = args.force

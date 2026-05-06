@@ -14,13 +14,17 @@
     };
 
     nvim-nix = {
-      type = "git";
-      url = "sso://user/tanmayvijay/nvim-nix";
+      url = "path:/usr/local/google/home/tanmayvijay/nvim-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     tasks-nvim = {
       url = "github:tanmayv/tasks.nvim";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    agent-tracker = {
+      url = "path:./extensions/agent-tracker";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -38,6 +42,13 @@
           extraSpecialArgs = { inherit inputs userSettings; };
           modules = [ 
             ./home.nix 
+            inputs.agent-tracker.homeManagerModules.default
+
+            # Configure extension options
+            ({ ... }: {
+              services.agent-tracker.enable = userSettings.enable-agent-tracker or false;
+              services.agent-tracker.enableTmuxIntegration = true;
+            })
 
             # Temporary override for local build
             ({ pkgs, ... }: {

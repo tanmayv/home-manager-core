@@ -9,8 +9,7 @@
     ++ (if userSettings.enable-neovim then [ inputs.nvim-nix.homeManagerModules.default ] else [])
     ++ (if userSettings.enable-tasks or false then [ ./modules/tasks ] else [])
     ++ (if userSettings.import-extras or false then [ ./modules/extras ] else [])
-    ++ (if userSettings.enable-smart-cd or false then [ ./modules/smart-cd ] else [])
-    ++ (if userSettings.enable-agent-tracker or false then [ ./modules/agent-tracker ] else []);
+    ++ (if userSettings.enable-smart-cd or false then [ ./modules/smart-cd ] else []);
 
   home.stateVersion = "25.11";
 

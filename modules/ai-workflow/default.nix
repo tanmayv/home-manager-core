@@ -36,15 +36,9 @@ To maintain persistent memory across sessions, agents have access to a dedicated
  - If you receive a message of format `From <agent-name> | <message>` Use `tmux-agent-comms` to reply to the agent.
 '';
 
-  # Logic for handling external extensions (Piper or local)
-  extraExtensions = userSettings.extra-ai-extensions or [ ];
-  personalPiperConfig = "/google/src/files/head/depot/configs/users/${username}/_agents";
-  allExtensions = [ personalPiperConfig ] ++ extraExtensions;
-
   # Format inherits for jetski/skills.json
-  # We assume each extension directory has a skills.json
   jetskiSkills = {
-    inherits = map (path: { path = "${path}/skills.json"; }) allExtensions;
+    inherits = [ ];
     entries = [ ];
   };
 in
@@ -82,12 +76,5 @@ in
   home.activation.geminiLinkExtensions = lib.hm.dag.entryAfter ["linkGeneration"] ''
     # Link the local configuration directory
     /google/bin/releases/gemini-cli/tools/gemini -- extensions link $HOME/.gemini --consent || true
-    
-    # Link additional extensions
-    ${lib.concatMapStringsSep "\n" (path: ''
-      if [[ -d "${path}" ]]; then
-        /google/bin/releases/gemini-cli/tools/gemini -- extensions link "${path}" --consent || true
-      fi
-    '') allExtensions}
   '';
 }

@@ -138,7 +138,7 @@ in
         set-option -g set-titles off
         
         # Pane border and title configuration
-        set -g pane-border-status top
+        set -g pane-border-status bottom
         set -g pane-border-format "#[fg=${palette.color8}]─(#[fg=${palette.color5}] #D #[fg=${palette.color8}]| ${if enableAgentComms then "#[fg=${palette.color4}]#{?@agent_name,#{@agent_name},no-name} #[fg=${palette.color8}]| " else ""}#[fg=${palette.color2}]#T #[fg=${palette.color8}])─"
         set -g pane-border-style "fg=${palette.color8}"
         set -g pane-active-border-style "fg=${palette.color4}"
@@ -196,7 +196,7 @@ in
 
         # Global mouse binding to handle status bar clicks
         bind-key -n MouseDown1Status if-shell -F '#{==:#{mouse_status_range},palette}' \
-            { display-popup -w 90% -h 70% -E "tmux-palette" } \
+            { display-popup -w 90% -h 70% -E "tmux-palette #{pane_id}" } \
             { if-shell -F '#{==:#{mouse_status_range},clinfo}' \
                 { run-shell "hg-cl --copy" } \
                 { if-shell -F '#{==:#{mouse_status_range},session}' \

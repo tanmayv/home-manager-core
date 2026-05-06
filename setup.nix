@@ -18,10 +18,6 @@
   preferred-scripting-language = "Python";
   enable-agent-tracker = true;
   enable-skill-publishing = false;
-  extra-ai-extensions = [
-    # Add paths to other Gemini extensions here
-    # e.g., "/google/src/files/head/depot/google3/path/to/team/extension"
-  ];
   skill-publishing = {
     # Target path in piper. $USER will be replaced with your LDAP.
     target-path = "//depot/configs/users/$USER/_agents/skills";
