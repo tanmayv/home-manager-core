@@ -46,6 +46,10 @@
       "includeTools": [
         "investigate_rollout"
       ]
+    },
+    "onedoc": {
+      "command": "/google/bin/users/gmiceli/onedoc/onedoc.par",
+      "args": ["mcp"]
     }
   }
 }

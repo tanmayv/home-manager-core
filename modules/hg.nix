@@ -1,6 +1,7 @@
 { pkgs, ... }: {
   home.packages = with pkgs; [
     delta
+    difftastic
   ];
 
   home.file.".hgrc" = {
@@ -14,6 +15,10 @@
       # e.g., hg delta -r chain
       [extdiff]
       cmd.delta = delta --dark --paging=never
+      cmd.ndiff = nvim
+      opts.ndiff = -d
+      cmd.cdiff = difft
+      opts.cdiff = --color=always
 
       # Configure hg diff to output git-style diffs, which delta prefers
       [diff]
@@ -22,7 +27,6 @@
       # Use delta as the pager for hg commands
       [pager]
       pager = delta --dark --paging=never
-      # Specify which commands should use the pager. Add others if needed.
       attend = diff, log, status, blame, annotate
     '';
   };

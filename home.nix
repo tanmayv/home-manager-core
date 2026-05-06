@@ -26,8 +26,6 @@
   programs.smart-cd.enable = userSettings.enable-smart-cd or false;
   programs.smart-cd.maxParents = userSettings.smart-cd-max-parents or 4;
 
-  services.agent-tracker.enable = userSettings.enable-agent-tracker or false;
-
   home.packages = with pkgs; [
     fzf
     ripgrep

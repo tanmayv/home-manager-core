@@ -105,8 +105,8 @@ in
   programs.tmux.extraConfig = ''
     bind-key C-c display-popup -w 95% -h 80% -E "${tmux-create-note}/bin/tmux-create-note || sleep 5000"
     bind-key T display-popup -w 95% -h 80% -E "${tmux-create-task}/bin/tmux-create-task || sleep 5000"
-    bind-key t display-popup -w 95% -h 80% -E "bash -c 'S=\$(tmux display-message -p \"#S\"); echo Running: task -p \"\$S\"; sleep 2; task -p \"\$S\"'"
-    bind-key -T root MouseDown1StatusLeft display-popup -w 95% -h 80% -E "bash -c 'S=\$(tmux display-message -p \"#S\"); echo Running: task -p \"\$S\"; sleep 2; task -p \"\$S\"'"
+    bind-key t display-popup -w 95% -h 80% -E "bash -c 'S=\$(tmux display-message -p \"#S\"); task -p \"\$S\"'"
+    bind-key -T root MouseDown1StatusLeft display-popup -w 95% -h 80% -E "bash -c 'S=\$(tmux display-message -p \"#S\"); task -p \"\$S\"'"
     set -g status-left-length 60
     set -g status-left "#{?client_prefix,#[reverse],#[fg=#bb9af7]}[#S]#[default] #(tmux-task-stats '#S') "
   '';

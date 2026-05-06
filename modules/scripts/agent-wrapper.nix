@@ -16,6 +16,18 @@
         cmd="$1"
         shift
         
+        # Parse --obs flag
+        obs_enabled=false
+        new_args=()
+        for arg in "$@"; do
+          if [[ "$arg" == "--obs" ]]; then
+            obs_enabled=true
+          else
+            new_args+=("$arg")
+          fi
+        done
+        set -- "''${new_args[@]}"
+
         if [[ -n "''${TMUX:-}" ]]; then
           pane_id="$TMUX_PANE"
           session_name=$(tmux display-message -p '#S')
@@ -43,6 +55,11 @@
             tmux select-pane -t "''${pane_id}" -T "$agent_name"
             export AGENT_NAME="$agent_name"
             tmux-status-refresh
+
+            # Open observer if requested and nvim is available
+            if [[ "$obs_enabled" == "true" ]] && command -v nvim &> /dev/null; then
+              tmux split-window -h -b -d -l 50% -c "#{pane_current_path}" "AGENT_NAME=\"$agent_name\" nvim -c :AgentObserverToggle"
+            fi
           fi
           
           # Run the tool in FOREGROUND to keep TUI interactive

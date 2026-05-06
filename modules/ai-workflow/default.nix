@@ -73,8 +73,4 @@ in
     ".gemini/skills/home-manager-skill".source = ./dotfiles/skills/home-manager-skill;
   } else { });
 
-  home.activation.geminiLinkExtensions = lib.hm.dag.entryAfter ["linkGeneration"] ''
-    # Link the local configuration directory
-    /google/bin/releases/gemini-cli/tools/gemini -- extensions link $HOME/.gemini --consent || true
-  '';
 }
