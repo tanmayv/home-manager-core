@@ -58,7 +58,7 @@
 
             # Open observer if requested and nvim is available
             if [[ "$obs_enabled" == "true" ]] && command -v nvim &> /dev/null; then
-              tmux split-window -h -b -d -l 50% -c "#{pane_current_path}" "AGENT_NAME=\"$agent_name\" nvim -c :AgentObserverToggle"
+              tmux split-window -h -d -l 50% -c "#{pane_current_path}" "AGENT_NAME=\"$agent_name\" nvim -c :AgentObserverToggle"
             fi
           fi
           
