@@ -15,5 +15,11 @@ with lib;
       default = true;
       description = "Enable agent-related tmux configuration (status bar, keybindings)";
     };
+
+    agents = mkOption {
+      type = types.attrsOf types.str;
+      default = {};
+      description = "Map of agent aliases to their executable paths.";
+    };
   };
 }
