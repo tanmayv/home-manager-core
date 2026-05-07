@@ -1,7 +1,6 @@
 { pkgs, lib, config, userSettings, inputs, ... }: {
   imports = [
     ./modules/tmux
-    ./modules/hg.nix
     ./modules/tmux-palette.nix
     ./modules/scripts
     ./modules/agent-tracker
