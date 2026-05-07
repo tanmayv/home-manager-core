@@ -50,9 +50,7 @@ in
     ".gemini/skills/.keep".text = "";
     "${lib.removePrefix "~/" userSettings.local_agent_knowledge_dir}/.keep".text = "";
 
-    ".gemini/jetski/mcp_config.json".source = ./dotfiles/mcp_config.json;
     ".gemini/jetski/skills.json".text = builtins.toJSON jetskiSkills;
-    ".gemini/gemini-extension.json".source = ./dotfiles/gemini-extension.json;
 
     # Link directories
     ".gemini/agents/home-manager".source = ./dotfiles/agents/home-manager;

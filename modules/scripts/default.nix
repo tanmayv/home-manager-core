@@ -15,7 +15,6 @@ in
     ./build-and-switch.nix
     ./tmux-cs-fzf.nix
     ./tmux-cs-cd.nix
-    ./ai-wrappers.nix
     ./knowledge-manager.nix
     ./check-for-update.nix
     ./new-gemini-agent.nix
