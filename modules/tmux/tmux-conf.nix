@@ -66,33 +66,45 @@ let
   tmux-status-refresh = pkgs.writeScriptBin "tmux-status-refresh" ''
     #!${pkgs.bash}/bin/bash
     # Dynamically set status lines and formats
-    num_sessions=$(tmux list-sessions | wc -l)
-    ${if enableAiWorkflow then ''
-    num_agents=$(agent-tracker-ctl list | python3 -c "import sys, json; print(len(json.load(sys.stdin)))" 2>/dev/null || echo 0)
-    '' else ''
-    num_agents=0
-    ''}
     
-    # Common components
+    # Core row 1 (Active Sessions)
     SESSIONS_PART="#[align=left,fg=${palette.color4},bold] Active Sessions: #[fg=${palette.color8},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\")"
-    AGENTS_PART="#[align=left,fg=${palette.color4},bold] Active Agents: #[fg=${palette.color8},nobold]#(agent-tracker-ctl status-bar)"
-    RIGHT_PART="#[align=right,fg=${palette.color5}]#(hg-cl) #[fg=default,nobold]#(hg-age) "
-
+    
+    # Row 0 right part from extensions
+    ROW0_RIGHT="${concatStringsSep " " config.programs.tmux.statusBar.row0.right}"
+    
+    # Calculate how many extra lines we need
+    declare -A lines
+    line_idx=1
+    
+    # Check active sessions condition (show if > 1)
+    num_sessions=$(tmux list-sessions | wc -l)
     if [ "$num_sessions" -gt 1 ]; then
-        if [ "$num_agents" -gt 0 ]; then
-            tmux set -g status 3
-            tmux set -g status-format[1] "$SESSIONS_PART$RIGHT_PART"
-            tmux set -g status-format[2] "$AGENTS_PART"
-        else
-            tmux set -g status 2
-            tmux set -g status-format[1] "$SESSIONS_PART$RIGHT_PART"
-        fi
-    elif [ "$num_agents" -gt 0 ]; then
-        tmux set -g status 2
-        tmux set -g status-format[1] "$AGENTS_PART$RIGHT_PART"
-    else
-        tmux set -g status on
+        lines[$line_idx]="$SESSIONS_PART"
+        line_idx=$((line_idx + 1))
     fi
+    
+    # Process extra lines from extensions
+    ${concatStringsSep "\n" (map (line: ''
+      if ${line.condition}; then
+        lines[$line_idx]="#[align=left]${line.command}"
+        line_idx=$((line_idx + 1))
+      fi
+    '') config.programs.tmux.statusBar.extraLines)}
+    
+    # Set status lines
+    total_lines=$((line_idx - 1))
+    
+    if [ "$total_lines" -eq 0 ]; then
+        tmux set -g status on
+    else
+        tmux set -g status "$((total_lines + 1))"
+        for i in "''${!lines[@]}"; do
+            tmux set -g status-format[$i] "''${lines[$i]}"
+        done
+    fi
+    
+    # Update row 0 right if needed (handled in static config usually, but could be dynamic)
   '';
 in
 {
@@ -107,6 +119,26 @@ in
       default = 25;
       description = "Maximum directory name length to include in tmux-sessionizer search";
     };
+    statusBar = {
+      row0 = {
+        right = mkOption {
+          type = types.listOf types.str;
+          default = [];
+          description = "Content to add to the right of row 0";
+        };
+      };
+      extraLines = mkOption {
+        type = types.listOf (types.submodule {
+          options = {
+            name = mkOption { type = types.str; };
+            command = mkOption { type = types.str; };
+            condition = mkOption { type = types.str; default = "true"; };
+          };
+        });
+        default = [];
+        description = "Extra status lines";
+      };
+    };
   };
 
   config = {
@@ -114,8 +146,6 @@ in
       tmux-sessionizer
       tmux-session-list-formatter
       tmux-status-refresh
-      hg-age
-      hg-cl
     ];
 
     programs.tmux = {
@@ -159,7 +189,7 @@ in
         set -g status-left-length 60
         set -g status-left "#{?client_prefix,#[bg=${palette.color2} fg=${palette.background} bold],#[fg=${palette.color4} bold]} #S #[default]"
         set -g status-right-length 120
-        set -g status-right "#{?#{!=:#{status},on},,#[fg=${palette.color5}]#(hg-cl) #[fg=default,nobold]#(hg-age) }#[range=user|palette]#[fg=${palette.color6}] [CMDS] #[norange]"
+        set -g status-right "#{?#{!=:#{status},on},,${concatStringsSep " " config.programs.tmux.statusBar.row0.right} }#[range=user|palette]#[fg=${palette.color6}] [CMDS] #[norange]"
         set -g window-status-format " #W "
         set -g window-status-current-format "#[bg=default,fg=${palette.color3},bold] #W #[fg=${palette.color4},bg=default]#{?window_zoomed_flag,󰊓,}#[fg=default,bg=default]"
         set -g window-status-separator " • "
@@ -197,47 +227,24 @@ in
         # Global mouse binding to handle status bar clicks
         bind-key -n MouseDown1Status if-shell -F '#{==:#{mouse_status_range},palette}' \
             { display-popup -w 90% -h 70% -E "tmux-palette #{pane_id}" } \
-            { if-shell -F '#{==:#{mouse_status_range},clinfo}' \
-                { run-shell "hg-cl --copy" } \
-                { if-shell -F '#{==:#{mouse_status_range},session}' \
-                    { switch-client -t = } \
-                    { if-shell -F '#{m:agent:*,#{mouse_status_range}}' \
-                        { 
-                            # Extract pane_id from agent:pane_id
-                            run-shell "echo 'range=#{mouse_status_range}' >> /tmp/click-debug.log; \
-                                       target_id=$(echo '#{mouse_status_range}' | cut -d: -f2); \
-                                       if tmux list-panes -a -F '##{pane_id}' | grep -q \"^\$target_id\$\"; then \
-                                           tmux switch-client -t \"\$target_id\"; \
-                                           tmux select-pane -t \"\$target_id\"; \
-                                       else \
-                                           agent-tracker-ctl unregister --pane \"\$target_id\"; \
-                                           tmux display-message \"Agent pane not found, entry removed\"; \
-                                       fi"
-                        } \
-                        { select-window -t = } \
+            { if-shell -F '#{==:#{mouse_status_range},session}' \
+                { switch-client -t = } \
+                { if-shell -F '#{m:agent:*,#{mouse_status_range}}' \
+                    { 
+                        # Extract pane_id from agent:pane_id
+                        run-shell "echo 'range=#{mouse_status_range}' >> /tmp/click-debug.log; \
+                                   target_id=$(echo '#{mouse_status_range}' | cut -d: -f2); \
+                                   if tmux list-panes -a -F '##{pane_id}' | grep -q \"^\$target_id\$\"; then \
+                                       tmux switch-client -t \"\$target_id\"; \
+                                       tmux select-pane -t \"\$target_id\"; \
+                                   else \
+                                       agent-tracker-ctl unregister --pane \"\$target_id\"; \
+                                       tmux display-message \"Agent pane not found, entry removed\"; \
+                                   fi"
                     } \
+                    { select-window -t = } \
                 } \
             }
-
-        # Right-click menu for hg-age (ageinfo range) or hg-cl (clinfo range) or session
-        bind-key -n MouseDown3Status \
-            if-shell -F '#{==:#{mouse_status_range},ageinfo}' \
-                { display-menu -T "#[align=centre]Repository Sync" -t = -x M -y W \
-                    "Sync Current" s { display-popup -T "Syncing Current Workspace" -w 80% -h 60% -E "hg sync && read" } \
-                    "Sync All" a { display-popup -T "Syncing All Workspaces" -w 80% -h 60% -E "for d in /google/src/cloud/$USER/*; do if [ -d \"$d/google3\" ]; then echo \"Syncing $d...\"; (cd \"$d\" && hg sync); fi; done; echo \"Finished syncing all workspaces.\"; read" } \
-                } \
-                { if-shell -F '#{==:#{mouse_status_range},clinfo}' \
-                    { display-menu -T "#[align=centre]CL Management" -t = -x M -y W \
-                        "Copy CL Number" c { run-shell "hg-cl --copy" } \
-                        "Switch CL" s { display-popup -T "Switch CL" -w 80% -h 60% -E "hg pickcheckout" } \
-                        "Amend" a { display-popup -T "Amend CL" -w 95% -h 80% -E "hg amend -i" } \
-                        "Commit" C { display-popup -T "Commit CL" -w 95% -h 80% -E "hg commit -i" } \
-                    } \
-                    { if-shell -F '#{==:#{mouse_status_range},session}' \
-                        { display-menu -T "#[align=centre]#{session_name}" -t = -x M -y W Next n { switch-client -n } Previous p { switch-client -p } "" Renumber N { move-window -r } Rename n { command-prompt -I "#S" { rename-session "%%" } } "" "New Session" s { new-session } "New Window" w { new-window } "" "Kill Session" X { kill-session } } \
-                        { select-window -t = } \
-                    } \
-                }
 
         # Enhanced right-click menu for session list on the left
         bind-key -T root MouseDown3StatusLeft display-menu -T "#[align=centre]#{session_name}" -t = -x M -y W Next n { switch-client -n } Previous p { switch-client -p } "" Renumber N { move-window -r } Rename n { command-prompt -I "#S" { rename-session "%%" } } "" "New Session" s { new-session } "New Window" w { new-window } "" "Kill Session" X { kill-session }
