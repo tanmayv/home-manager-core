@@ -42,7 +42,6 @@
           extraSpecialArgs = { inherit inputs userSettings; };
           modules = [ 
             ./home.nix 
-            inputs.extensions.homeManagerModules.agent-tracker
 
             # Configure extension options
             ({ ... }: {
