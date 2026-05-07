@@ -12,7 +12,12 @@ let
   };
   enableAgentComms = enableAiWorkflow && (aiFeatures.enable_tmux_based_agent_comms or false);
 
-  tmux-sessionizer = import ./tmux-sessionizer.nix { inherit pkgs; maxDirLength = config.programs.tmux.sessionizerMaxDirLength; };
+  tmux-sessionizer = import ./tmux-sessionizer.nix {
+    inherit pkgs;
+    maxDirLength = config.programs.tmux.sessionizerMaxDirLength;
+    searchPaths = config.programs.tmux.sessionizerSearchPaths;
+    displayReplacements = config.programs.tmux.sessionizerDisplayReplacements;
+  };
   hg-age = import ./hg-age.nix { inherit pkgs; };
   hg-cl = import ./hg-cl.nix { inherit pkgs; };
   tmux-session-list-formatter = pkgs.writeScriptBin "tmux-session-list-formatter" ''
@@ -118,6 +123,16 @@ in
       type = types.int;
       default = 25;
       description = "Maximum directory name length to include in tmux-sessionizer search";
+    };
+    sessionizerSearchPaths = mkOption {
+      type = types.listOf types.str;
+      default = [ "~" ];
+      description = "Paths to search for sessions in tmux-sessionizer.";
+    };
+    sessionizerDisplayReplacements = mkOption {
+      type = types.attrsOf types.str;
+      default = {};
+      description = "Map of path prefixes to display names in fzf (e.g., { \"/path/to/dir\" = \"[TAG]\"; }).";
     };
     statusBar = {
       row0 = {

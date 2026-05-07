@@ -1,4 +1,4 @@
-{ pkgs, maxDirLength ? 16 }:
+{ pkgs, maxDirLength ? 16, searchPaths ? [ "~" ], displayReplacements ? {} }:
 pkgs.writeScriptBin "tmux-sessionizer" ''
   #!${pkgs.stdenv.shell}
   CONFIG_FILE_NAME="tmux-sessionizer.conf"
@@ -182,7 +182,7 @@ pkgs.writeScriptBin "tmux-sessionizer" ''
 
   sanity_check
 
-  [[ -n "$TS_SEARCH_PATHS" ]] || TS_SEARCH_PATHS=(/google/src/cloud/$USER ~)
+  [[ -n "$TS_SEARCH_PATHS" ]] || TS_SEARCH_PATHS=(${concatStringsSep " " (map (p: "\"${p}\"") searchPaths)})
 
   if [[ ''${#TS_EXTRA_SEARCH_PATHS[@]} -gt 0 ]]; then
       TS_SEARCH_PATHS+=("''${TS_EXTRA_SEARCH_PATHS[@]}")
@@ -286,8 +286,8 @@ pkgs.writeScriptBin "tmux-sessionizer" ''
   elif [[ ! -z $user_selected ]]; then
       selected="$user_selected"
   else
-      selected_display=$(find_dirs | sed "s#^/google/src/cloud/$USER/#[Fig]#" | sed "s#^$HOME#[~]#" | ${pkgs.fzf}/bin/fzf)
-      selected=$(echo "$selected_display" | sed "s#^\[Fig\]#/google/src/cloud/$USER/#" | sed "s#^\[~\]#$HOME#")
+      selected_display=$(find_dirs | sed "s#^$HOME#[~]#" ${concatStringsSep " " (mapAttrsToList (k: v: "| sed \"s#^${k}/#${v}#\"") displayReplacements)} | ${pkgs.fzf}/bin/fzf)
+      selected=$(echo "$selected_display" | sed "s#^\[~\]#$HOME#" ${concatStringsSep " " (mapAttrsToList (k: v: "| sed \"s#^${lib.escapeShellArg v}#${k}/#\"") displayReplacements)})
   fi
 
   if [[ -z $selected ]]; then
@@ -302,11 +302,6 @@ pkgs.writeScriptBin "tmux-sessionizer" ''
   fi
 
   selected_name=$(basename "$selected" | tr . _)
-
-  if [[ $is_session == false ]] && [[ -d "$selected/google3" ]]; then
-      log "found google3 directory in $selected, switching to it"
-      selected="$selected/google3"
-  fi
 
   if ! is_tmux_running; then
       tmux new-session -ds "$selected_name" -c "$selected"
