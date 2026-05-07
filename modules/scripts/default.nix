@@ -20,9 +20,7 @@ in
     ./new-gemini-agent.nix
     ./twatch.nix
     ./tmux-rename-agent.nix
-  ] ++ (if userSettings.enable-skill-publishing or false then [
-    ./skill-ctl.nix
-  ] else []) ++ (if enableAgentComms then [
+  ] ++ (if enableAgentComms then [
     ./iamdone.nix
     ./waiting.nix
     ./send-message-to-agent.nix
