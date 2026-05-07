@@ -1,21 +1,5 @@
 {
   "nodes": {
-    "agent-tracker": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "path": "./extensions/agent-tracker",
-        "type": "path"
-      },
-      "original": {
-        "path": "./extensions/agent-tracker",
-        "type": "path"
-      },
-      "parent": []
-    },
     "astronvim-template": {
       "flake": false,
       "locked": {
@@ -30,6 +14,23 @@
         "owner": "AstroNvim",
         "repo": "template",
         "type": "github"
+      }
+    },
+    "extensions": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1778173163,
+        "narHash": "sha256-saYF8Vx/tt7Quc0YFboVO0xTMWioRKe/4zPUDVKAmwI=",
+        "path": "/usr/local/google/home/tanmayvijay/home-manager-extensions",
+        "type": "path"
+      },
+      "original": {
+        "path": "/usr/local/google/home/tanmayvijay/home-manager-extensions",
+        "type": "path"
       }
     },
     "flake-parts": {
@@ -211,7 +212,7 @@
         "nvim-pure": "nvim-pure"
       },
       "locked": {
-        "lastModified": 1778166277,
+        "lastModified": 1778166450,
         "narHash": "sha256-sXmCpIAPQFPgI5AfAL2L/P2VS3UD/44ensigCfVbQCM=",
         "path": "/usr/local/google/home/tanmayvijay/nvim-nix",
         "type": "path"
@@ -238,8 +239,8 @@
     },
     "root": {
       "inputs": {
-        "agent-tracker": "agent-tracker",
         "astronvim-template": "astronvim-template",
+        "extensions": "extensions",
         "home-manager": "home-manager",
         "nixpkgs": "nixpkgs",
         "nvim-nix": "nvim-nix",

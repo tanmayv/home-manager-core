@@ -23,8 +23,8 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    agent-tracker = {
-      url = "path:./extensions/agent-tracker";
+    extensions = {
+      url = "path:/usr/local/google/home/tanmayvijay/home-manager-extensions";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -42,7 +42,7 @@
           extraSpecialArgs = { inherit inputs userSettings; };
           modules = [ 
             ./home.nix 
-            inputs.agent-tracker.homeManagerModules.default
+            inputs.extensions.homeManagerModules.agent-tracker
 
             # Configure extension options
             ({ ... }: {
