@@ -211,8 +211,8 @@
         "nvim-pure": "nvim-pure"
       },
       "locked": {
-        "lastModified": 1778161392,
-        "narHash": "sha256-xuFUxx9svwvmY3noRFfA9srwkrVp5Nw0WeFRDMqGaaE=",
+        "lastModified": 1778166277,
+        "narHash": "sha256-sXmCpIAPQFPgI5AfAL2L/P2VS3UD/44ensigCfVbQCM=",
         "path": "/usr/local/google/home/tanmayvijay/nvim-nix",
         "type": "path"
       },
