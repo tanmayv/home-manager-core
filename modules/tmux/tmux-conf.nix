@@ -15,7 +15,7 @@ let
   tmux-sessionizer = import ./tmux-sessionizer.nix {
     inherit pkgs lib;
     maxDirLength = config.programs.tmux.sessionizerMaxDirLength;
-    searchPaths = config.programs.tmux.sessionizerSearchPaths;
+    searchPaths = unique ([ "~" ] ++ config.programs.tmux.sessionizerSearchPaths);
     displayReplacements = config.programs.tmux.sessionizerDisplayReplacements;
   };
   hg-age = import ./hg-age.nix { inherit pkgs; };
