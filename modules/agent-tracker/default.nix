@@ -12,6 +12,7 @@ let
       cp -r * $out/
     '';
   };
+  palette = import ../palette.nix;
 in
 {
   imports = [
@@ -114,6 +115,14 @@ in
         WantedBy = [ "default.target" ];
       };
     };
+
+    programs.tmux.statusBar.extraLines = mkIf cfg.enableTmuxIntegration [
+      {
+        name = "agents";
+        command = "#[fg=${palette.color4},bold] Active Agents: #[fg=${palette.color8},nobold]#(agent-tracker-ctl status-bar)";
+        condition = "[ $(agent-tracker-ctl list | python3 -c 'import sys, json; print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0) -gt 0 ]";
+      }
+    ];
 
     # Contribute tmux configuration if enabled
     programs.tmux.extraConfig = mkIf cfg.enableTmuxIntegration ''
