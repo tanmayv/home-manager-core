@@ -1,4 +1,5 @@
-{ pkgs, maxDirLength ? 16, searchPaths ? [ "~" ], displayReplacements ? {} }:
+{ pkgs, lib, maxDirLength ? 16, searchPaths ? [ "~" ], displayReplacements ? {} }:
+with lib;
 pkgs.writeScriptBin "tmux-sessionizer" ''
   #!${pkgs.stdenv.shell}
   CONFIG_FILE_NAME="tmux-sessionizer.conf"

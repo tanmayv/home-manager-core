@@ -75,6 +75,9 @@ let
             grep -v "dots/''${note_filename}" "$file" > "$file.tmp" && mv "$file.tmp" "$file"
           done
         fi
+      fi
+    '';
+  };
       tmux-task-stats = pkgs.writeShellApplication {
     name = "tmux-task-stats";
     runtimeInputs = with pkgs; [ coreutils bash jq ];
@@ -90,6 +93,8 @@ let
     '';
   };
 
+in
+{
   config = {
     home.packages = [
       inputs.tasks-nvim.packages.${pkgs.system}.default

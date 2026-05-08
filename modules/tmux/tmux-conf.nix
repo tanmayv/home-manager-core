@@ -13,7 +13,7 @@ let
   enableAgentComms = enableAiWorkflow && (aiFeatures.enable_tmux_based_agent_comms or false);
 
   tmux-sessionizer = import ./tmux-sessionizer.nix {
-    inherit pkgs;
+    inherit pkgs lib;
     maxDirLength = config.programs.tmux.sessionizerMaxDirLength;
     searchPaths = config.programs.tmux.sessionizerSearchPaths;
     displayReplacements = config.programs.tmux.sessionizerDisplayReplacements;
