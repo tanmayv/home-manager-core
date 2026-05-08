@@ -205,6 +205,7 @@ pkgs.writeScriptBin "tmux-sessionizer" ''
               else
                   path="$entry"
               fi
+              path="''${path/#\~/$HOME}"
 
               [[ -d "$path" ]] && find "$path" -mindepth 1 -maxdepth "''${depth:-''${TS_MAX_DEPTH:-1}}" -name ".*" -prune -o -type d -print0
           done
