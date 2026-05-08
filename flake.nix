@@ -12,23 +12,16 @@
       url = "github:AstroNvim/template";
       flake = false;
     };
-
-    nvim-nix = {
-      url = "path:/usr/local/google/home/tanmayvijay/nvim-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    tasks-nvim = {
-      url = "github:tanmayv/tasks.nvim";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
-  outputs = { nixpkgs, ... }@inputs:
+  outputs = inputs@{ nixpkgs, ... }:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
     in {
-      homeManagerModules.default = ./home.nix;
+      homeManagerModules.default = {
+        imports = [ ./home.nix ];
+        _module.args.inputs = inputs;
+      };
     };
 }

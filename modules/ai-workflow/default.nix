@@ -61,7 +61,17 @@ in
     # Link hooks
     ".gemini/hooks.json".source = ./dotfiles/hooks/hooks.json;
     ".gemini/jetski/hooks.json".source = ./dotfiles/hooks/jetski_hooks.json;
-    ".gemini/hooks".source = ./dotfiles/hooks;
+    
+    ".gemini/hooks/after_agent.py".source = ./dotfiles/hooks/after_agent.py;
+    ".gemini/hooks/jetski_post_tool.py".source = ./dotfiles/hooks/jetski_post_tool.py;
+    ".gemini/hooks/jetski_pre_tool.py".source = ./dotfiles/hooks/jetski_pre_tool.py;
+    ".gemini/hooks/notify_approval.py".source = ./dotfiles/hooks/notify_approval.py;
+    ".gemini/hooks/post_invocation.py".source = ./dotfiles/hooks/post_invocation.py;
+    ".gemini/hooks/post_tool.py".source = ./dotfiles/hooks/post_tool.py;
+    ".gemini/hooks/pre_invocation.py".source = ./dotfiles/hooks/pre_invocation.py;
+    ".gemini/hooks/pre_tool.py".source = ./dotfiles/hooks/pre_tool.py;
+    ".gemini/hooks/session_end.py".source = ./dotfiles/hooks/session_end.py;
+    ".gemini/hooks/stop.py".source = ./dotfiles/hooks/stop.py;
 
   } // (if aiFeatures.enable_ai_ssa_creator_skill then {
     ".gemini/skills/ai-ssa-creator".source = ./dotfiles/skills/ai-ssa-creator;
