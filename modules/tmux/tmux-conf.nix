@@ -69,47 +69,64 @@ let
 
 
   tmux-status-refresh = pkgs.writeScriptBin "tmux-status-refresh" ''
-    #!${pkgs.bash}/bin/bash
-    # Dynamically set status lines and formats
-    
-    # Core row 1 (Active Sessions)
-    SESSIONS_PART="#[align=left,fg=${palette.color4},bold] Active Sessions: #[fg=${palette.color8},nobold]#(tmux list-sessions -F \"##{session_created}|##{session_name}|##{session_id}\" | tmux-session-list-formatter 150 \"#S\")"
-    
-    # Row 0 right part from extensions
-    ROW0_RIGHT="${concatStringsSep " " config.programs.tmux.statusBar.row0.right}"
-    
-    # Calculate how many extra lines we need
-    declare -A lines
-    line_idx=1
-    
-    # Check active sessions condition (show if > 1)
-    num_sessions=$(tmux list-sessions | wc -l)
-    if [ "$num_sessions" -gt 1 ]; then
-        lines[$line_idx]="$SESSIONS_PART"
-        line_idx=$((line_idx + 1))
-    fi
-    
-    # Process extra lines from extensions
-    ${concatStringsSep "\n" (map (line: ''
-      if ${line.condition}; then
-        lines[$line_idx]="#[align=left]${line.command}"
-        line_idx=$((line_idx + 1))
-      fi
-    '') config.programs.tmux.statusBar.extraLines)}
-    
-    # Set status lines
-    total_lines=$((line_idx - 1))
-    
-    if [ "$total_lines" -eq 0 ]; then
-        tmux set -g status on
-    else
-        tmux set -g status "$((total_lines + 1))"
-        for i in "''${!lines[@]}"; do
-            tmux set -g status-format[$i] "''${lines[$i]}"
-        done
-    fi
-    
-    # Update row 0 right if needed (handled in static config usually, but could be dynamic)
+    #!${pkgs.python3}/bin/python3
+    import json
+    import os
+    import subprocess
+    import sys
+
+    def run_cmd(cmd):
+        try:
+            return subprocess.check_output(cmd, shell=True, text=True).strip()
+        except subprocess.CalledProcessError:
+            return ""
+
+    def main():
+        config_path = os.path.expanduser("~/.config/tmux/status-refresh.json")
+        if not os.path.exists(config_path):
+            print(f"Config file not found: {config_path}", file=sys.stderr)
+            # Fallback to basic status on
+            subprocess.run(["tmux", "set", "-g", "status", "on"])
+            return
+
+        with open(config_path, "r") as f:
+            config = json.load(f)
+
+        palette = config.get("palette", {})
+        color4 = palette.get("color4", "#7aa2f7")
+        color8 = palette.get("color8", "#414868")
+
+        lines = {}
+        line_idx = 1
+
+        # 1. Core row 1 (Active Sessions)
+        num_sessions = int(run_cmd("tmux list-sessions 2>/dev/null | wc -l") or "0")
+        if num_sessions > 1:
+            sessions_part = f"#[align=left,fg={color4},bold] Active Sessions: #[fg={color8},nobold]#(tmux list-sessions -F \"##{{session_created}}|##{{session_name}}|##{{session_id}}\" | tmux-session-list-formatter 150 \"#S\")"
+            lines[line_idx] = sessions_part
+            line_idx += 1
+
+        # 2. Process extra lines from extensions
+        extra_lines = config.get("extraLines", [])
+        for line in extra_lines:
+            condition = line.get("condition", "true")
+            # Evaluate condition by running it in shell
+            res = subprocess.run(condition, shell=True, capture_output=True)
+            if res.returncode == 0:
+                lines[line_idx] = f"#[align=left]{line.get('command')}"
+                line_idx += 1
+
+        total_lines = line_idx - 1
+
+        if total_lines == 0:
+            subprocess.run(["tmux", "set", "-g", "status", "on"])
+        else:
+            subprocess.run(["tmux", "set", "-g", "status", str(total_lines + 1)])
+            for idx, content in lines.items():
+                subprocess.run(["tmux", "set", "-g", f"status-format[{idx}]", content])
+
+    if __name__ == "__main__":
+        main()
   '';
 in
 {
@@ -162,6 +179,12 @@ in
       tmux-session-list-formatter
       tmux-status-refresh
     ];
+
+    xdg.configFile."tmux/status-refresh.json".text = builtins.toJSON {
+      inherit (palette) background foreground color4 color8;
+      extraLines = config.programs.tmux.statusBar.extraLines;
+      row0Right = config.programs.tmux.statusBar.row0.right;
+    };
 
     programs.tmux = {
       enable = true;
