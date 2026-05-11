@@ -28,6 +28,22 @@
         done
         set -- "''${new_args[@]}"
 
+        # Detect Agent Swarm session directory in the arguments
+        session_dir=""
+        for arg in "$@"; do
+          if [[ "$arg" =~ (google3/experimental/users/[^/]+/agent_swarm_sessions/[^/\`\ ]+) ]]; then
+             session_path="''${BASH_REMATCH[1]}"
+             if [[ "$session_path" == google3/* ]]; then
+                if [[ "$PWD" == /google/src/cloud/$USER/* ]]; then
+                   ws_part="''${PWD#/google/src/cloud/"$USER"/}"
+                   ws_name="''${ws_part%%/*}"
+                   session_dir="/google/src/cloud/$USER/$ws_name/$session_path"
+                fi
+             fi
+             break
+          fi
+        done
+
         if [[ -n "''${TMUX:-}" ]]; then
           pane_id="$TMUX_PANE"
           session_name=$(tmux display-message -p '#S')
@@ -58,7 +74,11 @@
 
             # Open observer if requested and nvim is available
             if [[ "$obs_enabled" == "true" ]] && command -v nvim &> /dev/null; then
-              tmux split-window -h -d -l 50% -c "#{pane_current_path}" "AGENT_NAME=\"$agent_name\" nvim -c :AgentObserverToggle"
+              env_vars="AGENT_NAME=\"$agent_name\""
+              if [[ -n "$session_dir" && -d "$session_dir" ]]; then
+                env_vars="$env_vars AGENT_OBSERVER_BASE_DIR=\"$session_dir\""
+              fi
+              tmux split-window -h -d -l 50% -c "#{pane_current_path}" "$env_vars nvim -c :AgentObserverToggle"
             fi
           fi
           
