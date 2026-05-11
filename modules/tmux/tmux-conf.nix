@@ -216,6 +216,34 @@ in
         
         # Tmux Command Palette
         bind-key C-p display-popup -T "Command Palette" -w 90% -h 70% -E "tmux-palette #{pane_id}"
+
+        # Custom bindings for new-window and split-window to support Fig workspace roots
+        bind-key c run-shell ' \
+            session_name="#{session_name}"; \
+            ws_root="/google/src/cloud/$USER/$session_name"; \
+            if [ -d "$ws_root" ]; then \
+                tmux new-window -c "$ws_root"; \
+            else \
+                tmux new-window -c "#{pane_current_path}"; \
+            fi'
+
+        bind-key % run-shell ' \
+            session_name="#{session_name}"; \
+            ws_root="/google/src/cloud/$USER/$session_name"; \
+            if [ -d "$ws_root" ]; then \
+                tmux split-window -h -c "$ws_root"; \
+            else \
+                tmux split-window -h -c "#{pane_current_path}"; \
+            fi'
+
+        bind-key '"' run-shell ' \
+            session_name="#{session_name}"; \
+            ws_root="/google/src/cloud/$USER/$session_name"; \
+            if [ -d "$ws_root" ]; then \
+                tmux split-window -v -c "$ws_root"; \
+            else \
+                tmux split-window -v -c "#{pane_current_path}"; \
+            fi'
         
         # Status Bar Position
         set -g status-position ${config.programs.tmux.statusBarPosition}
