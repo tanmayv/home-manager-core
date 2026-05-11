@@ -17,6 +17,7 @@ let
     maxDirLength = config.programs.tmux.sessionizerMaxDirLength;
     searchPaths = unique ([ "~" ] ++ config.programs.tmux.sessionizerSearchPaths);
     displayReplacements = config.programs.tmux.sessionizerDisplayReplacements;
+    postSelectionHook = config.programs.tmux.sessionizerPostSelectionHook;
   };
   hg-age = import ./hg-age.nix { inherit pkgs; };
   hg-cl = import ./hg-cl.nix { inherit pkgs; };
@@ -150,6 +151,11 @@ in
       type = types.attrsOf types.str;
       default = {};
       description = "Map of path prefixes to display names in fzf (e.g., { \"/path/to/dir\" = \"[TAG]\"; }).";
+    };
+    sessionizerPostSelectionHook = mkOption {
+      type = types.lines;
+      default = "";
+      description = "Custom shell script hook executed in tmux-sessionizer after a path is selected.";
     };
     statusBar = {
       row0 = {

@@ -1,4 +1,4 @@
-{ pkgs, lib, maxDirLength ? 16, searchPaths ? [ "~" ], displayReplacements ? {} }:
+{ pkgs, lib, maxDirLength ? 16, searchPaths ? [ "~" ], displayReplacements ? {}, postSelectionHook ? "" }:
 with lib;
 let
   escapeSedPattern = v: builtins.replaceStrings ["[" "]" "*" "."] ["\\[" "\\]" "\\*" "\\."] v;
@@ -307,13 +307,10 @@ pkgs.writeScriptBin "tmux-sessionizer" ''
       is_session=false
   fi
 
-  # Detect Fig/CitC workspaces and force opening in workspace root
-  if [[ "$selected" =~ ^/google/src/cloud/$USER/([^/]+) ]]; then
-      ws_name="''${BASH_REMATCH[1]}"
-      log "Detected Fig workspace '$ws_name' for path '$selected'"
-      selected="/google/src/cloud/$USER/$ws_name"
-      selected_name="$ws_name"
-  else
+  # Custom post-selection hook contributed by extensions
+  ${postSelectionHook}
+
+  if [[ -z "$selected_name" ]]; then
       selected_name=$(basename "$selected" | tr . _)
   fi
 
