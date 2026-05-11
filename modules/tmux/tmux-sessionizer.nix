@@ -303,7 +303,15 @@ pkgs.writeScriptBin "tmux-sessionizer" ''
       is_session=false
   fi
 
-  selected_name=$(basename "$selected" | tr . _)
+  # Detect Fig/CitC workspaces and force opening in workspace root
+  if [[ "$selected" =~ ^/google/src/cloud/$USER/([^/]+) ]]; then
+      ws_name="''${BASH_REMATCH[1]}"
+      log "Detected Fig workspace '$ws_name' for path '$selected'"
+      selected="/google/src/cloud/$USER/$ws_name"
+      selected_name="$ws_name"
+  else
+      selected_name=$(basename "$selected" | tr . _)
+  fi
 
   if ! is_tmux_running; then
       tmux new-session -ds "$selected_name" -c "$selected"
