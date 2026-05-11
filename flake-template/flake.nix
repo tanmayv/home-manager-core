@@ -14,9 +14,27 @@
       url = "sso://user/tanmayvijay/home-manager-minimal-ai";
       ref = "refs/tags/stable";
     };
+
+    # Google-specific extensions
+    extensions = {
+      type = "git";
+      url = "sso://user/tanmayvijay/home-manager-extensions";
+      ref = "refs/tags/stable";
+    };
+
+    nvim-nix = {
+      type = "git";
+      url = "sso://user/tanmayvijay/nvim-nix";
+      ref = "refs/tags/stable";
+    };
+
+    tasks-nvim = {
+      url = "github:tanmayv/tasks.nvim";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { nixpkgs, home-manager, minimal-cloudtop, ... }@inputs:
+  outputs = { nixpkgs, home-manager, minimal-cloudtop, extensions, ... }@inputs:
     let
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
@@ -38,12 +56,35 @@
 
         # minimal-cloudtop Home Manager module requires userSettings and inputs
         extraSpecialArgs = { 
-          inherit inputs userSettings; 
+          inherit userSettings;
+          inputs = inputs // minimal-cloudtop.inputs;
         };
 
         modules = [ 
           # Import the minimal-cloudtop Home Manager module
           minimal-cloudtop.homeManagerModules.default
+
+          # Load Google-specific extensions
+          extensions.homeManagerModules.google3-zsh
+          extensions.homeManagerModules.google3-bash
+          extensions.homeManagerModules.google-agents
+          extensions.homeManagerModules.google-codesearch
+          extensions.homeManagerModules.google3-tmux
+          extensions.homeManagerModules.google3-ai
+          extensions.homeManagerModules.google3-scripts
+          extensions.homeManagerModules.google3-hg
+
+          # Configure extension options
+          ({ ... }: {
+            services.agent-tracker.enable = userSettings.enable-agent-tracker or false;
+            services.agent-tracker.enableTmuxIntegration = true;
+            
+            programs.tmux.sessionizerSearchPaths = [ "/google/src/cloud/$USER" "~" ];
+            programs.tmux.sessionizerDisplayReplacements = {
+              "/google/src/cloud/$USER" = "[Fig]";
+            };
+            programs.tasks.workspaceSearchPaths = [ "/google/src/cloud/$USER" ];
+          })
 
           # Your own configuration block
           ({ pkgs, ... }: {

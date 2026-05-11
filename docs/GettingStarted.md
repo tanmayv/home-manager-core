@@ -30,18 +30,34 @@ nix-channel --add https://nixos.org/channels/nixpkgs-unstable && nix-channel --u
 The recommended way to use Minimal Cloudtop is to import it as a module into your personal dotfiles Flake. This keeps your personal configurations neatly separated from the upstream core logic.
 
 ### Create your Personal Flake
-Create a new directory for your configuration and create a `flake.nix`:
+Create the Home Manager configuration directory:
 
 ```bash
-mkdir -p ~/my-nix-config
-cd ~/my-nix-config
+mkdir -p ~/.config/home-manager
+cd ~/.config/home-manager
 ```
 
-Create a `flake.nix` with the following content, replacing `your-ldap` with your LDAP:
+Create a `setup.nix` to configure your features, replacing `your-ldap` with your LDAP:
 
 ```nix
 {
-  description = "My personal Home Manager configuration";
+  username = "your-ldap";
+  config-location = "~/.config/home-manager";
+  
+  # Features
+  enable-ai-workflow = true;
+  enable-neovim = true;
+  enable-tasks = true;
+  enable-agent-tracker = true;
+  enable-smart-cd = true;
+}
+```
+
+Create a `flake.nix` with the following content:
+
+```nix
+{
+  description = "User Home Manager configuration";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
@@ -49,31 +65,65 @@ Create a `flake.nix` with the following content, replacing `your-ldap` with your
       url = "github:nix-community/home-manager/release-25.11";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    
     minimal-cloudtop = {
       url = "sso://user/tanmayvijay/home-manager-minimal-ai";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    extensions = {
+      url = "sso://user/tanmayvijay/home-manager-extensions";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    nvim-nix = {
+      url = "sso://user/tanmayvijay/nvim-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    tasks-nvim = {
+      url = "github:tanmayv/tasks.nvim";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { nixpkgs, home-manager, minimal-cloudtop, ... }@inputs:
+  outputs = { nixpkgs, home-manager, minimal-cloudtop, extensions, ... }@inputs:
     let
-      user = "your-ldap";
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
+      userSettings = import ./setup.nix;
+      user = userSettings.username;
     in {
-      homeConfigurations."cloudtop" = home-manager.lib.homeManagerConfiguration {
+      homeConfigurations.cloudtop = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
+
         extraSpecialArgs = { 
-          inherit inputs; 
-          userSettings = { 
-            # Toggle features here
-            enable-ai-workflow = true;
-            enable-neovim = true;
-            enable-tasks = true;
-          };
+          inherit userSettings;
+          inputs = inputs // minimal-cloudtop.inputs;
         };
+
         modules = [ 
-          minimal-cloudtop.homeManagerModules.default 
+          minimal-cloudtop.homeManagerModules.default
+          extensions.homeManagerModules.google3-zsh
+          extensions.homeManagerModules.google3-bash
+          extensions.homeManagerModules.google-agents
+          extensions.homeManagerModules.google-codesearch
+          extensions.homeManagerModules.google3-tmux
+          extensions.homeManagerModules.google3-ai
+          extensions.homeManagerModules.google3-scripts
+          extensions.homeManagerModules.google3-hg
+
+          ({ ... }: {
+            services.agent-tracker.enable = userSettings.enable-agent-tracker or false;
+            services.agent-tracker.enableTmuxIntegration = true;
+            
+            programs.tmux.sessionizerSearchPaths = [ "/google/src/cloud/$USER" "~" ];
+            programs.tmux.sessionizerDisplayReplacements = {
+              "/google/src/cloud/$USER" = "[Fig]";
+            };
+            programs.tasks.workspaceSearchPaths = [ "/google/src/cloud/$USER" ];
+          })
+
           ({ pkgs, ... }: {
             home.username = user;
             home.homeDirectory = "/usr/local/google/home/${user}";
@@ -83,6 +133,7 @@ Create a `flake.nix` with the following content, replacing `your-ldap` with your
     };
 }
 ```
+
 
 ## 3. Initial Build
 

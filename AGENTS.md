@@ -1,6 +1,69 @@
 # AI Agents & Skills Guidelines
 
-This repository relies on a robust architecture of independent, interactable AI agents and modular skills. When contributing to or interacting with this ecosystem, adhere to the following principles:
+
+## Setup & Installation
+
+To enable the AI Agent ecosystem in your Home Manager configuration, follow these steps:
+
+### 1. Bootstrap Your Configuration
+If you are setting this up for the first time, you can bootstrap your configuration by cloning this repository and using the provided flake template:
+
+1. **Clone the Repository**:
+   ```bash
+   git clone sso://user/tanmayvijay/home-manager-minimal-ai ~/minimal-cloudtop
+   ```
+
+2. **Initialize Home Manager Config**:
+   Create the default Home Manager directory and copy the template files:
+   ```bash
+   mkdir -p ~/.config/home-manager
+   cp -r ~/minimal-cloudtop/flake-template/* ~/.config/home-manager/
+   ```
+
+3. **Configure Your Username/LDAP**:
+   Open `~/.config/home-manager/flake.nix` and replace `"your-username"` with your actual LDAP/username (lines 51-52):
+   ```nix
+   home.username = "your-ldap";
+   home.homeDirectory = "/usr/local/google/home/your-ldap";
+   ```
+   Also edit `~/.config/home-manager/setup.nix` to set `username = "your-ldap";`.
+
+4. **Initial Build**:
+   Apply the configuration for the first time:
+   ```bash
+   nix run home-manager -- switch -b backup --flake "~/.config/home-manager#cloudtop"
+   ```
+
+### 2. Configure AI Agent Features
+Once bootstrapped, you can customize and enable the AI Agent features in `~/.config/home-manager/setup.nix`:
+
+1. **Enable AI Workflow**: In your `setup.nix` file, ensure the `enable-ai-workflow` flag is set to `true`:
+   ```nix
+   enable-ai-workflow = true;
+   ```
+
+2. **Configure AI Features**: You can selectively enable specific AI capabilities within the `ai_features` block in `setup.nix`:
+   ```nix
+   ai_features = {
+     enable_agent_knowledge = true;        # Enables persistent markdown knowledge base in ~/agent_knowledge
+     enable_ai_ssa_creator_skill = true;   # Enables skill creator agent
+     enable_tmux_based_agent_comms = true; # Enables inter-agent communication (inbox, wrapper scripts)
+   };
+   ```
+
+3. **Enable Agent Tracker**: The Agent Tracker daemon monitors active agents across sessions and updates your tmux status bar.
+   * In `setup.nix`, ensure the tracker is enabled:
+     ```nix
+     enable-agent-tracker = true;
+     ```
+   * The tracker runs as a systemd user service (`agent-tracker.service`) and starts automatically upon successful build.
+
+4. **Rebuild**: Apply the changes by running:
+   ```bash
+   build-and-switch
+   ```
+
+---
 
 ## 1. The Independent Agent Model
 Unlike traditional AI workflows that use hidden sub-agents, this configuration treats agents as independent peers.

@@ -1,6 +1,6 @@
 {
   # Path to this configuration directory
-  config-location = "~/.config/minimal-cloudtop";
+  config-location = "~/.config/home-manager";
 
   # Preferred editor
   editor = "vim";
