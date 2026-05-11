@@ -152,6 +152,27 @@ Once the build finishes, restart your shell or start a new Tmux session:
 - Press `Ctrl+p` to open the Command Palette.
 - Clickable session indicators should appear in the Tmux status bar.
 
+## Updating to New Stable Releases
+
+Because your configuration is managed as a Nix Flake, updating to the latest stable release of Minimal Cloudtop and its extensions is straightforward:
+
+1. **Navigate to your configuration directory**:
+   ```bash
+   cd ~/.config/home-manager
+   ```
+
+2. **Update the Flake inputs**:
+   This will fetch the latest commits for all inputs (including `minimal-cloudtop` and `extensions` which are tracked to the rolling `stable` tag) and update your `flake.lock`:
+   ```bash
+   nix flake update
+   ```
+
+3. **Apply the updates**:
+   Run the build command to apply the updated configuration:
+   ```bash
+   build-and-switch
+   ```
+
 ---
 
 ## Alternative: Standalone Installation
