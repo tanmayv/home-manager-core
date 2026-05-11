@@ -30,11 +30,6 @@
       ref = "refs/tags/stable";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    tasks-nvim = {
-      url = "github:tanmayv/tasks.nvim";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs = { nixpkgs, home-manager, minimal-cloudtop, extensions, ... }@inputs:

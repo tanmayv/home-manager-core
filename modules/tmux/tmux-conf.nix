@@ -158,6 +158,11 @@ in
       description = "Custom shell script hook executed in tmux-sessionizer after a path is selected.";
     };
     statusBar = {
+      left = mkOption {
+        type = types.listOf types.str;
+        default = [];
+        description = "Extra content to append to the left status bar (after session name)";
+      };
       row0 = {
         right = mkOption {
           type = types.listOf types.str;
@@ -231,7 +236,7 @@ in
         # tmux-dotbar Tokyo Night theme configuration
         set -g status-justify "absolute-centre"
         set -g status-left-length 60
-        set -g status-left "#{?client_prefix,#[bg=${palette.color2} fg=${palette.background} bold],#[fg=${palette.color4} bold]} #S #[default]"
+        set -g status-left "#{?client_prefix,#[bg=${palette.color2} fg=${palette.background} bold],#[fg=${palette.color4} bold]} #S #[default]${concatStringsSep " " config.programs.tmux.statusBar.left}"
         set -g status-right-length 120
         set -g status-right "#{?#{!=:#{status},on},,${concatStringsSep " " config.programs.tmux.statusBar.row0.right} }#[range=user|palette]#[fg=${palette.color6}] [CMDS] #[norange]"
         set -g window-status-format " #W "

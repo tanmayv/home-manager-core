@@ -7,7 +7,6 @@
   ] ++ (if userSettings.enable_bash_over_zsh or false then [ ./modules/bash ] else [ ./modules/zsh ])
     ++ (if userSettings.enable-ai-workflow then [ ./modules/ai-workflow ] else [])
     ++ (if userSettings.enable-neovim then [ inputs.nvim-nix.homeManagerModules.default ] else [])
-    ++ (if userSettings.enable-tasks or false then [ ./modules/tasks ] else [])
     ++ (if userSettings.import-extras or false then [ ./modules/extras ] else []);
 
   home.stateVersion = "25.11";
