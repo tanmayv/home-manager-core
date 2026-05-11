@@ -44,6 +44,11 @@
           fi
         done
 
+        # Create the session directory proactively to allow Neovim to watch it on startup
+        if [[ -n "$session_dir" ]]; then
+          mkdir -p "$session_dir"
+        fi
+
         if [[ -n "''${TMUX:-}" ]]; then
           pane_id="$TMUX_PANE"
           session_name=$(tmux display-message -p '#S')
@@ -74,11 +79,13 @@
 
             # Open observer if requested and nvim is available
             if [[ "$obs_enabled" == "true" ]] && command -v nvim &> /dev/null; then
-              env_vars="AGENT_NAME=\"$agent_name\""
-              if [[ -n "$session_dir" && -d "$session_dir" ]]; then
-                env_vars="$env_vars AGENT_OBSERVER_BASE_DIR=\"$session_dir\""
+              # Split 1: Codebase observer (watches CWD/current workspace) on the right (50% width)
+              right_pane_id=$(tmux split-window -h -d -c "#{pane_current_path}" -P -F "#{pane_id}" "AGENT_NAME=\"$agent_name\" nvim -c :AgentObserverToggle")
+
+              # Split 2: Swarm session directory observer (watches session folder) split vertically below Split 1
+              if [[ -n "$session_dir" ]]; then
+                tmux split-window -v -d -t "$right_pane_id" -c "#{pane_current_path}" "AGENT_NAME=\"$agent_name\" AGENT_OBSERVER_BASE_DIR=\"$session_dir\" nvim -c :AgentObserverToggle"
               fi
-              tmux split-window -h -d -l 50% -c "#{pane_current_path}" "$env_vars nvim -c :AgentObserverToggle"
             fi
           fi
           
