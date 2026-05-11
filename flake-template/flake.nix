@@ -77,17 +77,6 @@
           extensions.homeManagerModules.google3-scripts
           extensions.homeManagerModules.google3-hg
 
-          # Configure extension options
-          ({ ... }: {
-            services.agent-tracker.enable = userSettings.enable-agent-tracker or false;
-            services.agent-tracker.enableTmuxIntegration = true;
-            
-            programs.tmux.sessionizerSearchPaths = [ "/google/src/cloud/$USER" "~" ];
-            programs.tmux.sessionizerDisplayReplacements = {
-              "/google/src/cloud/$USER" = "[Fig]";
-            };
-            programs.tasks.workspaceSearchPaths = [ "/google/src/cloud/$USER" ];
-          })
 
           # Your own configuration block
           ({ pkgs, ... }: {
