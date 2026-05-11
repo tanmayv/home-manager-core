@@ -1,5 +1,9 @@
 { pkgs, lib, maxDirLength ? 16, searchPaths ? [ "~" ], displayReplacements ? {} }:
 with lib;
+let
+  escapeSedPattern = v: builtins.replaceStrings ["[" "]" "*" "."] ["\\[" "\\]" "\\*" "\\."] v;
+  reverseReplacements = concatStringsSep " " (mapAttrsToList (k: v: "| sed \"s#^${escapeSedPattern v}#${k}/#\"") displayReplacements);
+in
 pkgs.writeScriptBin "tmux-sessionizer" ''
   #!${pkgs.stdenv.shell}
   CONFIG_FILE_NAME="tmux-sessionizer.conf"
@@ -289,7 +293,7 @@ pkgs.writeScriptBin "tmux-sessionizer" ''
       selected="$user_selected"
   else
       selected_display=$(find_dirs | sed "s#^$HOME#[~]#" ${concatStringsSep " " (mapAttrsToList (k: v: "| sed \"s#^${k}/#${v}#\"") displayReplacements)} | ${pkgs.fzf}/bin/fzf)
-      selected=$(echo "$selected_display" | sed "s#^\[~\]#$HOME#" ${concatStringsSep " " (mapAttrsToList (k: v: "| sed \"s#^${lib.escapeShellArg v}#${k}/#\"") displayReplacements)})
+      selected=$(echo "$selected_display" | sed "s#^\[~\]#$HOME#" ${reverseReplacements})
   fi
 
   if [[ -z $selected ]]; then
