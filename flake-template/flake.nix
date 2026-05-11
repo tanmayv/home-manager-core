@@ -2,9 +2,9 @@
   description = "Example flake using minimal-cloudtop as a library";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     home-manager = {
-      url = "github:nix-community/home-manager/release-25.11";
+      url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     
@@ -13,6 +13,7 @@
       type = "git";
       url = "sso://user/tanmayvijay/home-manager-minimal-ai";
       ref = "refs/tags/stable";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # Google-specific extensions
@@ -20,12 +21,14 @@
       type = "git";
       url = "sso://user/tanmayvijay/home-manager-extensions";
       ref = "refs/tags/stable";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     nvim-nix = {
       type = "git";
       url = "sso://user/tanmayvijay/nvim-nix";
       ref = "refs/tags/stable";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     tasks-nvim = {
