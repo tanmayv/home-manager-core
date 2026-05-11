@@ -14,6 +14,7 @@ This skill provides procedures and standards for modifying the Minimal Cloudtop 
 - **Centralized Settings:** All user-facing toggles must go into `setup.nix`.
 - **Documentation:** When adding a new flag to `setup.nix`, update `docs/Customization.md`.
 - **Validation:** Always use `build-and-switch` to apply and verify changes.
+- **No Google-Specific Code in Core:** The core repository (`minimal-cloudtop`) MUST remain entirely generic and free of Google3, CitC, Fig, or `hg` (Mercurial) specific paths, scripts, or configurations. All Google-specific customizations must be implemented in the `home-manager-extensions` repository (or a separate flake) and imported as a Flake input. Use generic Nix options or hooks (e.g. `sessionizerPostSelectionHook` or `extraConfig` lines) in the core repo to allow extensions to inject custom logic.
 
 ## Git Best Practices
 
