@@ -80,7 +80,7 @@
             # Open observer if requested and nvim is available
             if [[ "$obs_enabled" == "true" ]] && command -v nvim &> /dev/null; then
               # Split 1: Codebase observer (watches CWD/current workspace) on the right (50% width)
-              right_pane_id=$(tmux split-window -h -d -c "#{pane_current_path}" -P -F "#{pane_id}" "AGENT_NAME=\"$agent_name\" nvim -c :AgentObserverToggle")
+              right_pane_id=$(tmux split-window -h -l 70% -d -c "#{pane_current_path}" -P -F "#{pane_id}" "AGENT_NAME=\"$agent_name\" nvim -c :AgentObserverToggle")
 
               # Split 2: Swarm session directory observer (watches session folder) split vertically below Split 1
               if [[ -n "$session_dir" ]]; then
