@@ -11,16 +11,28 @@ Minimal Cloudtop requires an internet exception to download Nix packages and AI 
 ### Install Nix
 We use Nix for robust package management.
 - Follow the guide at **go/nix** to install and configure Nix.
-- **Verification**: Ensure `nix --version` works and you are in the `nix-users` group.
+- **Verification**: Ensure `nix --version` works, you are in the `nix-users` group, and your user is trusted by the Nix daemon.
 
 ```bash
+# Install Nix daemon in gLinux
 sudo apt install nix-setup-systemd
-sudo tee -a /etc/nix/nix.conf <<< 'experimental-features = nix-command flakes'
-```
-- Logout and ssh into the cloudtop again.
 
-```bash
+# Enable Flakes and configure Trusted Users to allow binary caches (e.g. Neovim Nightly)
+sudo tee -a /etc/nix/nix.conf <<< 'experimental-features = nix-command flakes'
+sudo tee -a /etc/nix/nix.conf <<< 'trusted-users = root @nix-users'
+
+# Add yourself to the nix-users group
 sudo usermod -a -G nix-users $USER
+```
+
+- **CRITICAL**: You must **logout and ssh into your cloudtop again** (or restart your terminal session) to apply the group membership.
+- After logging back in, restart the Nix daemon to pick up the updated configuration:
+```bash
+sudo systemctl restart nix-daemon
+```
+
+- Update Nix channels:
+```bash
 nix-channel --add https://nixos.org/channels/nixpkgs-unstable && nix-channel --update nixpkgs
 ```
 
