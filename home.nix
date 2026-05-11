@@ -4,6 +4,7 @@
     ./modules/tmux-palette.nix
     ./modules/scripts
     ./modules/agent-tracker
+    ./modules/git
   ] ++ (if userSettings.enable_bash_over_zsh or false then [ ./modules/bash ] else [ ./modules/zsh ])
     ++ (if userSettings.enable-ai-workflow then [ ./modules/ai-workflow ] else [])
     ++ (if userSettings.enable-neovim then [ inputs.nvim-nix.homeManagerModules.default ] else [])
