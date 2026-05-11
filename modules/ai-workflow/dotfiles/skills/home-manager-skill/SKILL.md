@@ -17,10 +17,13 @@ This skill provides procedures and standards for modifying the Minimal Cloudtop 
 
 ## Git Best Practices
 
-- **Branching Strategy:** NEVER work directly on the `master` (or `main`) branch for your personal configuration.
-- **Personal Branch:** Create a personal branch (e.g., `my-config`) off `stable` (or `master`) for your customizations.
-- **Contributing Back:** Only use the `master` branch if you intend to submit a pull request or contribute changes back to the upstream repository.
-- **Updates:** When updating, rebase your personal branch onto the latest upstream changes to preserve your customizations in `setup.nix`.
+- **Branching Strategy:** 
+  * **Strategy 2 (Recommended):** Manage your personal configuration in a separate repository (e.g., `~/.config/home-manager`) importing `minimal-cloudtop` core and `extensions` as Flake inputs. You can commit directly to its `main` branch.
+  * **Strategy 1 (Legacy):** If you are customizing a direct clone of the core repository, NEVER work directly on the `main` branch. Create a personal branch (e.g., `my-config`) off `stable`.
+- **Contributing Back:** Only use the core `main` branch if you intend to submit a pull request or contribute changes back to the upstream repository.
+- **Updates:** 
+  * **Strategy 2:** Update Flake inputs using `nix flake update` in your personal configuration directory.
+  * **Strategy 1:** Rebase your personal branch onto the latest upstream changes to preserve your customizations in `setup.nix`.
 
 ## Process and Planning Guidelines
 
@@ -62,22 +65,45 @@ When requested to make changes by the user:
 5.  Run `build-and-switch` to apply changes and link files.
 
 ### 5. Updating the Configuration
-1.  Run `check-for-update` to check for new stable versions.
-2.  If prompted, confirm to update. The script will automatically rebase your branch and run `build-and-switch`.
-3.  To update manually:
-    - Fetch the latest stable tag: `git fetch origin tag stable --no-tags`
-    - Rebase your current branch: `git rebase origin/stable`
-    - Resolve any conflicts if they arise.
-    - Apply changes: `build-and-switch`
+
+#### Strategy 2 (Recommended - Flake Input)
+1. Navigate to your personal configuration directory:
+   ```bash
+   cd ~/.config/home-manager
+   ```
+2. Update the Flake inputs (this fetches the latest commits for the rolling `stable` tags):
+   ```bash
+   nix flake update
+   ```
+3. Apply the updates:
+   ```bash
+   build-and-switch
+   ```
+
+#### Strategy 1 (Legacy - Direct Clone & Rebase)
+1. Run `check-for-update` to check for new stable versions.
+2. If prompted, confirm to update. The script will automatically rebase your branch and run `build-and-switch`.
+3. To update manually:
+   - Fetch the latest stable tag: `git fetch origin tag stable --no-tags`
+   - Rebase your current branch: `git rebase origin/stable`
+   - Apply changes: `build-and-switch`
 
 ### 6. Creating a New Release
-1.  Ensure all changes are merged into the main branch (e.g., `master` or `main`).
-2.  Create a new SemVer tag: `git tag vX.Y.Z` (replace with actual version).
-3.  Update the floating `stable` tag to point to the new release:
-    `git tag -f stable`
-4.  Push the tags to the remote repository:
-    `git push origin vX.Y.Z`
-    `git push origin -f stable`
+1. Ensure all changes are merged into the main branch (e.g., `main`).
+2. Create a new SemVer tag: 
+   ```bash
+   git tag -a vX.Y.Z -m "Release version X.Y.Z"
+   ```
+3. Update the floating `stable` tag to point to the new release:
+   ```bash
+   git tag -d stable
+   git tag -a stable -m "Stable release vX.Y.Z"
+   ```
+4. Push the tags to the remote repository:
+   ```bash
+   git push origin vX.Y.Z
+   git push origin stable --force
+   ```
 
 ## Rules for Code Changes
 

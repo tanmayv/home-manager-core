@@ -46,6 +46,13 @@ Create a `setup.nix` to configure your features, replacing `your-ldap` with your
   
   # Features
   enable-ai-workflow = true;
+  ai_features = {
+    enable_ai_ssa_creator_skill = true;
+    enable_tmux_based_agent_comms = true;
+    enable_agent_knowledge = true;
+    enable_home_manager_skill = true;
+  };
+
   enable-neovim = true;
   enable-tasks = true;
   enable-agent-tracker = true;
