@@ -28,26 +28,7 @@
         done
         set -- "''${new_args[@]}"
 
-        # Detect Agent Swarm session directory in the arguments
-        session_dir=""
-        for arg in "$@"; do
-          if [[ "$arg" =~ (google3/experimental/users/[^/]+/agent_swarm_sessions/[^/\`\ ]+) ]]; then
-             session_path="''${BASH_REMATCH[1]}"
-             if [[ "$session_path" == google3/* ]]; then
-                if [[ "$PWD" == /google/src/cloud/$USER/* ]]; then
-                   ws_part="''${PWD#/google/src/cloud/"$USER"/}"
-                   ws_name="''${ws_part%%/*}"
-                   session_dir="/google/src/cloud/$USER/$ws_name/$session_path"
-                fi
-             fi
-             break
-          fi
-        done
 
-        # Create the session directory proactively to allow Neovim to watch it on startup
-        if [[ -n "$session_dir" ]]; then
-          mkdir -p "$session_dir"
-        fi
 
         if [[ -n "''${TMUX:-}" ]]; then
           pane_id="$TMUX_PANE"
@@ -79,12 +60,16 @@
 
             # Open observer if requested and nvim is available
             if [[ "$obs_enabled" == "true" ]] && command -v nvim &> /dev/null; then
-              # Split 1: Codebase observer (watches CWD/current workspace) on the right (50% width)
+              # Split 1: Primary observer (watches CWD) on the right
               right_pane_id=$(tmux split-window -h -l 70% -d -c "#{pane_current_path}" -P -F "#{pane_id}" "AGENT_NAME=\"$agent_name\" nvim -c :AgentObserverToggle")
 
-              # Split 2: Swarm session directory observer (watches session folder) split vertically below Split 1
-              if [[ -n "$session_dir" ]]; then
-                tmux split-window -v -d -t "$right_pane_id" -c "#{pane_current_path}" "AGENT_NAME=\"$agent_name\" AGENT_OBSERVER_BASE_DIR=\"$session_dir\" nvim -c :AgentObserverToggle"
+              # Split remaining observers if specified in AGENT_OBSERVERS (newline-separated commands)
+              if [[ -n "''${AGENT_OBSERVERS:-}" ]]; then
+                while IFS= read -r cmd; do
+                  if [[ -n "$cmd" ]]; then
+                    tmux split-window -v -d -t "$right_pane_id" -c "#{pane_current_path}" "$cmd"
+                  fi
+                done <<< "''${AGENT_OBSERVERS}"
               fi
             fi
           fi
