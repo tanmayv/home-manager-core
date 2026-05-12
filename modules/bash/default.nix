@@ -13,6 +13,7 @@ in
 
   programs.bash = {
     enable = true;
+    enableCompletion = true;
     shellAliases = {};
 
     initExtra = ''
@@ -51,7 +52,15 @@ in
       fi
       '' else ""}
     '';
-    '';
+  };
+
+  programs.readline = {
+    enable = true;
+    bindings = {
+      "\\e[A" = "history-search-backward";
+      "\\e[B" = "history-search-forward";
+      "\\C-w" = "backward-kill-word";
+    };
   };
 
   programs.zoxide = {
@@ -66,6 +75,7 @@ in
     settings = {
       auto_sync = false;
       search_mode = "fuzzy";
+      enable_up_arrow = false;
     };
   };
 }

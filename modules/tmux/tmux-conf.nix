@@ -208,6 +208,10 @@ in
       terminal = "screen-256color";
       extraConfig = ''
         set -g mouse on
+
+        # Scroll in alternate screen (TUI apps like less, vim, jetski) using Up/Down arrow keys instead of entering copy-mode
+        bind -n WheelUpPane if-shell -F -t= "#{mouse_any_flag}" "send-keys -M" "if -Ft= '#{pane_in_mode}' 'send-keys -M' 'if -Ft= \"#{alternate_on}\" \"send-keys -t= Up Up Up\" \"copy-mode -et=\"'"
+        bind -n WheelDownPane if-shell -F -t= "#{mouse_any_flag}" "send-keys -M" "if -Ft= '#{pane_in_mode}' 'send-keys -M' 'if -Ft= \"#{alternate_on}\" \"send-keys -t= Down Down Down\"'"
         bind r source-file ~/.config/tmux/tmux.conf \; display-message "Config reloaded!"
         set -ga terminal-overrides ",*256col*:Tc"
         

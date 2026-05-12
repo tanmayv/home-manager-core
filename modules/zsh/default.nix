@@ -40,6 +40,7 @@ in
 
   programs.zsh = {
     enable = true;
+    enableCompletion = true;
     dotDir = "${config.xdg.configHome}/zsh";
     autosuggestion.enable = true;
     syntaxHighlighting.enable = true;
@@ -48,6 +49,11 @@ in
     initContent = ''
       zmodload zsh/nearcolor
       export COLORTERM=truecolor
+
+      # Enable Bash-style sub-word deletion boundaries (stops at slashes, etc.)
+      autoload -Uz select-word-style
+      select-word-style bash
+
 
       # Accept autosuggestion with Ctrl+E
       bindkey '^E' autosuggest-accept
