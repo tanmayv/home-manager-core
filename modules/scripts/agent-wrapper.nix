@@ -65,9 +65,9 @@
 
               # Split remaining observers if specified in AGENT_OBSERVERS (newline-separated commands)
               if [[ -n "''${AGENT_OBSERVERS:-}" ]]; then
-                while IFS= read -r cmd; do
-                  if [[ -n "$cmd" ]]; then
-                    tmux split-window -v -d -t "$right_pane_id" -c "#{pane_current_path}" "$cmd"
+                while IFS= read -r obs_cmd; do
+                  if [[ -n "$obs_cmd" ]]; then
+                    tmux split-window -v -d -t "$right_pane_id" -c "#{pane_current_path}" "$obs_cmd"
                   fi
                 done <<< "''${AGENT_OBSERVERS}"
               fi
