@@ -24,13 +24,9 @@
         _module.args.inputs = inputs;
       };
       templates = {
-        pure = {
-          path = ./flake-template-pure;
-          description = "Pure, non-Google Home Manager starter configuration";
-        };
         default = {
           path = ./flake-template;
-          description = "Google3/Cloudtop Home Manager starter configuration";
+          description = "Pure, standalone Home Manager starter configuration";
         };
       };
     };
