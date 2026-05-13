@@ -41,6 +41,14 @@ def run_tmux_cmd(cmd, timeout=5):
         logging.error(f"Unexpected error running tmux command: {e}")
         raise
 
+def set_agent_id(pane_id, agent_id, socket_path=None):
+    cmd = ["tmux"]
+    if socket_path:
+        cmd.extend(["-S", socket_path])
+    cmd.extend(["set-option", "-p", "-t", pane_id, "@agent_id", agent_id])
+    enqueue_tmux_cmd(cmd)
+
+
 def set_agent_uuid(pane_id, uuid, socket_path=None):
     cmd = ["tmux"]
     if socket_path:
@@ -48,23 +56,25 @@ def set_agent_uuid(pane_id, uuid, socket_path=None):
     cmd.extend(["set-option", "-p", "-t", pane_id, "@agent_uuid", uuid])
     enqueue_tmux_cmd(cmd)
 
+
 def list_panes():
-    """Lists panes with ID, agent name, UUID, type, cmd, and active state."""
+    """Lists panes with ID, agent identity, type, cmd, and active state."""
     try:
-        out = run_tmux_cmd(["list-panes", "-a", "-F", "#{pane_id}|#{@agent_name}|#{@agent_uuid}|#{@agent_type}|#{@agent_cmd}|#{pane_active}"])
+        out = run_tmux_cmd(["list-panes", "-a", "-F", "#{pane_id}|#{@agent_name}|#{@agent_id}|#{@agent_uuid}|#{@agent_type}|#{@agent_cmd}|#{pane_active}"])
         panes = []
         if out:
             for line in out.split("\n"):
                 parts = line.split('|')
-                if len(parts) < 6:
+                if len(parts) < 7:
                     continue
                 pane_info = {
                     "pane_id": parts[0],
                     "agent_name": parts[1] if parts[1] else None,
-                    "agent_uuid": parts[2] if parts[2] else None,
-                    "agent_type": parts[3] if parts[3] else "unknown",
-                    "agent_cmd": parts[4] if parts[4] else None,
-                    "pane_active": (parts[5] == "1")
+                    "agent_id": parts[2] if parts[2] else (parts[3] if parts[3] else None),
+                    "agent_uuid": parts[3] if parts[3] else None,
+                    "agent_type": parts[4] if parts[4] else "unknown",
+                    "agent_cmd": parts[5] if parts[5] else None,
+                    "pane_active": (parts[6] == "1")
                 }
                 panes.append(pane_info)
         return panes

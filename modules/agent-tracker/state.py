@@ -70,6 +70,7 @@ def init_state() -> None:
     for pane in panes:
         pane_id = pane["pane_id"]
         agent_name = pane["agent_name"]
+        agent_id = pane.get("agent_id")
         agent_uuid = pane["agent_uuid"]
         agent_type = pane.get("agent_type", "unknown")
         agent_cmd = pane.get("agent_cmd")
@@ -82,7 +83,7 @@ def init_state() -> None:
                     session = info["session"]
                     agent_pid = proc["pid"]
                     discovered_cmd = proc["comm"]
-                    resolved_uuid = agent_uuid or str(uuid.uuid4())
+                    resolved_agent_id = agent_id or agent_uuid or str(uuid.uuid4())
                     with state_lock:
                         state[agent_name] = {
                             "session": session,
@@ -92,18 +93,20 @@ def init_state() -> None:
                             "wrapper_pid": None,
                             "status": "idle",
                             "waiting_approval": False,
-                            "uuid": resolved_uuid,
+                            "agent_id": resolved_agent_id,
+                            "uuid": resolved_agent_id,
                             "agent_type": agent_type,
                             "agent_cmd": agent_cmd or discovered_cmd or "unknown",
                             "pending_notifications": []
                         }
 
-                    # If we didn't have a UUID in tmux, persist the new one
-                    if not agent_uuid:
-                        logging.info(f"Generated new UUID {resolved_uuid} for recovered agent {agent_name}")
-                        tmux_util.set_agent_uuid(pane_id, resolved_uuid)
+                    # If we didn't have an agent_id in tmux, persist the recovered one.
+                    if not agent_id:
+                        logging.info(f"Generated/recovered agent ID {resolved_agent_id} for agent {agent_name}")
+                        tmux_util.set_agent_id(pane_id, resolved_agent_id)
+                        tmux_util.set_agent_uuid(pane_id, resolved_agent_id)
 
-                    logging.info(f"Recovered agent {agent_name} with PID {agent_pid} and UUID {resolved_uuid}")
+                    logging.info(f"Recovered agent {agent_name} with PID {agent_pid} and agent ID {resolved_agent_id}")
             except Exception as e:
                 logging.error(f"Error recovering agent {agent_name}: {e}")
 

@@ -298,10 +298,11 @@ def main():
     elif args.subcommand == "whoami":
         info = call_rpc("whoami")
         if info:
-            print(f"Name:    {info.get('name')}")
-            print(f"UUID:    {info.get('uuid')}")
-            print(f"PID:     {info.get('pid')}")
-            print(f"Pane ID: {info.get('pane_id')}")
+            print(f"Name:     {info.get('name')}")
+            print(f"Agent ID: {info.get('agent_id') or info.get('uuid')}")
+            print(f"UUID:     {info.get('uuid')}")
+            print(f"PID:      {info.get('pid')}")
+            print(f"Pane ID:  {info.get('pane_id')}")
 
     elif args.subcommand == "unregister":
         params = {}

@@ -273,8 +273,9 @@ We want to preserve these current behaviors:
 
 Implementation status:
 - P0: done
-- P1: done in commit following `f28ad56` (lazy-start/bootstrap, shared startup lock, stale-socket handling under lock, Nix-derived socket path propagation to ctl/systemd/wrapper/hooks)
-- P2+: pending
+- P1: done in `e992949` (lazy-start/bootstrap, shared startup lock, stale-socket handling under lock, Nix-derived socket path propagation to ctl/systemd/wrapper/hooks)
+- P2: partially done in next commit after `e992949` (stable `agent_id` generation/export, register payload/storage, tmux metadata, and tracker exposure landed; heartbeat/re-register work still pending)
+- P3+: pending
 
 ### P0: protocol + invariants doc
 - write this design
@@ -286,13 +287,13 @@ Implementation status:
 - [done] make wrapper/ctl resilient when tracker is unavailable
 
 ### P2: wrapper identity + lifecycle
-- wrapper generates `agent_id`
-- wrapper exports env vars
-- wrapper registers by `agent_id`
-- wrapper writes tmux metadata (`@agent_id`, `@agent_name`, ...)
-- wrapper starts/stops the heartbeat helper
-- wrapper unregisters on exit/pane teardown path
-- wrapper/heartbeat helper perform re-register upsert on tracker restart
+- [done] wrapper generates `agent_id`
+- [done] wrapper exports env vars
+- [done] wrapper includes `agent_id` in register payload
+- [done] wrapper writes tmux metadata (`@agent_id`, `@agent_name`, ...)
+- [pending] wrapper starts/stops the heartbeat helper
+- [done] wrapper unregisters on exit/pane teardown path
+- [pending] wrapper/heartbeat helper perform re-register upsert on tracker restart
 
 ### P3: hooks switch to explicit identity
 - replace `/proc`-based caller identification in hooks

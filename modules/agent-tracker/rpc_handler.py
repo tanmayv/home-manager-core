@@ -13,7 +13,7 @@ import struct
 BUFFER_SIZE = 4096
 
 def handle_register(params: dict) -> str:
-    """Handles agent registration. Generates a UUID for the agent."""
+    """Handles agent registration, accepting a stable agent_id when provided."""
     session = params.get("session")
     tmux_pane = params.get("tmux_pane")
     wrapper_pid = params.get("wrapper_pid")
@@ -21,6 +21,7 @@ def handle_register(params: dict) -> str:
     name = params.get("name")
     agent_type = params.get("agent_type", "unknown")
     agent_cmd = params.get("agent_cmd", "unknown")
+    agent_id = params.get("agent_id") or str(uuid.uuid4())
     
     if not (session and tmux_pane and wrapper_pid and tmux_socket):
         raise ValueError("Invalid params")
@@ -47,7 +48,6 @@ def handle_register(params: dict) -> str:
             num += 1
         agent_name = f"{session}-agent-{num}"
         
-    agent_uuid = str(uuid.uuid4())
     state.set_agent(agent_name, {
         "session": session, 
         "tmux_pane": tmux_pane, 
@@ -56,14 +56,16 @@ def handle_register(params: dict) -> str:
         "pid": None,
         "status": "idle",
         "waiting_approval": False,
-        "uuid": agent_uuid,
+        "agent_id": agent_id,
+        "uuid": agent_id,
         "agent_type": agent_type,
         "agent_cmd": agent_cmd,
         "pending_notifications": []
     })
     
-    # Persist UUID in tmux to survive tracker restarts
-    tmux_util.set_agent_uuid(tmux_pane, agent_uuid, tmux_socket)
+    # Persist both new and legacy identity keys in tmux during migration.
+    tmux_util.set_agent_id(tmux_pane, agent_id, tmux_socket)
+    tmux_util.set_agent_uuid(tmux_pane, agent_id, tmux_socket)
     
     return agent_name
 
@@ -376,6 +378,7 @@ def handle_whoami(params: dict, caller_pid: int = None) -> dict:
         
     return {
         "name": agent_name,
+        "agent_id": info.get("agent_id") or info.get("uuid"),
         "uuid": info.get("uuid"),
         "pid": info.get("pid"),
         "pane_id": info.get("tmux_pane")
