@@ -31,7 +31,7 @@ try:
                 try:
                     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                     s.settimeout(1.0)
-                    s.connect(os.path.expanduser("~/.cache/agent-tracker.sock"))
+                    s.connect(os.environ.get("AGENT_TRACKER_SOCKET", os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "agent-tracker", "agent-tracker.sock")))
                     s.sendall(json.dumps({"jsonrpc": "2.0", "method": "update_agent", "params": {"agent_name": agent_name, "waiting_approval": True}, "id": 1}).encode())
                     s.close()
                     subprocess.run(["tmux-status-refresh"], capture_output=True)

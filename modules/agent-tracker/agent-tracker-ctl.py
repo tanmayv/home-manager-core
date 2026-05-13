@@ -1,11 +1,68 @@
 import argparse
+import fcntl
 import json
 import os
+import shlex
 import socket
 import subprocess
 import sys
+import time
 
-SOCKET_PATH = os.environ.get("AGENT_TRACKER_SOCKET", os.path.expanduser("~/.cache/agent-tracker.sock"))
+CACHE_DIR = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "agent-tracker")
+SOCKET_PATH = os.environ.get("AGENT_TRACKER_SOCKET", os.path.join(CACHE_DIR, "agent-tracker.sock"))
+LOCK_PATH = os.path.join(CACHE_DIR, "agent-tracker.lock")
+DEFAULT_STARTUP_TIMEOUT = 5.0
+
+
+def _can_connect() -> bool:
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(0.5)
+        s.connect(SOCKET_PATH)
+        s.close()
+        return True
+    except OSError:
+        return False
+
+
+def ensure_tracker_running(timeout: float = DEFAULT_STARTUP_TIMEOUT) -> bool:
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    if _can_connect():
+        return True
+
+    daemon_cmd = os.environ.get("AGENT_TRACKER_DAEMON")
+    if not daemon_cmd:
+        return False
+
+    with open(LOCK_PATH, "a+") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+
+        if _can_connect():
+            return True
+
+        if os.path.exists(SOCKET_PATH) and not _can_connect():
+            try:
+                os.remove(SOCKET_PATH)
+            except FileNotFoundError:
+                pass
+
+        if not _can_connect():
+            subprocess.Popen(
+                shlex.split(daemon_cmd),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if _can_connect():
+            return True
+        time.sleep(0.1)
+
+    return _can_connect()
+
 
 def call_rpc(method, params={}):
     try:
@@ -33,6 +90,8 @@ def main():
 
     subparsers.add_parser("list", help="List agents in JSON format")
     subparsers.add_parser("status-bar", help="List agents for status bar")
+    subparsers.add_parser("ensure-running", help="Ensure the tracker daemon is running")
+    subparsers.add_parser("daemon", help="Run the tracker daemon in the foreground")
 
     send_parser = subparsers.add_parser("send-message", help="Send message to agent")
     send_parser.add_argument("agent_name", help="Target agent name")
@@ -65,6 +124,23 @@ def main():
     group.add_argument("--pane", help="Tmux pane ID to unregister")
 
     args = parser.parse_args()
+
+    if args.subcommand == "daemon":
+        daemon_cmd = os.environ.get("AGENT_TRACKER_DAEMON")
+        if not daemon_cmd:
+            print("Error: AGENT_TRACKER_DAEMON is not configured.", file=sys.stderr)
+            sys.exit(1)
+        os.execvp(shlex.split(daemon_cmd)[0], shlex.split(daemon_cmd))
+
+    if args.subcommand == "ensure-running":
+        if ensure_tracker_running():
+            sys.exit(0)
+        print("Error: failed to start or connect to agent-tracker.", file=sys.stderr)
+        sys.exit(1)
+
+    if args.subcommand and not ensure_tracker_running():
+        print("Error: failed to start or connect to agent-tracker.", file=sys.stderr)
+        sys.exit(1)
 
     if args.subcommand == "list":
         agents = call_rpc("list")

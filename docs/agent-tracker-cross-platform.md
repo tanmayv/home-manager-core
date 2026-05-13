@@ -271,14 +271,19 @@ We want to preserve these current behaviors:
 
 ## Proposed phases
 
+Implementation status:
+- P0: done
+- P1: done in commit following `f28ad56` (lazy-start/bootstrap, shared startup lock, stale-socket handling under lock, Nix-derived socket path propagation to ctl/systemd/wrapper/hooks)
+- P2+: pending
+
 ### P0: protocol + invariants doc
 - write this design
 - define env vars, tmux metadata, RPC identity precedence, storage paths
 
 ### P1: lazy-start/bootstrap contract
-- implement `ensure_tracker_running()`
-- define stale socket + lockfile + race handling
-- make wrapper/ctl resilient when tracker is unavailable
+- [done] implement `ensure_tracker_running()`
+- [done] define stale socket + lockfile + race handling
+- [done] make wrapper/ctl resilient when tracker is unavailable
 
 ### P2: wrapper identity + lifecycle
 - wrapper generates `agent_id`

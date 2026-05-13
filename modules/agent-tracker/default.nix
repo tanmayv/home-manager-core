@@ -13,6 +13,9 @@ let
     '';
   };
   palette = import ../palette.nix;
+  cacheHome = config.xdg.cacheHome or "${config.home.homeDirectory}/.cache";
+  socketPath = "${cacheHome}/agent-tracker/agent-tracker.sock";
+  daemonCmd = "${pkgs.python3}/bin/python3 ${agentTrackerFiles}/agent-tracker.py";
 in
 {
   imports = [
@@ -24,6 +27,9 @@ in
       home.packages = [
         (pkgs.writeScriptBin "agent-tracker-ctl" ''
           #!${pkgs.python3}/bin/python3
+          import os
+          os.environ.setdefault("AGENT_TRACKER_SOCKET", "${socketPath}")
+          os.environ.setdefault("AGENT_TRACKER_DAEMON", "${daemonCmd}")
           ${builtins.readFile ./agent-tracker-ctl.py}
         '')
       ] ++ (lib.mapAttrsToList (alias: path: 
@@ -40,7 +46,8 @@ in
           Description = "Agent Tracker Daemon";
         };
         Service = {
-          ExecStart = "${pkgs.python3}/bin/python3 ${agentTrackerFiles}/agent-tracker.py";
+          Environment = [ "AGENT_TRACKER_SOCKET=${socketPath}" ];
+          ExecStart = daemonCmd;
           Restart = "always";
         };
         Install = {

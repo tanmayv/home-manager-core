@@ -1,3 +1,4 @@
+import fcntl
 import logging
 import os
 import socket
@@ -11,29 +12,47 @@ import rpc_handler
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', stream=sys.stderr)
 
-SOCKET_PATH = os.environ.get("AGENT_TRACKER_SOCKET", os.path.expanduser("~/.cache/agent-tracker.sock"))
+CACHE_DIR = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "agent-tracker")
+SOCKET_PATH = os.environ.get("AGENT_TRACKER_SOCKET", os.path.join(CACHE_DIR, "agent-tracker.sock"))
+LOCK_PATH = os.path.join(CACHE_DIR, "agent-tracker.lock")
+
+
+def _can_connect() -> bool:
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(0.5)
+        s.connect(SOCKET_PATH)
+        s.close()
+        return True
+    except OSError:
+        return False
+
 
 def main():
     os.makedirs(os.path.dirname(SOCKET_PATH), exist_ok=True)
-    try:
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.connect(SOCKET_PATH)
-        logging.error(f"Another instance of agent-tracker is already listening on {SOCKET_PATH}")
-        sys.exit(1)
-    except ConnectionRefusedError:
-        logging.info(f"Stale socket found at {SOCKET_PATH}, removing it.")
-        os.remove(SOCKET_PATH)
-    except FileNotFoundError:
-        pass
+
+    with open(LOCK_PATH, "a+") as lock_file:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+
+        if _can_connect():
+            logging.error(f"Another instance of agent-tracker is already listening on {SOCKET_PATH}")
+            sys.exit(1)
+
+        if os.path.exists(SOCKET_PATH) and not _can_connect():
+            logging.info(f"Removing stale socket at {SOCKET_PATH}")
+            try:
+                os.remove(SOCKET_PATH)
+            except FileNotFoundError:
+                pass
+
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server.bind(SOCKET_PATH)
+        server.listen(10)
 
     state.init_state()
     
     # Start background monitor thread
     threading.Thread(target=monitor.background_monitor, daemon=True).start()
-
-    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    server.bind(SOCKET_PATH)
-    server.listen(10)
     
     logging.info(f"Agent Tracker listening on {SOCKET_PATH}")
 
