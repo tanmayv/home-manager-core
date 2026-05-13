@@ -69,7 +69,29 @@ def background_monitor():
             
             wrapper_alive = wrapper_pid and is_process_alive(wrapper_pid)
             child_alive = pid and is_process_alive(pid)
-            
+
+            # Update child PID if not already known, or recover if the tracked child died
+            if wrapper_pid and (not info.get("pid") or (pid and not child_alive)):
+                try:
+                    out = subprocess.check_output(["pgrep", "-P", str(wrapper_pid)], timeout=1).decode("utf-8").strip()
+                    if out:
+                        actual_pid = int(out.split()[0])
+                        state.update_agent(name, pid=actual_pid)
+                        pid = actual_pid
+                        child_alive = is_process_alive(actual_pid)
+                except Exception as e:
+                    logging.debug(f"Failed to pgrep child PID for {name}: {e}")
+
+            # If wrapper/child tracking is stale, fall back to inspecting the pane's tty.
+            if pane_id and ((wrapper_pid and not wrapper_alive and not child_alive) or (pid and not child_alive)):
+                proc = state.discover_agent_process(pane_id, info.get("agent_cmd"))
+                if proc:
+                    logging.info(f"Recovered live pane process for {name}: PID {proc['pid']} ({proc['comm']})")
+                    state.update_agent(name, pid=proc["pid"], wrapper_pid=None)
+                    pid = proc["pid"]
+                    child_alive = True
+                    wrapper_pid = None
+
             if wrapper_pid:
                 if not wrapper_alive and not child_alive:
                     to_remove.append(name)
@@ -85,16 +107,6 @@ def background_monitor():
                 elif pid and not child_alive:
                     to_remove.append(name)
                     continue
-
-            # Update child PID if not already known
-            if not info.get("pid") and wrapper_pid:
-                try:
-                    out = subprocess.check_output(["pgrep", "-P", str(wrapper_pid)], timeout=1).decode("utf-8").strip()
-                    if out:
-                        actual_pid = int(out.split()[0])
-                        state.update_agent(name, pid=actual_pid)
-                except Exception as e:
-                    logging.debug(f"Failed to pgrep child PID for {name}: {e}")
             
             # Flush inbox to file
             inbox = info.get("inbox", [])

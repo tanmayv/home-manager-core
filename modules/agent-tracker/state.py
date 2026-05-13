@@ -9,6 +9,60 @@ import tmux_util
 state = {}
 state_lock = threading.Lock()
 
+TRANSIENT_COMMS = {
+    "ps", "grep", "pgrep", "ls", "cat", "sleep", "which", "sh", "bash", "zsh",
+    "fish", "tmux", "home-manager", "nix", "env"
+}
+
+
+def discover_agent_process(pane_id: str, agent_cmd: str | None = None) -> dict | None:
+    """Best-effort discovery of the long-lived agent process attached to a pane."""
+    info = tmux_util.get_pane_info(pane_id)
+    if not info:
+        return None
+
+    tty = info["tty"]
+    shell_pid = info["pid"]
+    pts_name = tty.replace("/dev/", "")
+
+    try:
+        out = subprocess.check_output(
+            ["ps", "-t", pts_name, "-o", "pid=,ppid=,comm=,args="],
+            timeout=2,
+        ).decode("utf-8").strip()
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return None
+
+    proc_list = []
+    for line in out.split("\n"):
+        parts = line.strip().split(None, 3)
+        if len(parts) < 3:
+            continue
+        pid = int(parts[0])
+        ppid = int(parts[1])
+        comm = parts[2]
+        args = parts[3] if len(parts) > 3 else comm
+        proc_list.append({"pid": pid, "ppid": ppid, "comm": comm, "args": args})
+
+    candidates = [p for p in proc_list if p["pid"] != shell_pid and p["comm"] not in TRANSIENT_COMMS]
+    if not candidates:
+        return None
+
+    expected_patterns = {
+        "jetski": ["cli", "jetski"],
+        "gemini": ["gemini"],
+        "pi": ["pi", "pi-coding-agent", "@earendil-works/pi-coding-agent"],
+    }.get(agent_cmd, [])
+
+    if expected_patterns:
+        for proc in reversed(candidates):
+            haystack = f'{proc["comm"]} {proc["args"]}'.lower()
+            if any(pattern in haystack for pattern in expected_patterns):
+                return proc
+
+    return candidates[-1]
+
+
 def init_state() -> None:
     """Recovers existing agents by querying tmux panes."""
     logging.info("Initializing state from tmux panes...")
@@ -23,63 +77,33 @@ def init_state() -> None:
             logging.info(f"Found recovered agent: {agent_name} of type {agent_type} in pane {pane_id}")
             try:
                 info = tmux_util.get_pane_info(pane_id)
-                if info:
-                    tty = info["tty"]
+                proc = discover_agent_process(pane_id, agent_cmd)
+                if info and proc:
                     session = info["session"]
-                    shell_pid = info["pid"]
-                    
-                    pts_name = tty.replace("/dev/", "")
-                    try:
-                        out = subprocess.check_output(["ps", "-t", pts_name, "-o", "pid=,comm="]).decode("utf-8").strip()
-                        lines = [line.strip().split(None, 1) for line in out.split("\n") if line.strip()]
-                        proc_list = [(int(parts[0]), parts[1]) for parts in lines if len(parts) == 2]
-                    except subprocess.CalledProcessError:
-                        proc_list = []
-                        out = "ERROR: ps failed"
-                        
-                    agent_pid = None
-                    discovered_cmd = None
-                    transient_comms = ["ps", "grep", "pgrep", "ls", "cat", "sleep", "which", "sh", "bash", "home-manager", "nix"]
-                    
-                    cmd_mapping = {"jetski": ["cli"], "gemini": ["gemini"]}
-                    expected_comms = cmd_mapping.get(agent_cmd, []) if agent_cmd else []
-                    
-                    for pid, comm in proc_list:
-                        if pid != shell_pid and comm not in transient_comms:
-                            if expected_comms:
-                                if comm in expected_comms:
-                                    agent_pid = pid
-                                    discovered_cmd = comm
-                                    break
-                            else:
-                                # Fallback to heuristic if no expected commands defined
-                                agent_pid = pid
-                                discovered_cmd = comm
-                                break
-                            
-                    if agent_pid:
-                        resolved_uuid = agent_uuid or str(uuid.uuid4())
-                        with state_lock:
-                            state[agent_name] = {
-                                "session": session,
-                                "tmux_pane": pane_id,
-                                "pid": agent_pid,
-                                "tmux_socket": "", # Fallback to default
-                                "wrapper_pid": None,
-                                "status": "idle",
-                                "waiting_approval": False,
-                                "uuid": resolved_uuid,
-                                "agent_type": agent_type,
-                                "agent_cmd": agent_cmd or discovered_cmd or "unknown",
-                                "pending_notifications": []
-                            }
-                        
-                        # If we didn't have a UUID in tmux, persist the new one
-                        if not agent_uuid:
-                            logging.info(f"Generated new UUID {resolved_uuid} for recovered agent {agent_name}")
-                            tmux_util.set_agent_uuid(pane_id, resolved_uuid)
-                            
-                        logging.info(f"Recovered agent {agent_name} with PID {agent_pid} and UUID {resolved_uuid}")
+                    agent_pid = proc["pid"]
+                    discovered_cmd = proc["comm"]
+                    resolved_uuid = agent_uuid or str(uuid.uuid4())
+                    with state_lock:
+                        state[agent_name] = {
+                            "session": session,
+                            "tmux_pane": pane_id,
+                            "pid": agent_pid,
+                            "tmux_socket": "", # Fallback to default
+                            "wrapper_pid": None,
+                            "status": "idle",
+                            "waiting_approval": False,
+                            "uuid": resolved_uuid,
+                            "agent_type": agent_type,
+                            "agent_cmd": agent_cmd or discovered_cmd or "unknown",
+                            "pending_notifications": []
+                        }
+
+                    # If we didn't have a UUID in tmux, persist the new one
+                    if not agent_uuid:
+                        logging.info(f"Generated new UUID {resolved_uuid} for recovered agent {agent_name}")
+                        tmux_util.set_agent_uuid(pane_id, resolved_uuid)
+
+                    logging.info(f"Recovered agent {agent_name} with PID {agent_pid} and UUID {resolved_uuid}")
             except Exception as e:
                 logging.error(f"Error recovering agent {agent_name}: {e}")
 

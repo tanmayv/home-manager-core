@@ -42,8 +42,26 @@
           agent_name=$(python3 -c "import socket, json, os, sys; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.connect(os.path.expanduser('~/.cache/agent-tracker.sock')); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'register', 'params': {'session': sys.argv[1], 'tmux_pane': sys.argv[2], 'wrapper_pid': int(sys.argv[3]), 'tmux_socket': sys.argv[4], 'name': sys.argv[5], 'agent_type': sys.argv[6], 'agent_cmd': sys.argv[7]}, 'id': 1}).encode()); s.shutdown(socket.SHUT_WR); resp = s.recv(1024); data = json.loads(resp.decode()); print(data.get(\"result\", \"\"))" "$session_name" "$pane_id" "$wrapper_pid" "$tmux_socket" "$suggested_name" "$agent_type" "$(basename "$cmd")" 2>>/tmp/wrapper.log)
           
           cleanup() {
+            tty=$(tmux display-message -p -t "''${pane_id}" '#{pane_tty}' 2>/dev/null || true)
+            shell_pid=$(tmux display-message -p -t "''${pane_id}" '#{pane_pid}' 2>/dev/null || true)
+
+            if [[ -n "$tty" && -n "$shell_pid" ]]; then
+              pts_name="''${tty#/dev/}"
+              if ps -t "$pts_name" -o pid=,comm=,args= 2>/dev/null | \
+                awk -v shell_pid="$shell_pid" '
+                  $1 != shell_pid && $2 !~ /^(ps|grep|pgrep|ls|cat|sleep|which|sh|bash|zsh|fish|tmux|home-manager|nix|env)$/ {
+                    print; found=1; exit
+                  }
+                  END { exit(found ? 0 : 1) }
+                '; then
+                tmux-status-refresh
+                return
+              fi
+            fi
+
             tmux set-option -p -u -t "''${pane_id}" @agent_name
             tmux set-option -p -u -t "''${pane_id}" @agent_type
+            tmux set-option -p -u -t "''${pane_id}" @agent_cmd
             tmux select-pane -t "''${pane_id}" -T ""
             tmux-status-refresh
           }
