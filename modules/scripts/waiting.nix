@@ -6,6 +6,7 @@
       runtimeInputs = with pkgs; [
         coreutils
         bash
+        python3
       ];
 
       text = ''
@@ -15,7 +16,11 @@
           exit 0
         fi
 
-        UUID=$(cat /proc/sys/kernel/random/uuid)
+        UUID=$(python3 - <<'PY'
+import uuid
+print(uuid.uuid4())
+PY
+)
         echo "Waiting for UUID: $UUID"
         
         SIGNAL_DIR="$HOME/.tmux_signals"

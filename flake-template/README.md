@@ -15,7 +15,8 @@ nix flake init -t github:tanmayv/home-manager-core
 ## Configuration
 
 1. Open `setup.nix` and set your `username`.
-2. Customize toggles and search paths as needed.
+2. Set `system` appropriately (for example, `aarch64-darwin` on Apple Silicon macOS).
+3. Customize toggles and search paths as needed.
 
 ## Activation
 

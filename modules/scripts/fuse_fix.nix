@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 
 let
   fuse_fix = pkgs.writeScriptBin "fuse_fix" ''
@@ -60,8 +60,10 @@ let
   '';
 in
 {
-  home.packages = [
-    fuse_fix
-    pkgs.gdb # The script requires gdb
-  ];
+  config = lib.mkIf pkgs.stdenv.isLinux {
+    home.packages = [
+      fuse_fix
+      pkgs.gdb # The script requires gdb
+    ];
+  };
 }

@@ -22,8 +22,12 @@
 
         # Check once a day
         if [ -f "$CACHE_FILE" ]; then
-          # Fallback to 0 if stat fails
-          last_check=$(stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0)
+          # Fallback to 0 if stat fails, with GNU/BSD stat compatibility.
+          if stat -c %Y "$CACHE_FILE" >/dev/null 2>&1; then
+            last_check=$(stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0)
+          else
+            last_check=$(stat -f %m "$CACHE_FILE" 2>/dev/null || echo 0)
+          fi
           now=$(date +%s)
           if [ $((now - last_check)) -lt 86400 ]; then
             exit 0

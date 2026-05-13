@@ -1,4 +1,5 @@
 {
+  system = "x86_64-linux"; # e.g. "aarch64-darwin" for Apple Silicon macOS
   username = "your-username";
   config-location = "~/.config/home-manager";
   local_agent_knowledge_dir = "~/agent_knowledge";

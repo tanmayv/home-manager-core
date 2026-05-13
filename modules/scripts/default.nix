@@ -1,4 +1,4 @@
-{ pkgs, userSettings, ... }:
+{ pkgs, userSettings ? {}, ... }:
 
 let
   enableAiWorkflow = userSettings.enable-ai-workflow or false;

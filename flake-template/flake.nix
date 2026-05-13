@@ -23,12 +23,15 @@
 
   outputs = { nixpkgs, home-manager, minimal-cloudtop, extensions, ... }@inputs:
     let
-      system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
-
       baseSettings = import ./setup.nix;
+      system = baseSettings.system or "x86_64-linux";
+      pkgs = nixpkgs.legacyPackages.${system};
+      enableAiAgents = !pkgs.stdenv.isDarwin;
+
       userSettings = baseSettings // {
         enable-ai-workflow = true;
+        # agent-tracker currently relies on Linux /proc + systemd user services.
+        enable-agent-tracker = (baseSettings.enable-agent-tracker or false) && enableAiAgents;
       };
     in {
       homeConfigurations.core = home-manager.lib.homeManagerConfiguration {
@@ -43,9 +46,11 @@
         modules = [ 
           minimal-cloudtop.homeManagerModules.default
           extensions.homeManagerModules.tasks
+        ] ++ (if enableAiAgents then [
           extensions.homeManagerModules.ai-agents
-
-          ({ pkgs, ... }: {
+        ] else [ ]) ++ [
+          ({ lib, pkgs, ... }: {
+            services.agent-tracker.enable = lib.mkForce (userSettings.enable-agent-tracker or false);
             home.username = userSettings.username or "your-username";
             home.homeDirectory = if pkgs.stdenv.isLinux then "/home/${userSettings.username or "your-username"}" else "/Users/${userSettings.username or "your-username"}";
             home.stateVersion = "25.11";

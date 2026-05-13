@@ -14,11 +14,7 @@
     };
   };
 
-  outputs = inputs@{ nixpkgs, ... }:
-    let
-      system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
-    in {
+  outputs = inputs@{ nixpkgs, ... }: {
       homeManagerModules.default = {
         imports = [ ./home.nix ];
         _module.args.inputs = inputs;
