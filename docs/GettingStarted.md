@@ -39,117 +39,26 @@ nix-channel --add https://nixos.org/channels/nixpkgs-unstable && nix-channel --u
 
 ## 2. Installation as a Flake Input (Recommended)
 
-The recommended way to use Minimal Cloudtop is to import it as a module into your personal dotfiles Flake. This keeps your personal configurations neatly separated from the upstream core logic.
+The recommended way to use Minimal Cloudtop is to bootstrap a starter configuration using Flake templates. This keeps your personal configurations neatly separated from the upstream core logic.
 
-### Create your Personal Flake
-Create the Home Manager configuration directory:
+### Initialize Starter Configuration
+Create the Home Manager configuration directory and initialize the Google3 template:
 
 ```bash
 mkdir -p ~/.config/home-manager
 cd ~/.config/home-manager
+nix flake init -t github:tanmayv/home-manager-core#default
 ```
 
-Create a `setup.nix` to configure your features, replacing `your-ldap` with your LDAP:
+### Customize Settings
+Open `setup.nix` and replace `your-username` with your actual LDAP username:
 
 ```nix
 {
   username = "your-ldap";
   config-location = "~/.config/home-manager";
   
-  # Features
-  enable-ai-workflow = true;
-  ai_features = {
-    enable_ai_ssa_creator_skill = true;
-    enable_tmux_based_agent_comms = true;
-    enable_agent_knowledge = true;
-    enable_home_manager_skill = true;
-  };
-
-  enable-neovim = true;
-  enable-tasks = true;
-  enable-agent-tracker = true;
-  enable-smart-cd = true;
-}
-```
-
-Create a `flake.nix` with the following content:
-
-```nix
-{
-  description = "User Home Manager configuration";
-
-  inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
-    home-manager = {
-      url = "github:nix-community/home-manager/release-25.11";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-    
-    minimal-cloudtop = {
-      url = "sso://user/tanmayvijay/home-manager-minimal-ai";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    extensions = {
-      url = "sso://user/tanmayvijay/home-manager-extensions";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    nvim-nix = {
-      url = "sso://user/tanmayvijay/nvim-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    tasks-nvim = {
-      url = "github:tanmayv/tasks.nvim";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-  };
-
-  outputs = { nixpkgs, home-manager, minimal-cloudtop, extensions, ... }@inputs:
-    let
-      system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
-      userSettings = import ./setup.nix;
-      user = userSettings.username;
-    in {
-      homeConfigurations.cloudtop = home-manager.lib.homeManagerConfiguration {
-        inherit pkgs;
-
-        extraSpecialArgs = { 
-          inherit userSettings;
-          inputs = inputs // minimal-cloudtop.inputs;
-        };
-
-        modules = [ 
-          minimal-cloudtop.homeManagerModules.default
-          extensions.homeManagerModules.google3-zsh
-          extensions.homeManagerModules.google3-bash
-          extensions.homeManagerModules.google-agents
-          extensions.homeManagerModules.google-codesearch
-          extensions.homeManagerModules.google3-tmux
-          extensions.homeManagerModules.google3-ai
-          extensions.homeManagerModules.google3-scripts
-          extensions.homeManagerModules.google3-hg
-
-          ({ ... }: {
-            services.agent-tracker.enable = userSettings.enable-agent-tracker or false;
-            services.agent-tracker.enableTmuxIntegration = true;
-            
-            programs.tmux.sessionizerSearchPaths = [ "/google/src/cloud/$USER" "~" ];
-            programs.tmux.sessionizerDisplayReplacements = {
-              "/google/src/cloud/$USER" = "[Fig]";
-            };
-            programs.tasks.workspaceSearchPaths = [ "/google/src/cloud/$USER" ];
-          })
-
-          ({ pkgs, ... }: {
-            home.username = user;
-            home.homeDirectory = "/usr/local/google/home/${user}";
-          })
-        ];
-      };
-    };
+  # Customize features as needed...
 }
 ```
 

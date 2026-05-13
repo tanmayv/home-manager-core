@@ -69,7 +69,17 @@ We support a **User-Visible Knowledge Base** (markdown notes in `~/agent_knowled
 
 ## Installation & Setup
 
-Please refer to [docs/GettingStarted.md](docs/GettingStarted.md) for detailed installation instructions.
+### Quick Start (Pure Starter)
+
+You can instantly bootstrap a clean, standalone starter configuration using Flake templates:
+
+```bash
+mkdir -p ~/.config/home-manager
+cd ~/.config/home-manager
+nix flake init -t github:tanmayv/home-manager-core#pure
+```
+
+For Google3/Cloudtop specific setup or detailed instructions, please refer to [docs/GettingStarted.md](docs/GettingStarted.md).
 
 ### Keeping Up to Date
 Minimal Cloudtop includes an automatic update checker. Once a day, it will notify you if a new `stable` version is available and offer to automatically rebase your changes and rebuild your environment. You can also run `check-for-update` manually at any time.
