@@ -1,7 +1,10 @@
 { pkgs, lib, config, userSettings, ... }:
 
 {
-  home.file.".config/git/ignore".text = ''
-    .jetskicli
-  '';
+  programs.git = {
+    enable = lib.mkDefault true;
+    ignores = [
+      ".jetskicli"
+    ];
+  };
 }
