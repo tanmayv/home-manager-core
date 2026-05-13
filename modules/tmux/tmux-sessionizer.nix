@@ -211,7 +211,11 @@ pkgs.writeScriptBin "tmux-sessionizer" ''
               fi
               path="''${path/#\~/$HOME}"
 
-              [[ -d "$path" ]] && find "$path" -mindepth 1 -maxdepth "''${depth:-''${TS_MAX_DEPTH:-1}}" -name ".*" -prune -o -type d -print0
+              if [[ "$depth" == "0" ]]; then
+                  [[ -d "$path" ]] && printf "%s\0" "$path"
+              else
+                  [[ -d "$path" ]] && find "$path" -mindepth 1 -maxdepth "''${depth:-''${TS_MAX_DEPTH:-1}}" -name ".*" -prune -o -type d -print0
+              fi
           done
       ) | awk -v RS='\0' -v ORS='\0' -F/ 'length($NF) <= ${toString maxDirLength}' | (
           if stat -c "%Y %n" . >/dev/null 2>&1; then

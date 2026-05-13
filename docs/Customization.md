@@ -71,6 +71,8 @@ To update, simply run `nix flake update` in your personal repository.
 | `local_agent_knowledge_create_command` | Optional command override for creating new notes. | `""` |
 | `editor` | The default CLI editor used by all system tools. | `"nvim"` |
 | `preferred-scripting-language` | The preferred language for new CLI tools (NuShell, Python, Bash). | `"NuShell"` |
+| `sessionizerMaxDirLength` | Maximum directory name length (basename) to include in tmux-sessionizer search. | `25` |
+| `sessionizerSearchPaths` | Paths to search for sessions in tmux-sessionizer. Use `:depth` suffix (e.g., `:0` for exact path). | `[ "~" ]` |
 
 ### Feature Toggles
 

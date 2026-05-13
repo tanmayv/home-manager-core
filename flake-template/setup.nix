@@ -19,6 +19,8 @@
   enable-smart-cd = true;
   smart-cd-max-parents = 4;
   enable-cd-verbose = true;
+  sessionizerMaxDirLength = 25;
+  sessionizerSearchPaths = [ "~" ];
 
   # Git/CitC Features
   auto-switch-workspace-on-hgd = true;

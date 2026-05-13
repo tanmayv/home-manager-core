@@ -139,12 +139,12 @@ in
     };
     sessionizerMaxDirLength = mkOption {
       type = types.int;
-      default = 25;
+      default = userSettings.sessionizerMaxDirLength or 25;
       description = "Maximum directory name length to include in tmux-sessionizer search";
     };
     sessionizerSearchPaths = mkOption {
       type = types.listOf types.str;
-      default = [ "~" ];
+      default = userSettings.sessionizerSearchPaths or [ "~" ];
       description = "Paths to search for sessions in tmux-sessionizer.";
     };
     sessionizerDisplayReplacements = mkOption {
