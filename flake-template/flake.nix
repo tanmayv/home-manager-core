@@ -1,5 +1,5 @@
 {
-  description = "Example flake using minimal-cloudtop as a library";
+  description = "Pure, standalone Home Manager configuration";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -8,26 +8,15 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     
-    # Use the stable version of minimal-cloudtop
+    # Minimal Cloudtop Core Library (GitHub)
     minimal-cloudtop = {
-      type = "git";
-      url = "sso://user/tanmayvijay/home-manager-minimal-ai";
-      ref = "refs/tags/stable";
+      url = "github:tanmayv/home-manager-core";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Google-specific extensions
+    # Public Extensions (provides tasks, ai-agents, and inherits neovim-flake)
     extensions = {
-      type = "git";
-      url = "sso://user/tanmayvijay/home-manager-extensions";
-      ref = "refs/tags/stable";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    nvim-nix = {
-      type = "git";
-      url = "sso://user/tanmayvijay/nvim-nix";
-      ref = "refs/tags/stable";
+      url = "github:tanmayv/home-manager-extensions";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -37,50 +26,29 @@
       system = "x86_64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
 
-      # Import from a local setup.nix and optionally override values
-      # Note: Ensure setup.nix exists in the same directory!
       baseSettings = import ./setup.nix;
-
-      # You can override any setting from setup.nix here
       userSettings = baseSettings // {
-        # Add Overrides here, look at setup.nix for available options.
-        enable-ai-workflow = true; 
-        # enable-agent-tracker = false;
+        enable-ai-workflow = true;
       };
     in {
-      # The configuration name (e.g. .#cloudtop)
-      homeConfigurations.cloudtop = home-manager.lib.homeManagerConfiguration {
+      homeConfigurations.core = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
 
-        # minimal-cloudtop Home Manager module requires userSettings and inputs
+        # Pass minimal-cloudtop and extensions inputs (which includes nvim-nix)
         extraSpecialArgs = { 
           inherit userSettings;
-          inputs = inputs // minimal-cloudtop.inputs;
+          inputs = inputs // minimal-cloudtop.inputs // extensions.inputs;
         };
 
         modules = [ 
-          # Import the minimal-cloudtop Home Manager module
           minimal-cloudtop.homeManagerModules.default
+          extensions.homeManagerModules.tasks
+          extensions.homeManagerModules.ai-agents
 
-          # Load Google-specific extensions
-          extensions.homeManagerModules.google3-zsh
-          extensions.homeManagerModules.google3-bash
-          extensions.homeManagerModules.google-agents
-          extensions.homeManagerModules.google-codesearch
-          extensions.homeManagerModules.google3-tmux
-          extensions.homeManagerModules.google3-ai
-          extensions.homeManagerModules.google3-scripts
-          extensions.homeManagerModules.google3-hg
-
-
-          # Your own configuration block
           ({ pkgs, ... }: {
-            # IMPORTANT: Set your LDAP/username here!
-            home.username = "your-username";
-            home.homeDirectory = "/usr/local/google/home/your-username";
+            home.username = userSettings.username or "your-username";
+            home.homeDirectory = if pkgs.stdenv.isLinux then "/home/${userSettings.username or "your-username"}" else "/Users/${userSettings.username or "your-username"}";
             home.stateVersion = "25.11";
-            
-            # Add your own Home Manager configuration here...
           })
         ];
       };

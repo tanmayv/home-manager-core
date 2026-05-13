@@ -1,36 +1,24 @@
-# Using Minimal Cloudtop as a Library
+# Pure Home Manager Starter Configuration
 
-This directory contains an example `flake.nix` for integrating Minimal Cloudtop into your own Home Manager configuration.
+This is a minimal, user-agnostic starter configuration for Home Manager powered by `minimal-cloudtop` and `neovim-flake`. It is completely free of Google3/CitC/Piper specific extensions or overrides.
 
-## Setup
+## Initialization
 
-1. Add Minimal Cloudtop as an input to your `flake.nix`:
-   ```nix
-   inputs.minimal-cloudtop = {
-     type = "git";
-     url = "sso://user/tanmayvijay/home-manager-minimal-ai";
-     ref = "refs/tags/stable";
-   };
-   ```
+To initialize this template in a new configuration directory:
 
-2. Pass the required `extraSpecialArgs` to your `homeManagerConfiguration`:
-   ```nix
-   extraSpecialArgs = { 
-     inherit inputs userSettings; 
-   };
-   ```
+```bash
+mkdir -p ~/.config/home-manager
+cd ~/.config/home-manager
+nix flake init -t github:tanmayv/home-manager-core
+```
 
-3. Import the module in your `modules` list and set `home.username`:
-   ```nix
-   modules = [ 
-     minimal-cloudtop.homeManagerModules.default
-     {
-       home.username = "your-username";
-       home.homeDirectory = "/usr/local/google/home/your-username";
-     }
-   ];
-   ```
+## Configuration
 
-## Note on Arguments
+1. Open `setup.nix` and set your `username`.
+2. Customize toggles and search paths as needed.
 
-The Minimal Cloudtop module expects `userSettings` to be available. The `username` is automatically picked up from `config.home.username`.
+## Activation
+
+```bash
+nix run .#homeConfigurations.core.activationPackage
+```
