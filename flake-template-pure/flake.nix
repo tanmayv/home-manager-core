@@ -44,7 +44,6 @@
           minimal-cloudtop.homeManagerModules.default
           extensions.homeManagerModules.tasks
           extensions.homeManagerModules.ai-agents
-          extensions.inputs.nvim-nix.homeManagerModules.default
 
           ({ pkgs, ... }: {
             home.username = userSettings.username or "your-username";
