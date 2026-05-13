@@ -19,7 +19,7 @@
   enable-cd-verbose = true;
   enable-auto-codesearch-with-cd = true;
   sessionizerMaxDirLength = 25;
-  sessionizerSearchPaths = [ "~" ];
+  sessionizerSearchPaths = [ "~" "~/projects/nix" ];
 
   enable-agent-tracker = true;
   enable-skill-publishing = false;
