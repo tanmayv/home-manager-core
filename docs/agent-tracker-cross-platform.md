@@ -282,7 +282,7 @@ Implementation status:
 - P6: partially done in `583d87f` (explicit heartbeat freshness/stale/expired semantics in monitor; heartbeat/recovered-at timing used as primary liveness policy before pane tty fallback eviction; monitor tests now cover expired-with-live-pane-process and expired-without-live-pane-process branches; liveness intervals are configurable via Home Manager options with an eval-time grace>=stale assertion)
 - Follow-up reliability fix: done in `a62be9d` (`agent-tracker-ctl` now reads RPC responses until EOF, fixing large `read-inbox` responses)
 - P7: pending
-- P8: done (Linux systemd and macOS launchd both supported as optional service-manager optimizations; lazy-start remains the core path)
+- P8: done (Linux systemd and macOS launchd both supported as optional service-manager optimizations; lazy-start remains the core path; launchd now writes stdout/stderr logs under the agent-tracker cache directory)
 
 ### P0: protocol + invariants doc
 - write this design
@@ -447,7 +447,7 @@ The most useful remaining validation work is:
 
 Not required for functional cross-platform behavior, but now implemented as optional accelerators:
 - keep Linux `systemd.user` integration healthy as an optimization
-- Darwin `launchd` now uses the same socket/cache/liveness environment conventions as ctl and wrapper
+- Darwin `launchd` now uses the same socket/cache/liveness environment conventions as ctl and wrapper, and writes stdout/stderr logs under the agent-tracker cache directory for troubleshooting
 - cross-platform packaging is expected to rely on lazy-start by default, with service managers remaining optional accelerators
 - generated agent aliases now carry an explicit `agent-wrapper` dependency instead of assuming it is already on PATH
 

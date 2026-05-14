@@ -15,6 +15,9 @@ let
   palette = import ../palette.nix;
   cacheHome = config.xdg.cacheHome or "${config.home.homeDirectory}/.cache";
   socketPath = "${cacheHome}/agent-tracker/agent-tracker.sock";
+  logDir = "${cacheHome}/agent-tracker";
+  launchdStdoutPath = "${logDir}/launchd.stdout.log";
+  launchdStderrPath = "${logDir}/launchd.stderr.log";
   daemonCmd = "${pkgs.python3}/bin/python3 ${agentTrackerFiles}/agent-tracker.py";
   agentWrapperPackage = import ../scripts/agent-wrapper-package.nix { inherit pkgs config; };
   monitorEnvVars = {
@@ -38,6 +41,10 @@ in
           message = "services.agent-tracker.heartbeatGraceSeconds must be greater than or equal to services.agent-tracker.heartbeatStaleSeconds.";
         }
       ];
+
+      home.activation.ensureAgentTrackerCacheDir = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        mkdir -p ${lib.escapeShellArg logDir}
+      '';
 
       home.packages = [
         agentWrapperPackage
@@ -105,6 +112,8 @@ in
           };
           ProcessType = "Background";
           RunAtLoad = true;
+          StandardOutPath = launchdStdoutPath;
+          StandardErrorPath = launchdStderrPath;
         };
       };
     })
