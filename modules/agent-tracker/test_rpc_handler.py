@@ -247,6 +247,116 @@ class TestRpcHandler(unittest.TestCase):
             if os.path.exists(inbox_path):
                 os.remove(inbox_path)
 
+    @mock.patch("tmux_util.set_agent_uuid")
+    @mock.patch("tmux_util.set_agent_id")
+    def test_simultaneous_wrapper_reconnect_race(self, _set_agent_id, _set_agent_uuid):
+        state.set_agent(
+            "agent1",
+            {
+                "agent_id": "id-1",
+                "status": "unknown",
+                "waiting_approval": False,
+                "pending_notifications": [],
+                "tmux_pane": "%1",
+                "tmux_socket": "sock",
+            },
+        )
+
+        name1 = rpc_handler.handle_register(
+            {
+                "session": "sess",
+                "tmux_pane": "%1",
+                "wrapper_pid": 111,
+                "tmux_socket": "sock",
+                "name": "agent1",
+                "agent_id": "id-1",
+            }
+        )
+        name2 = rpc_handler.handle_register(
+            {
+                "session": "sess",
+                "tmux_pane": "%1",
+                "wrapper_pid": 222,
+                "tmux_socket": "sock",
+                "name": "agent1",
+                "agent_id": "id-1",
+            }
+        )
+
+        self.assertEqual(name1, "agent1")
+        self.assertEqual(name2, "agent1")
+        self.assertEqual(len(state.state), 1)
+        info = state.get_agent("agent1")
+        self.assertEqual(info["wrapper_pid"], 222)
+        self.assertEqual(info["status"], "unknown")
+
+    @mock.patch("tmux_util.spin_agent")
+    @mock.patch("tmux_util.set_agent_uuid")
+    @mock.patch("tmux_util.set_agent_id")
+    def test_placeholder_spawning_replaced_by_real_register(self, _set_agent_id, _set_agent_uuid, _spin):
+        assigned_name = rpc_handler.handle_spin_agent(
+            {"session": "sess", "command": "jetski", "name": "agent1"}
+        )
+        self.assertEqual(assigned_name, "agent1")
+        spawning_info = state.get_agent("agent1")
+        self.assertEqual(spawning_info["status"], "spawning")
+
+        real_name = rpc_handler.handle_register(
+            {
+                "session": "sess",
+                "tmux_pane": "%2",
+                "wrapper_pid": 333,
+                "tmux_socket": "sock",
+                "name": "agent1",
+                "agent_id": "real-uuid-123",
+            }
+        )
+        self.assertEqual(real_name, "agent1")
+        self.assertEqual(len(state.state), 1)
+        info = state.get_agent("agent1")
+        self.assertEqual(info["agent_id"], "real-uuid-123")
+        self.assertEqual(info["status"], "idle")
+
+    @mock.patch("tmux_util.send_keys")
+    def test_busy_agent_pending_notification_flush(self, send_keys):
+        inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent(
+                "agent1",
+                {
+                    "agent_id": "id-1",
+                    "status": "working",
+                    "waiting_approval": False,
+                    "pending_notifications": [],
+                    "tmux_pane": "%1",
+                    "tmux_socket": "sock",
+                },
+            )
+
+            self.assertTrue(
+                rpc_handler.handle_send_message({"agent_id": "id-1", "message": "msg1", "sender_name": "alice"})
+            )
+            self.assertTrue(
+                rpc_handler.handle_send_message({"agent_id": "id-1", "message": "msg2", "sender_name": "bob"})
+            )
+
+            info = state.get_agent("agent1")
+            self.assertEqual(info["pending_notifications"], ["alice", "bob"])
+            send_keys.assert_not_called()
+
+            rpc_handler.handle_update_agent({"agent_name": "agent1", "status": "idle"})
+
+            info = state.get_agent("agent1")
+            self.assertEqual(info["pending_notifications"], [])
+            self.assertEqual(send_keys.call_count, 2)
+            send_keys.assert_any_call("%1", "New message in inbox from alice", "sock")
+            send_keys.assert_any_call("%1", "New message in inbox from bob", "sock")
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -66,6 +66,26 @@ class TestMonitor(unittest.TestCase):
 
         self.assertIsNone(state.get_agent("agent1"))
 
+    @mock.patch("tmux_util.list_panes", return_value=[{"pane_id": "%1", "pane_active": False}])
+    @mock.patch("monitor.is_process_alive", return_value=False)
+    @mock.patch("state.discover_agent_process", return_value=None)
+    def test_kill_9_wrapper_evicts_agent_after_grace_period(self, _discover, _alive, _list_panes):
+        state.set_agent(
+            "agent1",
+            {
+                "agent_id": "id-1",
+                "status": "working",
+                "tmux_pane": "%1",
+                "last_heartbeat": 60.0,
+                "wrapper_pid": 999,
+                "agent_cmd": "jetski",
+            },
+        )
+
+        monitor.monitor_once(now=100.0)
+
+        self.assertIsNone(state.get_agent("agent1"))
+
 
 if __name__ == "__main__":
     unittest.main()
