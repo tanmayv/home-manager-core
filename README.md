@@ -89,8 +89,7 @@ nix flake init -t github:tanmayv/home-manager-core#gmac
 
 For Google3/Cloudtop specific setup or detailed instructions, please refer to [docs/GettingStarted.md](docs/GettingStarted.md).
 
-### Keeping Up to Date
-Minimal Cloudtop includes an automatic update checker. Once a day, it will notify you if a new `stable` version is available and offer to automatically rebase your changes and rebuild your environment. You can also run `check-for-update` manually at any time.
+
 
 ## Customization
 

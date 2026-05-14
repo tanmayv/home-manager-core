@@ -100,10 +100,7 @@ in
         add-zsh-hook preexec fixup_ssh_auth_sock
       fi
 
-      # Only check for updates in top-level shells (outside tmux)
-      if [[ -z "$TMUX" ]]; then
-        check-for-update
-      fi
+
       
       # Autostart tmux
       ${if enableTmuxOnSsh then ''

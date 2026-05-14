@@ -31,7 +31,7 @@ This `GEMINI.md` provides context and instructions for AI agents working within 
 ## Versioning & User Customization
 - **Release Strategy**: The project uses SemVer tags (e.g., `v0.1.0`) and a floating `stable` tag for releases.
 - **User Customizations**: Users are instructed to create a personal branch (e.g., `my-config`) off `stable` to modify `setup.nix`. 
-- **Updates**: When updating the configuration via `check-for-update` or manually, the agent/script must **rebase** the user's branch onto the new `stable` tag (`git rebase origin/stable`) to preserve their customizations in `setup.nix` without merge conflicts.
+- **Updates**: When updating the configuration manually, the agent/script must **rebase** the user's branch onto the new `stable` tag (`git rebase origin/stable`) to preserve their customizations in `setup.nix` without merge conflicts.
 
 ## AI Workflow Integration
 - **AI Workflow Layout**: AI skills, hooks, and agents are linked from `modules/ai-workflow/dotfiles/` to the standard `~/.gemini/` location.

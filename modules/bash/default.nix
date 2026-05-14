@@ -39,10 +39,7 @@ in
         PROMPT_COMMAND="fixup_ssh_auth_sock; $PROMPT_COMMAND"
       fi
 
-      # Only check for updates in top-level shells (outside tmux)
-      if [[ -z "$TMUX" ]]; then
-        check-for-update
-      fi
+
       
       # Autostart tmux
       ${if enableTmuxOnSsh then ''
