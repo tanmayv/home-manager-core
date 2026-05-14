@@ -277,7 +277,7 @@ Implementation status:
 - P2: done in `f44c1c8` (wrapper-driven heartbeat loop, explicit heartbeat RPC, cleanup stop/unregister, and same-agent_id re-register preserving runtime state)
 - P3: done in `7facea1` (hooks send `agent_id` explicitly when available and no longer depend on /proc for caller identification; tmux/name fallbacks remain only as compatibility paths)
 - P4: done in `a5c953a` (internal tracker state keyed by `agent_id` with a name index; explicit `agent_id` precedence now covers targeted delivery and CLI `--id` targeting while preserving name-based UX)
-- P5: partially done in `713216f` (restart recovery rebuilds records from tmux metadata even without a discovered live child process, initializing recovered agents as `unknown`; tests now cover recovered entries being refreshed in place by later live register/heartbeat)
+- P5: done (restart recovery rebuilds records from tmux metadata even without a discovered live child process, initializing recovered agents as `unknown`; tests now cover recovered entries being refreshed in place by later live register/heartbeat and preserving tmux-sourced renamed display names across restart)
 - P6: partially done in `583d87f` (explicit heartbeat freshness/stale/expired semantics in monitor; heartbeat/recovered-at timing used as primary liveness policy before pane tty fallback eviction; monitor tests now cover expired-with-live-pane-process and expired-without-live-pane-process branches)
 - Follow-up reliability fix: done in `a62be9d` (`agent-tracker-ctl` now reads RPC responses until EOF, fixing large `read-inbox` responses)
 - P7+: pending
@@ -384,20 +384,20 @@ This section is intended to let the next agent pick up work without re-deriving 
 
 ### Remaining P5 work (recovery hardening)
 
-Current state:
-- recovery recreates agent records from tmux metadata even if no live child process is discovered
-- recovered entries come back as `status = "unknown"`, `pid = null`, and rely on later heartbeat/re-register to become live again
+Status: complete for the planned cross-platform recovery slice.
 
-Suggested completion steps:
-1. [done] Add a focused test for tracker restart + wrapper heartbeat re-register/register refresh:
+What is now covered:
+1. [done] tracker restart + wrapper heartbeat/register refresh:
    - seed tmux metadata for an agent
    - run `init_state()` to recover it as `unknown`
    - simulate `heartbeat` or `register` from the same `agent_id`
    - assert `recovered_at` is cleared and the live record is refreshed in place
-2. Add a test for rename + restart:
+2. [done] rename + restart:
    - rename an agent
    - ensure tmux `@agent_name` remains the source for recovered display name
    - verify wrapper re-register does not revert to stale env `AGENT_NAME`
+
+Further recovery work, if any, should now be treated as broader validation/race coverage under P7 rather than core P5 functionality.
 
 ### Remaining P6 work (liveness hardening)
 

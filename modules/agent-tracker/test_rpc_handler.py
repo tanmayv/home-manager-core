@@ -1,3 +1,5 @@
+import datetime
+import json
 import os
 import unittest
 from unittest import mock
@@ -122,6 +124,69 @@ class TestRpcHandler(unittest.TestCase):
         self.assertEqual(info["last_heartbeat"], 456.0)
         self.assertIsNone(info["recovered_at"])
 
+    @mock.patch("tmux_util.set_agent_uuid")
+    @mock.patch("tmux_util.set_agent_id")
+    @mock.patch("state.discover_agent_process", return_value=None)
+    @mock.patch("tmux_util.get_pane_info", return_value={"tty": "/dev/pts/1", "session": "sess", "pid": 101})
+    @mock.patch("tmux_util.list_panes", return_value=[{
+        "pane_id": "%1",
+        "agent_name": "agent2",
+        "agent_id": "id-1",
+        "agent_uuid": "id-1",
+        "agent_type": "pi",
+        "agent_cmd": "pi",
+        "pane_active": False,
+    }])
+    @mock.patch("subprocess.run")
+    @mock.patch("tmux_util.set_pane_title_sync")
+    @mock.patch("tmux_util.set_agent_name_sync")
+    def test_recovery_prefers_tmux_name_over_stale_register_name(
+        self,
+        _set_agent_name_sync,
+        _set_pane_title_sync,
+        _subprocess_run,
+        _list_panes,
+        _get_pane_info,
+        _discover_agent_process,
+        _set_agent_id,
+        _set_agent_uuid,
+    ):
+        state.set_agent(
+            "agent1",
+            {
+                "agent_id": "id-1",
+                "status": "idle",
+                "tmux_pane": "%1",
+                "tmux_socket": "sock",
+            },
+        )
+        self.assertTrue(rpc_handler.handle_rename({"old_name": "agent1", "new_name": "agent2", "force": True}))
+        self.assertIsNotNone(state.get_agent("agent2"))
+
+        state.state = {}
+        state.name_index = {}
+        state.init_state()
+        self.assertIsNotNone(state.get_agent("agent2"))
+
+        assigned_name = rpc_handler.handle_register(
+            {
+                "session": "new-session",
+                "tmux_pane": "%2",
+                "wrapper_pid": 222,
+                "tmux_socket": "new-sock",
+                "name": "agent1",
+                "agent_type": "pi",
+                "agent_cmd": "pi",
+                "agent_id": "id-1",
+            }
+        )
+
+        self.assertEqual(assigned_name, "agent2")
+        self.assertIsNone(state.get_agent("agent1"))
+        info = state.get_agent("agent2")
+        self.assertEqual(info["agent_id"], "id-1")
+        self.assertEqual(info["tmux_pane"], "%2")
+
     def test_send_message_targets_agent_id(self):
         inbox_path = "/tmp/agent-inboxes/id-1.inbox"
         try:
@@ -143,6 +208,11 @@ class TestRpcHandler(unittest.TestCase):
             )
             info = state.get_agent("agent1")
             self.assertEqual(info["pending_notifications"], ["tester"])
+            with open(inbox_path, "r") as f:
+                message = json.loads(f.readline())
+            timestamp = datetime.datetime.fromisoformat(message["timestamp"])
+            self.assertIsNotNone(timestamp.tzinfo)
+            self.assertIsNotNone(timestamp.utcoffset())
         finally:
             if os.path.exists(inbox_path):
                 os.remove(inbox_path)
