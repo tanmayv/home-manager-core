@@ -12,6 +12,11 @@ import struct
 
 BUFFER_SIZE = 4096
 
+
+def _utc_now_isoformat() -> str:
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
 def handle_register(params: dict) -> str:
     """Handles agent registration, accepting a stable agent_id when provided."""
     session = params.get("session")
@@ -267,7 +272,7 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
 
     msg_obj = {
         "sender": sender_name,
-        "timestamp": datetime.datetime.utcnow().isoformat(),
+        "timestamp": _utc_now_isoformat(),
         "message": msg,
         "read": False
     }

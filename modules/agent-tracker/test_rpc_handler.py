@@ -58,6 +58,70 @@ class TestRpcHandler(unittest.TestCase):
         self.assertIn("last_heartbeat", info)
         self.assertEqual(len(state.state), 1)
 
+    @mock.patch("rpc_handler.time.time", return_value=123.0)
+    @mock.patch("tmux_util.set_agent_uuid")
+    @mock.patch("tmux_util.set_agent_id")
+    @mock.patch("state.discover_agent_process", return_value=None)
+    @mock.patch("tmux_util.get_pane_info", return_value={"tty": "/dev/pts/1", "session": "sess", "pid": 101})
+    @mock.patch("tmux_util.list_panes", return_value=[{
+        "pane_id": "%1",
+        "agent_name": "agent1",
+        "agent_id": "id-1",
+        "agent_uuid": "id-1",
+        "agent_type": "pi",
+        "agent_cmd": "pi",
+        "pane_active": False,
+    }])
+    def test_register_clears_recovered_at_after_recovery(
+        self,
+        _list_panes,
+        _get_pane_info,
+        _discover_agent_process,
+        _set_agent_id,
+        _set_agent_uuid,
+        _time,
+    ):
+        state.init_state()
+        recovered = state.get_agent("agent1")
+        self.assertEqual(recovered["status"], "unknown")
+        self.assertIsNotNone(recovered["recovered_at"])
+
+        rpc_handler.handle_register(
+            {
+                "session": "new-session",
+                "tmux_pane": "%2",
+                "wrapper_pid": 222,
+                "tmux_socket": "new-sock",
+                "name": "agent1",
+                "agent_type": "pi",
+                "agent_cmd": "pi",
+                "agent_id": "id-1",
+            }
+        )
+
+        info = state.get_agent("agent1")
+        self.assertEqual(info["tmux_pane"], "%2")
+        self.assertEqual(info["wrapper_pid"], 222)
+        self.assertEqual(info["last_heartbeat"], 123.0)
+        self.assertIsNone(info["recovered_at"])
+
+    @mock.patch("rpc_handler.time.time", return_value=456.0)
+    def test_heartbeat_clears_recovered_at(self, _time):
+        state.set_agent(
+            "agent1",
+            {
+                "agent_id": "id-1",
+                "status": "unknown",
+                "recovered_at": 100.0,
+            },
+        )
+
+        self.assertTrue(rpc_handler.handle_heartbeat({"agent_id": "id-1"}))
+
+        info = state.get_agent("agent1")
+        self.assertEqual(info["last_heartbeat"], 456.0)
+        self.assertIsNone(info["recovered_at"])
+
     def test_send_message_targets_agent_id(self):
         inbox_path = "/tmp/agent-inboxes/id-1.inbox"
         try:

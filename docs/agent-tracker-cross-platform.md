@@ -277,7 +277,7 @@ Implementation status:
 - P2: done in `f44c1c8` (wrapper-driven heartbeat loop, explicit heartbeat RPC, cleanup stop/unregister, and same-agent_id re-register preserving runtime state)
 - P3: done in `7facea1` (hooks send `agent_id` explicitly when available and no longer depend on /proc for caller identification; tmux/name fallbacks remain only as compatibility paths)
 - P4: done in `a5c953a` (internal tracker state keyed by `agent_id` with a name index; explicit `agent_id` precedence now covers targeted delivery and CLI `--id` targeting while preserving name-based UX)
-- P5: partially done in `713216f` (restart recovery rebuilds records from tmux metadata even without a discovered live child process, initializing recovered agents as `unknown`)
+- P5: partially done in `713216f` (restart recovery rebuilds records from tmux metadata even without a discovered live child process, initializing recovered agents as `unknown`; tests now cover recovered entries being refreshed in place by later live register/heartbeat)
 - P6: partially done in `583d87f` (explicit heartbeat freshness/stale/expired semantics in monitor; heartbeat/recovered-at timing used as primary liveness policy before pane tty fallback eviction; monitor tests now cover expired-with-live-pane-process and expired-without-live-pane-process branches)
 - Follow-up reliability fix: done in `a62be9d` (`agent-tracker-ctl` now reads RPC responses until EOF, fixing large `read-inbox` responses)
 - P7+: pending
@@ -389,7 +389,7 @@ Current state:
 - recovered entries come back as `status = "unknown"`, `pid = null`, and rely on later heartbeat/re-register to become live again
 
 Suggested completion steps:
-1. Add a focused test for tracker restart + wrapper heartbeat re-register:
+1. [done] Add a focused test for tracker restart + wrapper heartbeat re-register/register refresh:
    - seed tmux metadata for an agent
    - run `init_state()` to recover it as `unknown`
    - simulate `heartbeat` or `register` from the same `agent_id`
@@ -449,7 +449,6 @@ Not required for functional cross-platform behavior, but still open:
 ### Small backlog / cleanup items
 
 These are non-blocking and can be done opportunistically:
-- replace `datetime.utcnow()` in `rpc_handler.py` with a timezone-aware UTC timestamp helper
 - centralize repeated socket-path resolution logic used in inline Python snippets/hooks
 - consider exposing heartbeat/liveness constants as formal Home Manager options
 - consider expanding test coverage around `agent-tracker-ctl` CLI behavior for `--id` paths
