@@ -156,7 +156,9 @@ def main():
 
     if args.subcommand == "list":
         params = {}
-        if "AGENT_NAME" in os.environ:
+        if "AGENT_ID" in os.environ:
+            params["agent_id"] = os.environ["AGENT_ID"]
+        elif "AGENT_NAME" in os.environ:
             params["agent_name"] = os.environ["AGENT_NAME"]
         agents = call_rpc("list", params)
         print(json.dumps(agents))
@@ -197,7 +199,9 @@ def main():
             print("Error: send-message requires <agent_name> or --id <agent_id>", file=sys.stderr)
             sys.exit(1)
         params = {"message": args.message}
-        if "AGENT_NAME" in os.environ:
+        if "AGENT_ID" in os.environ:
+            params["sender_id"] = os.environ["AGENT_ID"]
+        elif "AGENT_NAME" in os.environ:
             params["sender_name"] = os.environ["AGENT_NAME"]
         if args.agent_id:
             params["agent_id"] = args.agent_id
@@ -272,7 +276,9 @@ def main():
             new_name = args.names[0]
             
         params = {"old_name": old_name, "new_name": new_name, "force": force}
-        if "AGENT_NAME" in os.environ:
+        if "AGENT_ID" in os.environ:
+            params["agent_id"] = os.environ["AGENT_ID"]
+        elif "AGENT_NAME" in os.environ:
             params["agent_name"] = os.environ["AGENT_NAME"]
         call_rpc("rename", params)
         print("Agent renamed.")
@@ -294,6 +300,8 @@ def main():
             params["agent_id"] = args.agent_id
         elif agent_name:
             params["agent_name"] = agent_name
+        elif "AGENT_ID" in os.environ:
+            params["agent_id"] = os.environ["AGENT_ID"]
         elif "AGENT_NAME" in os.environ:
             params["agent_name"] = os.environ["AGENT_NAME"]
             
@@ -330,7 +338,9 @@ def main():
 
     elif args.subcommand == "whoami":
         params = {}
-        if "AGENT_NAME" in os.environ:
+        if "AGENT_ID" in os.environ:
+            params["agent_id"] = os.environ["AGENT_ID"]
+        elif "AGENT_NAME" in os.environ:
             params["agent_name"] = os.environ["AGENT_NAME"]
         info = call_rpc("whoami", params)
         if info:
