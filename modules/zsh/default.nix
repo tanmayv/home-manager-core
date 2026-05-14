@@ -78,14 +78,22 @@ in
       zstyle :prompt:pure:git:stash show no
       prompt pure
 
-      # Customize Pure prompt: hide user/host and use custom path
+      # Customize Pure prompt: hide user/host but always show the current cwd.
       function customize_pure_prompt() {
-        # Compute custom path
+        setopt prompt_percent
+
+        # Compute custom path. Extensions may override this, but keep %~ as a
+        # safe fallback so the current working directory is always visible.
         local custom_path="%~"
         ${config.programs.zsh.prompt.pathShortener}
+        if [[ -z "''${custom_path}" ]]; then
+          custom_path="%~"
+        fi
         
-        # Recreate PROMPT with custom path
-        PROMPT='%(12V.%F{$prompt_pure_colors[suspended_jobs]}%12v%f .)%F{''${prompt_pure_colors[path]}}'"$custom_path"'%f%(14V. %F{''${prompt_pure_git_branch_color}}%14v%(15V.%F{$prompt_pure_colors[git:dirty]}%15v.)%f.)%(16V. %F{$prompt_pure_colors[git:action]}%16v%f.)%(17V. %F{$prompt_pure_colors[git:arrow]}%17v%f.)%(18V. %F{$prompt_pure_colors[git:stash]}''${PURE_GIT_STASH_SYMBOL:-≡}%f.)%(19V. %F{$prompt_pure_colors[execution_time]}%19v%f.)
+        # Recreate PROMPT with an explicit theme path color. Relying on
+        # prompt_pure_colors[path] can make the cwd effectively invisible when
+        # themes override Pure's palette.
+        PROMPT='%(12V.%F{$prompt_pure_colors[suspended_jobs]}%12v%f .)%F{${palette.color4}}'"$custom_path"'%f%(14V. %F{''${prompt_pure_git_branch_color}}%14v%(15V.%F{$prompt_pure_colors[git:dirty]}%15v.)%f.)%(16V. %F{$prompt_pure_colors[git:action]}%16v%f.)%(17V. %F{$prompt_pure_colors[git:arrow]}%17v%f.)%(18V. %F{$prompt_pure_colors[git:stash]}''${PURE_GIT_STASH_SYMBOL:-≡}%f.)%(19V. %F{$prompt_pure_colors[execution_time]}%19v%f.)
 %(20V.%F{$prompt_pure_colors[virtualenv]}%20v%f .)%(?.%F{${palette.color3}}.%F{$prompt_pure_colors[prompt:error]})❯%f '
       }
       autoload -Uz add-zsh-hook
