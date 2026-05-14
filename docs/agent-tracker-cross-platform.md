@@ -281,8 +281,10 @@ Implementation status:
 - P5: done (restart recovery rebuilds records from tmux metadata even without a discovered live child process, initializing recovered agents as `unknown`; tests now cover recovered entries being refreshed in place by later live register/heartbeat and preserving tmux-sourced renamed display names across restart)
 - P6: partially done in `583d87f` (explicit heartbeat freshness/stale/expired semantics in monitor; heartbeat/recovered-at timing used as primary liveness policy before pane tty fallback eviction; monitor tests now cover expired-with-live-pane-process and expired-without-live-pane-process branches; liveness intervals are configurable via Home Manager options with an eval-time grace>=stale assertion)
 - Follow-up reliability fix: done in `a62be9d` (`agent-tracker-ctl` now reads RPC responses until EOF, fixing large `read-inbox` responses)
+- Storage & CLI plumbing fix: done in `427e939` (removed legacy hardcoded `/tmp/agent-inboxes` in favor of XDG-compliant `~/.cache/agent-tracker/inboxes`; plumbed `AGENT_NAME` from environment into `agent-tracker-ctl` RPC parameters for `send-message`, `list`, `rename`, `read-inbox`, and `whoami` to completely bypass fragile `/proc` tree tracing)
 - P7: partially done (manual Linux tmux-session smoke validated lazy-start startup, wrapper registration, rename, send-message/read-inbox, tracker restart recovery, heartbeat re-registration, and pane-exit cleanup against the current branch; recovered `unknown` agents now notify via tmux immediately instead of silently queueing forever)
 - P8: done (Linux systemd and macOS launchd both supported as optional service-manager optimizations; lazy-start remains the core path; launchd now writes stdout/stderr logs under the agent-tracker cache directory)
+
 
 ### P0: protocol + invariants doc
 - write this design
@@ -453,5 +455,6 @@ Not required for functional cross-platform behavior, but now implemented as opti
 ### Small backlog / cleanup items
 
 These are non-blocking and can be done opportunistically:
-- centralize repeated socket-path resolution logic used in inline Python snippets/hooks
+- [done] centralize repeated socket-path and storage resolution logic across the tracker daemon and CLI tools (centralized in `state.py` and `agent-tracker-ctl.py` with XDG cache compliance)
+- [done] plumb `AGENT_NAME` into `agent-tracker-ctl` RPC parameters for `send-message`, `list`, `rename`, `read-inbox`, and `whoami` to bypass fragile `/proc` tree tracing
 - consider expanding test coverage around `agent-tracker-ctl` CLI behavior for `--id` paths
