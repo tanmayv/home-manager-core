@@ -14,14 +14,14 @@
     };
 
     public-extensions = {
-      url = "github:tanmayv/home-manager-public-extensions";
+      url = "github:tanmayv/home-manager-extensions";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.tasks-nvim.follows = "tasks-nvim";
       inputs.nvim-nix.follows = "nvim-nix";
     };
 
     nvim-nix = {
-      url = "github:tanmayv/nvim-nix";
+      url = "github:tanmayv/neovim-flake";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
