@@ -174,10 +174,15 @@ def set_agent(name: str, info: dict) -> None:
         normalized["agent_id"] = agent_id
         normalized["uuid"] = agent_id
         normalized["name"] = name
+        if "aliases" not in normalized:
+            normalized["aliases"] = []
 
         existing = state.get(agent_id)
-        if existing and existing.get("name") and existing.get("name") != name:
-            name_index.pop(existing["name"], None)
+        if existing:
+            normalized["aliases"] = existing.get("aliases", []).copy()
+            if existing.get("name") and existing.get("name") != name:
+                if existing["name"] not in normalized["aliases"]:
+                    normalized["aliases"].append(existing["name"])
 
         existing_id_for_name = name_index.get(name)
         if existing_id_for_name and existing_id_for_name != agent_id:
@@ -186,6 +191,8 @@ def set_agent(name: str, info: dict) -> None:
 
         state[agent_id] = normalized
         name_index[name] = agent_id
+        for alias in normalized["aliases"]:
+            name_index[alias] = agent_id
 
 
 def delete_agent(name_or_id: str) -> None:
@@ -195,8 +202,11 @@ def delete_agent(name_or_id: str) -> None:
         if not agent_id:
             return
         info = state.pop(agent_id, None)
-        if info and info.get("name"):
-            name_index.pop(info["name"], None)
+        if info:
+            if info.get("name"):
+                name_index.pop(info["name"], None)
+            for alias in info.get("aliases", []):
+                name_index.pop(alias, None)
 
 
 def update_agent(name_or_id: str, **kwargs) -> bool:
@@ -218,7 +228,10 @@ def rename_agent(old_name: str, new_name: str) -> bool:
         agent_id = name_index.get(old_name)
         if not agent_id or new_name in name_index:
             return False
-        name_index.pop(old_name, None)
         name_index[new_name] = agent_id
         state[agent_id]["name"] = new_name
+        if "aliases" not in state[agent_id]:
+            state[agent_id]["aliases"] = []
+        if old_name not in state[agent_id]["aliases"]:
+            state[agent_id]["aliases"].append(old_name)
         return True

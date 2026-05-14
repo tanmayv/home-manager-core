@@ -207,7 +207,9 @@ def main():
             params["agent_id"] = args.agent_id
         else:
             params["agent_name"] = args.agent_name
-        call_rpc("send_message", params)
+        res = call_rpc("send_message", params)
+        if isinstance(res, dict) and res.get("warning"):
+            print(res["warning"], file=sys.stderr)
         print("Message sent.")
 
     elif args.subcommand == "focus":

@@ -271,6 +271,12 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
     if not info:
         raise ValueError("Target agent not found")
 
+    current_name = state.get_agent_name_by_id(info["agent_id"])
+    warning_msg = None
+    if agent_name != current_name:
+        warning_msg = f"Note: Agent '{agent_name}' was renamed to '{current_name}'."
+        logging.info(warning_msg)
+
     msg_obj = {
         "sender": sender_name,
         "timestamp": _utc_now_isoformat(),
@@ -278,7 +284,7 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
         "read": False
     }
     
-    uuid_str = info.get("uuid") or agent_name
+    uuid_str = info.get("uuid") or current_name
     inbox_file = os.path.join(state.INBOX_DIR, f"{uuid_str}.inbox")
     
     try:
@@ -287,13 +293,16 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
             f.write(json.dumps(msg_obj) + "\n")
             
         if _is_agent_waiting(info):
-            logging.info(f"Queuing notification for {agent_name} from {sender_name} (agent is busy)")
+            logging.info(f"Queuing notification for {current_name} from {sender_name} (agent is busy)")
             pending = info.get("pending_notifications", [])
             pending.append(sender_name)
-            state.update_agent(agent_name, pending_notifications=pending)
+            state.update_agent(current_name, pending_notifications=pending)
         else:
             notify_msg = f"New message in inbox from {sender_name}"
             tmux_util.send_keys(info["tmux_pane"], notify_msg, info["tmux_socket"])
+        
+        if warning_msg:
+            return {"success": True, "warning": warning_msg}
         return True
     except IOError as e:
         logging.error(f"Failed to write to inbox file for {agent_name}: {e}")
