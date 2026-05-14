@@ -91,8 +91,9 @@ def handle_list(params: dict, caller_pid: int = None) -> dict:
     return agents
 
 def _is_agent_waiting(info: dict) -> bool:
-    """Returns True if the agent is busy or waiting for approval."""
-    return info.get("status") != "idle" or info.get("waiting_approval", False)
+    """Returns True if the agent is actively busy or waiting for approval."""
+    busy_statuses = {"working", "waiting", "spawning"}
+    return info.get("status") in busy_statuses or info.get("waiting_approval", False)
 
 def _flush_notifications(agent_name: str):
     """Sends all pending notifications for an agent if it is no longer waiting."""

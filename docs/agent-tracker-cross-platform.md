@@ -281,7 +281,7 @@ Implementation status:
 - P5: done (restart recovery rebuilds records from tmux metadata even without a discovered live child process, initializing recovered agents as `unknown`; tests now cover recovered entries being refreshed in place by later live register/heartbeat and preserving tmux-sourced renamed display names across restart)
 - P6: partially done in `583d87f` (explicit heartbeat freshness/stale/expired semantics in monitor; heartbeat/recovered-at timing used as primary liveness policy before pane tty fallback eviction; monitor tests now cover expired-with-live-pane-process and expired-without-live-pane-process branches; liveness intervals are configurable via Home Manager options with an eval-time grace>=stale assertion)
 - Follow-up reliability fix: done in `a62be9d` (`agent-tracker-ctl` now reads RPC responses until EOF, fixing large `read-inbox` responses)
-- P7: pending
+- P7: partially done (manual Linux tmux-session smoke validated lazy-start startup, wrapper registration, rename, send-message/read-inbox, tracker restart recovery, heartbeat re-registration, and pane-exit cleanup against the current branch; recovered `unknown` agents now notify via tmux immediately instead of silently queueing forever)
 - P8: done (Linux systemd and macOS launchd both supported as optional service-manager optimizations; lazy-start remains the core path; launchd now writes stdout/stderr logs under the agent-tracker cache directory)
 
 ### P0: protocol + invariants doc
@@ -322,14 +322,15 @@ Implementation status:
 - [partial] keep Linux procfs fallback only as optional best-effort recovery/debug aid
 
 ### P7: validation/tests
-- Linux + macOS eval
-- smoke tests for register/update/rename/inbox/unregister
-- tracker restart recovery test
-- pane-close cleanup test
-- simultaneous wrapper start race test
-- busy-agent pending notification flush test
-- kill `agent-wrapper` with `-9` while leaving the pane open
-- tracker restart while two wrappers simultaneously reconnect/re-register
+- [partial] Linux eval + Linux tmux-session smoke completed on current branch via `home-manager switch` in `~/nix-config` plus explicit tmux config reload
+- [pending] macOS eval
+- [done manually] smoke tests for register/rename/send-message/read-inbox/unregister-style cleanup
+- [done manually] tracker restart recovery test
+- [done manually] pane-close cleanup test
+- [pending] simultaneous wrapper start race test
+- [pending] busy-agent pending notification flush test
+- [pending] kill `agent-wrapper` with `-9` while leaving the pane open
+- [pending] tracker restart while two wrappers simultaneously reconnect/re-register
 
 ### P8: optional service managers
 - [done] keep Linux systemd user service as an optimization only
@@ -426,14 +427,12 @@ Suggested completion steps:
 ### Remaining P7 work (validation matrix)
 
 The most useful remaining validation work is:
-1. Linux eval + macOS eval for the Home Manager template/config
-2. smoke tests for:
-   - register
-   - heartbeat
-   - rename
-   - send-message
-   - read-inbox
-   - unregister
+1. macOS eval for the Home Manager template/config
+2. follow-up smoke coverage for:
+   - explicit heartbeat/liveness observation beyond the restart/re-register flow already exercised manually
+   - busy-agent pending notification flush
+   - explicit `unregister` CLI path (manual cleanup via pane exit is already exercised)
+   - Darwin launchd-managed notification visibility/logging once macOS validation is available
 3. focused regressions for:
    - stale-socket/bootstrap races
    - same-agent_id duplicate register preserving runtime state
