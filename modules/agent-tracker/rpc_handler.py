@@ -65,6 +65,7 @@ def handle_register(params: dict) -> str:
         "agent_type": agent_type or (existing_info or {}).get("agent_type", "unknown"),
         "agent_cmd": agent_cmd or (existing_info or {}).get("agent_cmd", "unknown"),
         "last_heartbeat": time.time(),
+        "recovered_at": None,
         "pending_notifications": (existing_info or {}).get("pending_notifications", [])
     })
     
@@ -127,6 +128,7 @@ def handle_heartbeat(params: dict, caller_pid: int = None) -> bool:
 
     kwargs = {k: v for k, v in params.items() if k not in ["agent_id", "agent_name"]}
     kwargs["last_heartbeat"] = time.time()
+    kwargs["recovered_at"] = None
     if state.update_agent(agent_name, **kwargs):
         return True
     raise ValueError(f"Agent '{agent_name}' not found")

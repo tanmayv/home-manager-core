@@ -275,7 +275,7 @@ Implementation status:
 - P0: done
 - P1: done in `e992949` (lazy-start/bootstrap, shared startup lock, stale-socket handling under lock, Nix-derived socket path propagation to ctl/systemd/wrapper/hooks)
 - P2: done in `f44c1c8` (wrapper-driven heartbeat loop, explicit heartbeat RPC, cleanup stop/unregister, and same-agent_id re-register preserving runtime state)
-- P3: partially done in `e6bfca7` (hooks send `agent_id` explicitly when available; procfs/tmux-pane/name fallbacks still remain until later precedence cleanup)
+- P3: done in next commit after `583d87f` (hooks send `agent_id` explicitly when available and no longer depend on /proc for caller identification; tmux/name fallbacks remain only as compatibility paths)
 - P4: partially done (internal tracker state keyed by `agent_id` with a name index; external CLI/name UX and compatibility aliases preserved)
 - P5: partially done in `713216f` (restart recovery rebuilds records from tmux metadata even without a discovered live child process, initializing recovered agents as `unknown`)
 - P6: partially done (explicit heartbeat freshness/stale/expired semantics in monitor; heartbeat/recovered-at timing used as primary liveness policy before pane tty fallback eviction)
@@ -300,7 +300,7 @@ Implementation status:
 - [done] wrapper/heartbeat helper perform re-register upsert on tracker restart
 
 ### P3: hooks switch to explicit identity
-- [pending] replace `/proc`-based caller identification in hooks
+- [done] replace `/proc`-based caller identification in hooks
 - [done] send `agent_id` in RPC updates
 - [done] keep tmux/env fallback only where needed
 

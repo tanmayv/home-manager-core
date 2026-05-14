@@ -23,11 +23,7 @@ try:
 except Exception as e:
     print(f"[JETSKI WRAPPER] Failed to call child script: {e}", file=sys.stderr)
 
-try:
-    with open(f"/proc/{os.getppid()}/comm", "r") as f:
-        caller_name = f.read().strip()
-except Exception:
-    caller_name = "unknown"
+caller_name = os.environ.get("AGENT_NAME") or os.environ.get("AGENT_ID") or os.path.basename(sys.argv[0]) or "unknown"
 
 with open("/tmp/hooks.log", "a") as f:
     f.write(f"[HOOK] Event: JetskiPostTool, Caller: {caller_name}, Input: {input_data}\n")
