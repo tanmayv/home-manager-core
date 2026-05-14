@@ -24,15 +24,21 @@ try:
         with open("/tmp/hooks.log", "a") as f:
             f.write("[HOOK] No TMUX_PANE found in environment. Skipping tracker update.\n")
     else:
-        agent_name = subprocess.check_output(["tmux", "display-message", "-p", "-t", pane_id, "#{@agent_name}"]).decode().strip()
-        if agent_name:
+        agent_id = os.environ.get("AGENT_ID")
+        agent_name = None if agent_id else subprocess.check_output(["tmux", "display-message", "-p", "-t", pane_id, "#{@agent_name}"]).decode().strip()
+        if agent_id or agent_name:
+            params = {"waiting_approval": False, "status": "working"}
+            if agent_id:
+                params["agent_id"] = agent_id
+            else:
+                params["agent_name"] = agent_name
             import time
             for _ in range(3):
                 try:
                     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                     s.settimeout(1.0)
                     s.connect(os.environ.get("AGENT_TRACKER_SOCKET", os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "agent-tracker", "agent-tracker.sock")))
-                    s.sendall(json.dumps({"jsonrpc": "2.0", "method": "update_agent", "params": {"agent_name": agent_name, "waiting_approval": False, "status": "working"}, "id": 1}).encode())
+                    s.sendall(json.dumps({"jsonrpc": "2.0", "method": "update_agent", "params": params, "id": 1}).encode())
                     s.close()
                     subprocess.run(["tmux-status-refresh"], capture_output=True)
                     break

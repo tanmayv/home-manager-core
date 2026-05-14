@@ -308,7 +308,13 @@ def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None
 
 
 def _identify_agent(params: dict, caller_pid: int = None) -> str:
-    """Identifies the agent name based on params (name, pane) or caller PID."""
+    """Identifies the agent name based on params (id/name/pane) or caller PID."""
+    agent_id = params.get("agent_id")
+    if agent_id:
+        resolved_name = state.get_agent_name_by_id(agent_id)
+        if resolved_name:
+            return resolved_name
+
     agent_name = params.get("agent_name")
     if agent_name:
         return agent_name

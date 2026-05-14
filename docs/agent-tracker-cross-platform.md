@@ -274,8 +274,9 @@ We want to preserve these current behaviors:
 Implementation status:
 - P0: done
 - P1: done in `e992949` (lazy-start/bootstrap, shared startup lock, stale-socket handling under lock, Nix-derived socket path propagation to ctl/systemd/wrapper/hooks)
-- P2: partially done in next commit after `e992949` (stable `agent_id` generation/export, register payload/storage, tmux metadata, and tracker exposure landed; heartbeat/re-register work still pending)
-- P3+: pending
+- P2: partially done in `bbb815c` (stable `agent_id` generation/export, register payload/storage, tmux metadata, and tracker exposure landed; heartbeat/re-register work still pending)
+- P3: partially done in next commit after `bbb815c` (hooks send `agent_id` explicitly when available; procfs/tmux-pane/name fallbacks still remain until later precedence cleanup)
+- P4+: pending
 
 ### P0: protocol + invariants doc
 - write this design
@@ -296,9 +297,9 @@ Implementation status:
 - [pending] wrapper/heartbeat helper perform re-register upsert on tracker restart
 
 ### P3: hooks switch to explicit identity
-- replace `/proc`-based caller identification in hooks
-- send `agent_id` in RPC updates
-- keep tmux/env fallback only where needed
+- [pending] replace `/proc`-based caller identification in hooks
+- [done] send `agent_id` in RPC updates
+- [done] keep tmux/env fallback only where needed
 
 ### P4: tracker core keyed by `agent_id`
 - state keyed by `agent_id`

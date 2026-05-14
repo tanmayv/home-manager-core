@@ -120,6 +120,15 @@ def get_agent(name: str) -> dict | None:
     with state_lock:
         return state.get(name, None)
 
+
+def get_agent_name_by_id(agent_id: str) -> str | None:
+    """Returns the agent name for a given stable agent_id."""
+    with state_lock:
+        for name, info in state.items():
+            if info.get("agent_id") == agent_id or info.get("uuid") == agent_id:
+                return name
+    return None
+
 def set_agent(name: str, info: dict) -> None:
     """Sets the state of a specific agent."""
     with state_lock:

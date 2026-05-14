@@ -38,8 +38,9 @@ except Exception as e:
 try:
     pane_id = os.environ.get("TMUX_PANE")
     if pane_id and input_data:
-        agent_name = subprocess.check_output(["tmux", "display-message", "-p", "-t", pane_id, "#{@agent_name}"]).decode().strip()
-        if agent_name:
+        agent_id = os.environ.get("AGENT_ID")
+        agent_name = None if agent_id else subprocess.check_output(["tmux", "display-message", "-p", "-t", pane_id, "#{@agent_name}"]).decode().strip()
+        if agent_id or agent_name:
             tool_call = input_data.get("toolCall", {})
             args = tool_call.get("args", {})
             safe_to_auto_run = args.get("SafeToAutoRun", True)
@@ -49,10 +50,15 @@ try:
             # Assume requires approval if SafeToAutoRun is missing or false
             if "SafeToAutoRun" not in args or not args.get("SafeToAutoRun"):
                 # Requires approval!
+                params = {"waiting_approval": True}
+                if agent_id:
+                    params["agent_id"] = agent_id
+                else:
+                    params["agent_name"] = agent_name
                 s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 s.settimeout(1.0)
                 s.connect(os.environ.get("AGENT_TRACKER_SOCKET", os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "agent-tracker", "agent-tracker.sock")))
-                s.sendall(json.dumps({"jsonrpc": "2.0", "method": "update_agent", "params": {"agent_name": agent_name, "waiting_approval": True}, "id": 1}).encode())
+                s.sendall(json.dumps({"jsonrpc": "2.0", "method": "update_agent", "params": params, "id": 1}).encode())
                 s.close()
                 subprocess.run(["tmux-status-refresh"], capture_output=True)
 except Exception as e:
