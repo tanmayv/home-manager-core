@@ -273,7 +273,7 @@ We want to preserve these current behaviors:
 
 Implementation status:
 - P0: done
-- P1: done in `e992949` (lazy-start/bootstrap, shared startup lock, stale-socket handling under lock, Nix-derived socket path propagation to ctl/systemd/wrapper/hooks)
+- P1: done in `e992949` (lazy-start/bootstrap, shared startup lock, stale-socket handling under lock, Nix-derived socket path propagation to ctl/systemd/wrapper/hooks; Home Manager now installs the lazy-start ctl/aliases cross-platform instead of gating the whole module on Linux)
 - P2: done in `f44c1c8` (wrapper-driven heartbeat loop, explicit heartbeat RPC, cleanup stop/unregister, and same-agent_id re-register preserving runtime state)
 - P3: done in `7facea1` (hooks send `agent_id` explicitly when available and no longer depend on /proc for caller identification; tmux/name fallbacks remain only as compatibility paths)
 - P4: done in `a5c953a` (internal tracker state keyed by `agent_id` with a name index; explicit `agent_id` precedence now covers targeted delivery and CLI `--id` targeting while preserving name-based UX)
@@ -330,8 +330,9 @@ Implementation status:
 - tracker restart while two wrappers simultaneously reconnect/re-register
 
 ### P8: optional service managers
-- Linux systemd user service as optimization
-- macOS launchd as optimization
+- [done] keep Linux systemd user service as an optimization only
+- [pending] macOS launchd as optimization
+- [done] core Home Manager packaging / tmux integration no longer depend on Linux service-manager support
 - not required for MVP
 
 ## Minimal MVP
@@ -445,6 +446,7 @@ Not required for functional cross-platform behavior, but still open:
 - keep Linux `systemd.user` integration healthy as an optimization
 - add Darwin `launchd` support only if desired after core behavior is stable
 - if launchd is added, ensure it uses the same socket/cache path conventions as ctl and wrapper
+- cross-platform packaging is now expected to rely on lazy-start by default, with service managers remaining optional accelerators
 
 ### Small backlog / cleanup items
 

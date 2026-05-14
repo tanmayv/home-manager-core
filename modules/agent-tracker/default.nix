@@ -29,7 +29,7 @@ in
   ];
 
   config = mkMerge [
-    (mkIf (cfg.enable && pkgs.stdenv.isLinux) {
+    (mkIf cfg.enable {
       home.packages = [
         (pkgs.writeScriptBin "agent-tracker-ctl" ''
           #!${pkgs.python3}/bin/python3
@@ -41,7 +41,7 @@ in
           os.environ.setdefault("HEARTBEAT_GRACE_SECONDS", "${toString cfg.heartbeatGraceSeconds}")
           ${builtins.readFile ./agent-tracker-ctl.py}
         '')
-      ] ++ (lib.mapAttrsToList (alias: path: 
+      ] ++ (lib.mapAttrsToList (alias: path:
         pkgs.writeShellApplication {
           name = alias;
           text = ''
@@ -49,20 +49,6 @@ in
           '';
         }
       ) cfg.agents);
-
-      systemd.user.services.agent-tracker = {
-        Unit = {
-          Description = "Agent Tracker Daemon";
-        };
-        Service = {
-          Environment = monitorEnv;
-          ExecStart = daemonCmd;
-          Restart = "always";
-        };
-        Install = {
-          WantedBy = [ "default.target" ];
-        };
-      };
 
       programs.tmux.statusBar.extraLines = mkIf cfg.enableTmuxIntegration [
         {
@@ -80,10 +66,20 @@ in
       '';
     })
 
-    (mkIf (cfg.enable && !pkgs.stdenv.isLinux) {
-      warnings = [
-        "services.agent-tracker is currently Linux-only; it will not be started on this platform."
-      ];
+    (mkIf (cfg.enable && pkgs.stdenv.isLinux) {
+      systemd.user.services.agent-tracker = {
+        Unit = {
+          Description = "Agent Tracker Daemon";
+        };
+        Service = {
+          Environment = monitorEnv;
+          ExecStart = daemonCmd;
+          Restart = "always";
+        };
+        Install = {
+          WantedBy = [ "default.target" ];
+        };
+      };
     })
   ];
 }
