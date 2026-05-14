@@ -31,13 +31,13 @@ with lib;
     heartbeatStaleSeconds = mkOption {
       type = types.ints.positive;
       default = 20;
-      description = "Heartbeat age in seconds after which an agent becomes stale.";
+      description = "Heartbeat age in seconds after which an agent becomes stale. Must be less than or equal to heartbeatGraceSeconds.";
     };
 
     heartbeatGraceSeconds = mkOption {
       type = types.ints.positive;
       default = 30;
-      description = "Heartbeat age in seconds after which the monitor may evict an agent if no live pane process is found.";
+      description = "Heartbeat age in seconds after which the monitor may evict an agent if no live pane process is found. Must be greater than or equal to heartbeatStaleSeconds.";
     };
   };
 }

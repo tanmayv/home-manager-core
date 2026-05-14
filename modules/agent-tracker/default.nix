@@ -31,6 +31,13 @@ in
 
   config = mkMerge [
     (mkIf cfg.enable {
+      assertions = [
+        {
+          assertion = cfg.heartbeatGraceSeconds >= cfg.heartbeatStaleSeconds;
+          message = "services.agent-tracker.heartbeatGraceSeconds must be greater than or equal to services.agent-tracker.heartbeatStaleSeconds.";
+        }
+      ];
+
       home.packages = [
         agentWrapperPackage
         (pkgs.writeScriptBin "agent-tracker-ctl" ''

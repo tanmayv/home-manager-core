@@ -279,7 +279,7 @@ Implementation status:
 - P3: done in `7facea1` (hooks send `agent_id` explicitly when available and no longer depend on /proc for caller identification; tmux/name fallbacks remain only as compatibility paths)
 - P4: done in `a5c953a` (internal tracker state keyed by `agent_id` with a name index; explicit `agent_id` precedence now covers targeted delivery and CLI `--id` targeting while preserving name-based UX)
 - P5: done (restart recovery rebuilds records from tmux metadata even without a discovered live child process, initializing recovered agents as `unknown`; tests now cover recovered entries being refreshed in place by later live register/heartbeat and preserving tmux-sourced renamed display names across restart)
-- P6: partially done in `583d87f` (explicit heartbeat freshness/stale/expired semantics in monitor; heartbeat/recovered-at timing used as primary liveness policy before pane tty fallback eviction; monitor tests now cover expired-with-live-pane-process and expired-without-live-pane-process branches; liveness intervals are now configurable via Home Manager options)
+- P6: partially done in `583d87f` (explicit heartbeat freshness/stale/expired semantics in monitor; heartbeat/recovered-at timing used as primary liveness policy before pane tty fallback eviction; monitor tests now cover expired-with-live-pane-process and expired-without-live-pane-process branches; liveness intervals are configurable via Home Manager options with an eval-time grace>=stale assertion)
 - Follow-up reliability fix: done in `a62be9d` (`agent-tracker-ctl` now reads RPC responses until EOF, fixing large `read-inbox` responses)
 - P7+: pending
 
@@ -420,6 +420,7 @@ Suggested completion steps:
    - have two wrappers for the same `agent_id` reconnect nearly simultaneously
    - assert one logical record remains and runtime state is preserved
 4. [done] Expose `POLL_INTERVAL`, `HEARTBEAT_STALE_SECONDS`, and `HEARTBEAT_GRACE_SECONDS` as Home Manager options so lazy-started and service-managed daemons share the same configured liveness policy
+5. [done] Guard the public liveness-option contract at eval time by asserting `heartbeatGraceSeconds >= heartbeatStaleSeconds`
 
 ### Remaining P7 work (validation matrix)
 
