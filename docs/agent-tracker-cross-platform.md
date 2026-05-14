@@ -273,7 +273,8 @@ We want to preserve these current behaviors:
 
 Implementation status:
 - P0: done
-- P1: done in `e992949` (lazy-start/bootstrap, shared startup lock, stale-socket handling under lock, Nix-derived socket path propagation to ctl/systemd/wrapper/hooks; Home Manager now installs the lazy-start ctl/aliases cross-platform instead of gating the whole module on Linux)
+- P1: done in `e992949` (lazy-start/bootstrap, shared startup lock, stale-socket handling under lock, Nix-derived socket path propagation to ctl/systemd/wrapper/hooks)
+- Packaging follow-ups: Home Manager now installs the lazy-start ctl/aliases cross-platform instead of gating the whole module on Linux, and the generated aliases bundle a guaranteed `agent-wrapper` dependency
 - P2: done in `f44c1c8` (wrapper-driven heartbeat loop, explicit heartbeat RPC, cleanup stop/unregister, and same-agent_id re-register preserving runtime state)
 - P3: done in `7facea1` (hooks send `agent_id` explicitly when available and no longer depend on /proc for caller identification; tmux/name fallbacks remain only as compatibility paths)
 - P4: done in `a5c953a` (internal tracker state keyed by `agent_id` with a name index; explicit `agent_id` precedence now covers targeted delivery and CLI `--id` targeting while preserving name-based UX)
@@ -447,6 +448,7 @@ Not required for functional cross-platform behavior, but still open:
 - add Darwin `launchd` support only if desired after core behavior is stable
 - if launchd is added, ensure it uses the same socket/cache path conventions as ctl and wrapper
 - cross-platform packaging is now expected to rely on lazy-start by default, with service managers remaining optional accelerators
+- generated agent aliases now carry an explicit `agent-wrapper` dependency instead of assuming it is already on PATH
 
 ### Small backlog / cleanup items
 

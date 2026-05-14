@@ -16,6 +16,7 @@ let
   cacheHome = config.xdg.cacheHome or "${config.home.homeDirectory}/.cache";
   socketPath = "${cacheHome}/agent-tracker/agent-tracker.sock";
   daemonCmd = "${pkgs.python3}/bin/python3 ${agentTrackerFiles}/agent-tracker.py";
+  agentWrapperPackage = import ../scripts/agent-wrapper-package.nix { inherit pkgs config; };
   monitorEnv = [
     "AGENT_TRACKER_SOCKET=${socketPath}"
     "POLL_INTERVAL=${toString cfg.pollInterval}"
@@ -31,6 +32,7 @@ in
   config = mkMerge [
     (mkIf cfg.enable {
       home.packages = [
+        agentWrapperPackage
         (pkgs.writeScriptBin "agent-tracker-ctl" ''
           #!${pkgs.python3}/bin/python3
           import os
@@ -44,8 +46,9 @@ in
       ] ++ (lib.mapAttrsToList (alias: path:
         pkgs.writeShellApplication {
           name = alias;
+          runtimeInputs = [ agentWrapperPackage ];
           text = ''
-            agent-wrapper "${path}" "$@"
+            ${agentWrapperPackage}/bin/agent-wrapper "${path}" "$@"
           '';
         }
       ) cfg.agents);
