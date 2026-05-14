@@ -1,6 +1,6 @@
 { pkgs, config, userSettings, lib, ... }:
 let
-  palette = import ../palette.nix;
+  palette = import ../palette.nix { inherit userSettings; };
   username = config.home.username;
   enableTmuxOnSsh = userSettings.enable-tmux-on-ssh or true;
   autoSwitchHg = userSettings.auto-switch-workspace-on-hgd or true;

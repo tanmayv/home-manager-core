@@ -1,4 +1,4 @@
-{ pkgs, lib, config, ... }:
+{ pkgs, lib, config, userSettings ? {}, ... }:
 
 with lib;
 
@@ -12,7 +12,7 @@ let
       cp -r * $out/
     '';
   };
-  palette = import ../palette.nix;
+  palette = import ../palette.nix { inherit userSettings; };
   cacheHome = config.xdg.cacheHome or "${config.home.homeDirectory}/.cache";
   socketPath = "${cacheHome}/agent-tracker/agent-tracker.sock";
   logDir = "${cacheHome}/agent-tracker";

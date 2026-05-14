@@ -1,7 +1,7 @@
 { pkgs, lib, config, userSettings, ... }:
 with lib;
 let
-  palette = import ../palette.nix;
+  palette = import ../palette.nix { inherit userSettings; };
   
   # Check if AI features are enabled
   enableAiWorkflow = userSettings.enable-ai-workflow or false;

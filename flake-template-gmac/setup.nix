@@ -5,6 +5,7 @@
   local_agent_knowledge_dir = "~/agent_knowledge";
   local_agent_knowledge_create_command = "";
   editor = "nvim";
+  theme = "everforest";
   preferred-scripting-language = "Python";
 
   enable_bash_over_zsh = false;
