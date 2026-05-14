@@ -201,7 +201,7 @@ def handle_unregister(params: dict, caller_pid: int = None) -> bool:
     
     # Remove inbox file
     uuid_str = info.get("uuid") or agent_name
-    inbox_file = os.path.join("/tmp/agent-inboxes", f"{uuid_str}.inbox")
+    inbox_file = os.path.join(state.INBOX_DIR, f"{uuid_str}.inbox")
     if os.path.exists(inbox_file):
         try:
             os.remove(inbox_file)
@@ -279,7 +279,7 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
     }
     
     uuid_str = info.get("uuid") or agent_name
-    inbox_file = os.path.join("/tmp/agent-inboxes", f"{uuid_str}.inbox")
+    inbox_file = os.path.join(state.INBOX_DIR, f"{uuid_str}.inbox")
     
     try:
         os.makedirs(os.path.dirname(inbox_file), exist_ok=True)
@@ -404,7 +404,7 @@ def handle_get_inbox(params: dict, caller_pid: int = None) -> dict:
         raise ValueError(f"Agent '{agent_name}' not found")
         
     uuid_str = info.get("uuid") or agent_name
-    inbox_file = os.path.join("/tmp/agent-inboxes", f"{uuid_str}.inbox")
+    inbox_file = os.path.join(state.INBOX_DIR, f"{uuid_str}.inbox")
             
     return _read_and_update_inbox_file(inbox_file, clear, last_n)
 

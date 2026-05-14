@@ -141,7 +141,7 @@ def monitor_once(now: float | None = None):
             uuid_str = info.get("uuid")
             if not uuid_str:
                 uuid_str = name
-            inbox_file = os.path.join("/tmp/agent-inboxes", f"{uuid_str}.inbox")
+            inbox_file = os.path.join(state.INBOX_DIR, f"{uuid_str}.inbox")
             try:
                 os.makedirs(os.path.dirname(inbox_file), exist_ok=True)
                 with open(inbox_file, "a") as f:

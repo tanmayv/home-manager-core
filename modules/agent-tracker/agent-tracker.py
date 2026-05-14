@@ -12,9 +12,9 @@ import rpc_handler
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', stream=sys.stderr)
 
-CACHE_DIR = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "agent-tracker")
-SOCKET_PATH = os.environ.get("AGENT_TRACKER_SOCKET", os.path.join(CACHE_DIR, "agent-tracker.sock"))
-LOCK_PATH = os.path.join(CACHE_DIR, "agent-tracker.lock")
+CACHE_DIR = state.CACHE_DIR
+SOCKET_PATH = state.SOCKET_PATH
+LOCK_PATH = state.LOCK_PATH
 
 
 def _can_connect() -> bool:

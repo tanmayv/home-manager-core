@@ -7,6 +7,11 @@ import os
 import json
 import tmux_util
 
+CACHE_DIR = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "agent-tracker")
+SOCKET_PATH = os.environ.get("AGENT_TRACKER_SOCKET", os.path.join(CACHE_DIR, "agent-tracker.sock"))
+LOCK_PATH = os.path.join(CACHE_DIR, "agent-tracker.lock")
+INBOX_DIR = os.path.join(CACHE_DIR, "inboxes")
+
 state = {}  # keyed by stable agent_id
 name_index = {}  # agent_name -> agent_id
 state_lock = threading.Lock()

@@ -12,6 +12,7 @@ class TestRpcHandler(unittest.TestCase):
     def setUp(self):
         state.state = {}
         state.name_index = {}
+        state.INBOX_DIR = "/tmp/test-agent-inboxes"
 
     @mock.patch("tmux_util.set_agent_uuid")
     @mock.patch("tmux_util.set_agent_id")
@@ -188,7 +189,7 @@ class TestRpcHandler(unittest.TestCase):
         self.assertEqual(info["tmux_pane"], "%2")
 
     def test_send_message_targets_agent_id(self):
-        inbox_path = "/tmp/agent-inboxes/id-1.inbox"
+        inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
         try:
             if os.path.exists(inbox_path):
                 os.remove(inbox_path)
@@ -219,7 +220,7 @@ class TestRpcHandler(unittest.TestCase):
 
     @mock.patch("tmux_util.send_keys")
     def test_send_message_notifies_recovered_unknown_agent(self, send_keys):
-        inbox_path = "/tmp/agent-inboxes/id-1.inbox"
+        inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
         try:
             if os.path.exists(inbox_path):
                 os.remove(inbox_path)
