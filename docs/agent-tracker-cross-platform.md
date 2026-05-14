@@ -329,10 +329,10 @@ Implementation status:
 - [done manually] smoke tests for register/rename/send-message/read-inbox/unregister-style cleanup
 - [done manually] tracker restart recovery test
 - [done manually] pane-close cleanup test
-- [pending] simultaneous wrapper start race test
-- [pending] busy-agent pending notification flush test
-- [pending] kill `agent-wrapper` with `-9` while leaving the pane open
-- [pending] tracker restart while two wrappers simultaneously reconnect/re-register
+- [done] simultaneous wrapper start race test (covered in `test_simultaneous_wrapper_reconnect_race`)
+- [done] busy-agent pending notification flush test (covered in `test_busy_agent_pending_notification_flush`)
+- [done] kill `agent-wrapper` with `-9` while leaving the pane open (covered in `test_kill_9_wrapper_evicts_agent_after_grace_period`)
+- [done] tracker restart while two wrappers simultaneously reconnect/re-register (covered in `test_simultaneous_wrapper_reconnect_race`)
 
 ### P8: optional service managers
 - [done] keep Linux systemd user service as an optimization only
@@ -416,10 +416,10 @@ Suggested completion steps:
 1. [done] Add monitor tests for the two most important branches:
    - expired entry + live pane process found => keep record
    - expired entry + no live pane process found => evict record
-2. Add an integration-style test or scripted repro for:
+2. [done] Add an integration-style test or scripted repro for:
    - `kill -9` wrapper while shell pane remains open
    - verify agent survives briefly, then is evicted after grace when no live agent process remains
-3. Add a tracker-restart race test:
+3. [done] Add a tracker-restart race test:
    - recover agent as `unknown`
    - have two wrappers for the same `agent_id` reconnect nearly simultaneously
    - assert one logical record remains and runtime state is preserved
@@ -432,13 +432,13 @@ The most useful remaining validation work is:
 1. macOS eval for the Home Manager template/config
 2. follow-up smoke coverage for:
    - explicit heartbeat/liveness observation beyond the restart/re-register flow already exercised manually
-   - busy-agent pending notification flush
+   - [done] busy-agent pending notification flush (covered in `test_busy_agent_pending_notification_flush`)
    - explicit `unregister` CLI path (manual cleanup via pane exit is already exercised)
    - Darwin launchd-managed notification visibility/logging once macOS validation is available
 3. focused regressions for:
    - stale-socket/bootstrap races
-   - same-agent_id duplicate register preserving runtime state
-   - placeholder spawning record replaced by real register
+   - [done] same-agent_id duplicate register preserving runtime state
+   - [done] placeholder spawning record replaced by real register (covered in `test_placeholder_spawning_replaced_by_real_register`)
    - large `read-inbox` response decoding
 4. explicit shared allowlist validation for tty/process classification on:
    - Linux
