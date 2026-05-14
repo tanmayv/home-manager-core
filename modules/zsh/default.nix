@@ -80,14 +80,12 @@ in
 
       # Customize Pure prompt: hide user/host and use custom path
       function customize_pure_prompt() {
-        prompt_pure_state[username]=""
-        
         # Compute custom path
         local custom_path="%~"
         ${config.programs.zsh.prompt.pathShortener}
         
         # Recreate PROMPT with custom path
-        PROMPT='%(12V.%F{$prompt_pure_colors[suspended_jobs]}%12v%f .)%(13V.''${prompt_pure_state[username]} .)%F{''${prompt_pure_colors[path]}}'"$custom_path"'%f%(14V. %F{''${prompt_pure_git_branch_color}}%14v%(15V.%F{$prompt_pure_colors[git:dirty]}%15v.)%f.)%(16V. %F{$prompt_pure_colors[git:action]}%16v%f.)%(17V. %F{$prompt_pure_colors[git:arrow]}%17v%f.)%(18V. %F{$prompt_pure_colors[git:stash]}''${PURE_GIT_STASH_SYMBOL:-≡}%f.)%(19V. %F{$prompt_pure_colors[execution_time]}%19v%f.)''${prompt_newline}%(20V.%F{$prompt_pure_colors[virtualenv]}%20v%f .)%(?.%F{${palette.color3}}.%F{$prompt_pure_colors[prompt:error]})''${prompt_pure_state[prompt]}%f '
+        PROMPT='%(12V.%F{$prompt_pure_colors[suspended_jobs]}%12v%f .)%F{''${prompt_pure_colors[path]}}'"$custom_path"'%f%(14V. %F{''${prompt_pure_git_branch_color}}%14v%(15V.%F{$prompt_pure_colors[git:dirty]}%15v.)%f.)%(16V. %F{$prompt_pure_colors[git:action]}%16v%f.)%(17V. %F{$prompt_pure_colors[git:arrow]}%17v%f.)%(18V. %F{$prompt_pure_colors[git:stash]}''${PURE_GIT_STASH_SYMBOL:-≡}%f.)%(19V. %F{$prompt_pure_colors[execution_time]}%19v%f.)''${prompt_newline}%(20V.%F{$prompt_pure_colors[virtualenv]}%20v%f .)%(?.%F{${palette.color3}}.%F{$prompt_pure_colors[prompt:error]})''${prompt_pure_state[prompt]}%f '
       }
       autoload -Uz add-zsh-hook
       add-zsh-hook precmd customize_pure_prompt
