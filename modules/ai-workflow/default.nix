@@ -6,7 +6,6 @@ let
     enable_ai_ssa_creator_skill = false;
     enable_tmux_based_agent_comms = false;
     enable_agent_knowledge = false;
-    enable_home_manager_skill = false;
   };
 
   geminiMdContent = ''
@@ -77,8 +76,6 @@ in
     ".gemini/skills/ai-ssa-creator".source = ./dotfiles/skills/ai-ssa-creator;
   } else { }) // (if aiFeatures.enable_tmux_based_agent_comms then {
     ".gemini/skills/tmux-agent-comms".source = ./dotfiles/skills/tmux-agent-comms;
-  } else { }) // (if aiFeatures.enable_home_manager_skill then {
-    ".gemini/skills/home-manager-skill".source = ./dotfiles/skills/home-manager-skill;
   } else { });
 
 }

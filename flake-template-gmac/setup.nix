@@ -32,6 +32,5 @@
     enable_agent_knowledge = true;
     enable_ai_ssa_creator_skill = true;
     enable_tmux_based_agent_comms = true;
-    enable_home_manager_skill = true;
   };
 }
