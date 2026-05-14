@@ -46,7 +46,7 @@ def handle_register(params: dict) -> str:
     elif name:
         num = 1
         agent_name = name
-        while agent_name in agents and agents[agent_name].get("status") != "spawning":
+        while state.get_agent_id_by_name(agent_name) and (state.get_agent(agent_name) or {}).get("status") != "spawning":
             agent_name = f"{name}-{num}"
             num += 1
     else:
@@ -239,7 +239,7 @@ def handle_spin_agent(params: dict) -> str:
     agents = state.get_all_agents()
     num = 1
     agent_name = name
-    while agent_name in agents:
+    while state.get_agent_id_by_name(agent_name) and (state.get_agent(agent_name) or {}).get("status") != "spawning":
         agent_name = f"{name}-{num}"
         num += 1
         
