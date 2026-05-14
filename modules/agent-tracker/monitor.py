@@ -61,6 +61,9 @@ def monitor_once(now: float | None = None):
 
     agents_snapshot = state.get_all_agents()
     active_panes = tmux_util.list_panes()
+    if active_panes is None:
+        logging.warning("Skipping monitor pass because tmux panes could not be listed.")
+        return
     active_pane_ids = [p["pane_id"] for p in active_panes]
 
     for name, info in agents_snapshot.items():

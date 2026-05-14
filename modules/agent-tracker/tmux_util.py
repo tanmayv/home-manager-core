@@ -58,7 +58,12 @@ def set_agent_uuid(pane_id, uuid, socket_path=None):
 
 
 def list_panes():
-    """Lists panes with ID, agent identity, type, cmd, and active state."""
+    """Lists panes with ID, agent identity, type, cmd, and active state.
+
+    Returns None when tmux itself cannot be queried. This lets the monitor
+    distinguish "no panes" from "tmux unavailable" and avoid deleting every
+    tracked agent during transient PATH/launchd issues on macOS.
+    """
     try:
         out = run_tmux_cmd(["list-panes", "-a", "-F", "#{pane_id}|#{@agent_name}|#{@agent_id}|#{@agent_uuid}|#{@agent_type}|#{@agent_cmd}|#{pane_active}"])
         panes = []
@@ -80,7 +85,7 @@ def list_panes():
         return panes
     except Exception as e:
         logging.error(f"Failed to list panes: {e}")
-        return []
+        return None
 
 def get_pane_info(pane_id):
     """Gets tty, session, and shell pid for a pane."""

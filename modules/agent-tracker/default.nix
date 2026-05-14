@@ -25,6 +25,10 @@ let
     POLL_INTERVAL = toString cfg.pollInterval;
     HEARTBEAT_STALE_SECONDS = toString cfg.heartbeatStaleSeconds;
     HEARTBEAT_GRACE_SECONDS = toString cfg.heartbeatGraceSeconds;
+  } // lib.optionalAttrs pkgs.stdenv.isDarwin {
+    # launchd starts services with a minimal PATH, so bare `tmux` lookups from
+    # the daemon fail on macOS unless we provide the Nix profile tool paths.
+    PATH = "${lib.makeBinPath [ pkgs.tmux pkgs.coreutils pkgs.gnugrep ]}:/usr/bin:/bin:/usr/sbin:/sbin";
   };
   monitorEnv = lib.mapAttrsToList (name: value: "${name}=${value}") monitorEnvVars;
 in

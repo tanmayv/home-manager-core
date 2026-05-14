@@ -74,6 +74,9 @@ def init_state() -> None:
     """Recovers existing agents by querying tmux panes."""
     logging.info("Initializing state from tmux panes...")
     panes = tmux_util.list_panes()
+    if panes is None:
+        logging.warning("Skipping state recovery because tmux panes could not be listed.")
+        return
     for pane in panes:
         pane_id = pane["pane_id"]
         agent_name = pane["agent_name"]
