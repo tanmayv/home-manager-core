@@ -276,9 +276,10 @@ Implementation status:
 - P1: done in `e992949` (lazy-start/bootstrap, shared startup lock, stale-socket handling under lock, Nix-derived socket path propagation to ctl/systemd/wrapper/hooks)
 - P2: done in `f44c1c8` (wrapper-driven heartbeat loop, explicit heartbeat RPC, cleanup stop/unregister, and same-agent_id re-register preserving runtime state)
 - P3: done in `7facea1` (hooks send `agent_id` explicitly when available and no longer depend on /proc for caller identification; tmux/name fallbacks remain only as compatibility paths)
-- P4: done (internal tracker state keyed by `agent_id` with a name index; explicit `agent_id` precedence now covers targeted delivery and CLI `--id` targeting while preserving name-based UX)
+- P4: done in `a5c953a` (internal tracker state keyed by `agent_id` with a name index; explicit `agent_id` precedence now covers targeted delivery and CLI `--id` targeting while preserving name-based UX)
 - P5: partially done in `713216f` (restart recovery rebuilds records from tmux metadata even without a discovered live child process, initializing recovered agents as `unknown`)
-- P6: partially done (explicit heartbeat freshness/stale/expired semantics in monitor; heartbeat/recovered-at timing used as primary liveness policy before pane tty fallback eviction)
+- P6: partially done in `583d87f` (explicit heartbeat freshness/stale/expired semantics in monitor; heartbeat/recovered-at timing used as primary liveness policy before pane tty fallback eviction)
+- Follow-up reliability fix: done in `a62be9d` (`agent-tracker-ctl` now reads RPC responses until EOF, fixing large `read-inbox` responses)
 - P7+: pending
 
 ### P0: protocol + invariants doc
@@ -376,3 +377,79 @@ Implementation status:
 - `whoami` should return both `agent_id` and `agent_name`
 - during migration, dual support for `agent_name` and `agent_id` RPC params may be useful
 - self-identification on macOS should prefer explicit `agent_id` params/env over tmux name matching
+
+## Pending work / handoff guide
+
+This section is intended to let the next agent pick up work without re-deriving the plan.
+
+### Remaining P5 work (recovery hardening)
+
+Current state:
+- recovery recreates agent records from tmux metadata even if no live child process is discovered
+- recovered entries come back as `status = "unknown"`, `pid = null`, and rely on later heartbeat/re-register to become live again
+
+Suggested completion steps:
+1. Add a focused test for tracker restart + wrapper heartbeat re-register:
+   - seed tmux metadata for an agent
+   - run `init_state()` to recover it as `unknown`
+   - simulate `heartbeat` or `register` from the same `agent_id`
+   - assert `recovered_at` is cleared and the live record is refreshed in place
+2. Add a test for rename + restart:
+   - rename an agent
+   - ensure tmux `@agent_name` remains the source for recovered display name
+   - verify wrapper re-register does not revert to stale env `AGENT_NAME`
+
+### Remaining P6 work (liveness hardening)
+
+Current state:
+- monitor uses `last_heartbeat` or `recovered_at` as the primary liveness reference
+- pane disappearance is immediately authoritative
+- after grace expiry, tty/process discovery is only a best-effort fallback before eviction
+
+Suggested completion steps:
+1. Add monitor tests for the two most important branches:
+   - expired entry + live pane process found => keep record
+   - expired entry + no live pane process found => evict record
+2. Add an integration-style test or scripted repro for:
+   - `kill -9` wrapper while shell pane remains open
+   - verify agent survives briefly, then is evicted after grace when no live agent process remains
+3. Add a tracker-restart race test:
+   - recover agent as `unknown`
+   - have two wrappers for the same `agent_id` reconnect nearly simultaneously
+   - assert one logical record remains and runtime state is preserved
+4. Revisit whether `HEARTBEAT_STALE_SECONDS` and `HEARTBEAT_GRACE_SECONDS` should become Home Manager options instead of only environment-driven constants
+
+### Remaining P7 work (validation matrix)
+
+The most useful remaining validation work is:
+1. Linux eval + macOS eval for the Home Manager template/config
+2. smoke tests for:
+   - register
+   - heartbeat
+   - rename
+   - send-message
+   - read-inbox
+   - unregister
+3. focused regressions for:
+   - stale-socket/bootstrap races
+   - same-agent_id duplicate register preserving runtime state
+   - placeholder spawning record replaced by real register
+   - large `read-inbox` response decoding
+4. explicit shared allowlist validation for tty/process classification on:
+   - Linux
+   - macOS
+
+### Remaining P8 work (optional system integration)
+
+Not required for functional cross-platform behavior, but still open:
+- keep Linux `systemd.user` integration healthy as an optimization
+- add Darwin `launchd` support only if desired after core behavior is stable
+- if launchd is added, ensure it uses the same socket/cache path conventions as ctl and wrapper
+
+### Small backlog / cleanup items
+
+These are non-blocking and can be done opportunistically:
+- replace `datetime.utcnow()` in `rpc_handler.py` with a timezone-aware UTC timestamp helper
+- centralize repeated socket-path resolution logic used in inline Python snippets/hooks
+- consider exposing heartbeat/liveness constants as formal Home Manager options
+- consider expanding test coverage around `agent-tracker-ctl` CLI behavior for `--id` paths
