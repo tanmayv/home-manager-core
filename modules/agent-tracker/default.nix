@@ -17,12 +17,13 @@ let
   socketPath = "${cacheHome}/agent-tracker/agent-tracker.sock";
   daemonCmd = "${pkgs.python3}/bin/python3 ${agentTrackerFiles}/agent-tracker.py";
   agentWrapperPackage = import ../scripts/agent-wrapper-package.nix { inherit pkgs config; };
-  monitorEnv = [
-    "AGENT_TRACKER_SOCKET=${socketPath}"
-    "POLL_INTERVAL=${toString cfg.pollInterval}"
-    "HEARTBEAT_STALE_SECONDS=${toString cfg.heartbeatStaleSeconds}"
-    "HEARTBEAT_GRACE_SECONDS=${toString cfg.heartbeatGraceSeconds}"
-  ];
+  monitorEnvVars = {
+    AGENT_TRACKER_SOCKET = socketPath;
+    POLL_INTERVAL = toString cfg.pollInterval;
+    HEARTBEAT_STALE_SECONDS = toString cfg.heartbeatStaleSeconds;
+    HEARTBEAT_GRACE_SECONDS = toString cfg.heartbeatGraceSeconds;
+  };
+  monitorEnv = lib.mapAttrsToList (name: value: "${name}=${value}") monitorEnvVars;
 in
 {
   imports = [
@@ -88,6 +89,22 @@ in
         };
         Install = {
           WantedBy = [ "default.target" ];
+        };
+      };
+    })
+
+    (mkIf (cfg.enable && pkgs.stdenv.isDarwin) {
+      launchd.agents.agent-tracker = {
+        enable = true;
+        config = {
+          ProgramArguments = [ "${pkgs.python3}/bin/python3" "${agentTrackerFiles}/agent-tracker.py" ];
+          EnvironmentVariables = monitorEnvVars;
+          KeepAlive = {
+            Crashed = true;
+            SuccessfulExit = false;
+          };
+          ProcessType = "Background";
+          RunAtLoad = true;
         };
       };
     })

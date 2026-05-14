@@ -281,7 +281,8 @@ Implementation status:
 - P5: done (restart recovery rebuilds records from tmux metadata even without a discovered live child process, initializing recovered agents as `unknown`; tests now cover recovered entries being refreshed in place by later live register/heartbeat and preserving tmux-sourced renamed display names across restart)
 - P6: partially done in `583d87f` (explicit heartbeat freshness/stale/expired semantics in monitor; heartbeat/recovered-at timing used as primary liveness policy before pane tty fallback eviction; monitor tests now cover expired-with-live-pane-process and expired-without-live-pane-process branches; liveness intervals are configurable via Home Manager options with an eval-time grace>=stale assertion)
 - Follow-up reliability fix: done in `a62be9d` (`agent-tracker-ctl` now reads RPC responses until EOF, fixing large `read-inbox` responses)
-- P7+: pending
+- P7: pending
+- P8: done (Linux systemd and macOS launchd both supported as optional service-manager optimizations; lazy-start remains the core path)
 
 ### P0: protocol + invariants doc
 - write this design
@@ -332,7 +333,7 @@ Implementation status:
 
 ### P8: optional service managers
 - [done] keep Linux systemd user service as an optimization only
-- [pending] macOS launchd as optimization
+- [done] macOS launchd as optimization
 - [done] core Home Manager packaging / tmux integration no longer depend on Linux service-manager support
 - not required for MVP
 
@@ -444,11 +445,10 @@ The most useful remaining validation work is:
 
 ### Remaining P8 work (optional system integration)
 
-Not required for functional cross-platform behavior, but still open:
+Not required for functional cross-platform behavior, but now implemented as optional accelerators:
 - keep Linux `systemd.user` integration healthy as an optimization
-- add Darwin `launchd` support only if desired after core behavior is stable
-- if launchd is added, ensure it uses the same socket/cache path conventions as ctl and wrapper
-- cross-platform packaging is now expected to rely on lazy-start by default, with service managers remaining optional accelerators
+- Darwin `launchd` now uses the same socket/cache/liveness environment conventions as ctl and wrapper
+- cross-platform packaging is expected to rely on lazy-start by default, with service managers remaining optional accelerators
 - generated agent aliases now carry an explicit `agent-wrapper` dependency instead of assuming it is already on PATH
 
 ### Small backlog / cleanup items
