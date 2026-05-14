@@ -50,15 +50,15 @@ def main():
         print(f"Error: {assigned_name} not found in list after registration", file=sys.stderr)
         sys.exit(1)
 
-    # 3. Rename it
+    # 3. Rename it (Force rename of another agent)
     new_name = f"{assigned_name}-renamed"
-    print(f"Renaming {assigned_name} to {new_name}...")
+    print(f"Renaming {assigned_name} to {new_name} with --force...")
 
     # Call agent-tracker-ctl.py directly to test the changes without needing to build/install
     dir_path = os.path.dirname(os.path.abspath(__file__))
     ctl_script = os.path.join(dir_path, "agent-tracker-ctl.py")
     try:
-        subprocess.run(["python3", ctl_script, "rename", assigned_name, new_name], check=True, capture_output=True)
+        subprocess.run(["python3", ctl_script, "rename", "--force", assigned_name, new_name], check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
         print(f"Error calling agent-tracker-ctl rename: {e.stderr.decode()}", file=sys.stderr)
         sys.exit(1)
@@ -70,6 +70,22 @@ def main():
         sys.exit(1)
     if assigned_name in agents:
         print(f"Error: Old name {assigned_name} still exists in list after rename", file=sys.stderr)
+        sys.exit(1)
+
+    # 5. Test self-rename using AGENT_NAME
+    newer_name = f"{new_name}-again"
+    print(f"Testing self-rename of {new_name} to {newer_name} using AGENT_NAME...")
+    env = os.environ.copy()
+    env["AGENT_NAME"] = new_name
+    try:
+        subprocess.run(["python3", ctl_script, "rename", newer_name], env=env, check=True, capture_output=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error calling agent-tracker-ctl self-rename: {e.stderr.decode()}", file=sys.stderr)
+        sys.exit(1)
+
+    agents = call_rpc("list")
+    if newer_name not in agents:
+        print(f"Error: {newer_name} not found in list after self-rename", file=sys.stderr)
         sys.exit(1)
 
     print("Test passed successfully!")
