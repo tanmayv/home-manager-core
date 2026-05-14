@@ -7,6 +7,8 @@ import state
 import tmux_util
 
 POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", 5))
+HEARTBEAT_STALE_SECONDS = int(os.environ.get("HEARTBEAT_STALE_SECONDS", 20))
+HEARTBEAT_GRACE_SECONDS = int(os.environ.get("HEARTBEAT_GRACE_SECONDS", 30))
 
 def is_process_alive(pid):
     """Checks if a process is alive. Note: This is Linux-specific due to /proc usage."""
@@ -38,11 +40,26 @@ def is_process_alive(pid):
         logging.debug(f"Unexpected error in is_process_alive for PID {pid}: {e}")
         return False
 
+def get_liveness_phase(info: dict, now: float | None = None) -> str:
+    """Classifies heartbeat/recovery liveness as fresh, stale, expired, or none."""
+    now = now if now is not None else time.time()
+    reference = info.get("last_heartbeat") or info.get("recovered_at")
+    if reference is None:
+        return "none"
+    age = now - reference
+    if age <= HEARTBEAT_STALE_SECONDS:
+        return "fresh"
+    if age <= HEARTBEAT_GRACE_SECONDS:
+        return "stale"
+    return "expired"
+
+
 def background_monitor():
     """Periodically checks process health and scrapes panes for status."""
     logging.info("Starting background monitor...")
     while True:
         time.sleep(POLL_INTERVAL)
+        now = time.time()
         to_remove = []
         
         agents_snapshot = state.get_all_agents()
@@ -64,14 +81,27 @@ def background_monitor():
                 logging.info(f"Pane {pane_id} for agent {name} no longer exists.")
                 to_remove.append(name)
                 continue
+
+            liveness_phase = get_liveness_phase(info, now)
+            if pane_id and liveness_phase == "expired":
+                proc = state.discover_agent_process(pane_id, info.get("agent_cmd"))
+                if proc:
+                    logging.info(f"Keeping stale agent {name}; found live pane process PID {proc['pid']} ({proc['comm']})")
+                    state.update_agent(name, pid=proc["pid"], wrapper_pid=None)
+                else:
+                    logging.info(f"Removing stale agent {name}; no live pane process found after heartbeat grace period.")
+                    to_remove.append(name)
+                    continue
+
             wrapper_pid = info.get("wrapper_pid")
             pid = info.get("pid")
-            
-            wrapper_alive = wrapper_pid and is_process_alive(wrapper_pid)
-            child_alive = pid and is_process_alive(pid)
+            use_procfs_fallback = (liveness_phase == "none")
 
-            # Update child PID if not already known, or recover if the tracked child died
-            if wrapper_pid and (not info.get("pid") or (pid and not child_alive)):
+            wrapper_alive = wrapper_pid and is_process_alive(wrapper_pid) if use_procfs_fallback else False
+            child_alive = pid and is_process_alive(pid) if use_procfs_fallback else False
+
+            # Update child PID if not already known, or recover if the tracked child died.
+            if use_procfs_fallback and wrapper_pid and (not info.get("pid") or (pid and not child_alive)):
                 try:
                     out = subprocess.check_output(["pgrep", "-P", str(wrapper_pid)], timeout=1).decode("utf-8").strip()
                     if out:
@@ -83,7 +113,7 @@ def background_monitor():
                     logging.debug(f"Failed to pgrep child PID for {name}: {e}")
 
             # If wrapper/child tracking is stale, fall back to inspecting the pane's tty.
-            if pane_id and ((wrapper_pid and not wrapper_alive and not child_alive) or (pid and not child_alive)):
+            if use_procfs_fallback and pane_id and ((wrapper_pid and not wrapper_alive and not child_alive) or (pid and not child_alive)):
                 proc = state.discover_agent_process(pane_id, info.get("agent_cmd"))
                 if proc:
                     logging.info(f"Recovered live pane process for {name}: PID {proc['pid']} ({proc['comm']})")
@@ -92,15 +122,15 @@ def background_monitor():
                     child_alive = True
                     wrapper_pid = None
 
-            if wrapper_pid:
+            if use_procfs_fallback and wrapper_pid:
                 if not wrapper_alive and not child_alive:
                     to_remove.append(name)
                     continue
-            else:
+            elif use_procfs_fallback:
                 # Spawning agent timeout check
                 if info.get("status") == "spawning":
                     spawn_time = info.get("timestamp", 0)
-                    if time.time() - spawn_time > 60:
+                    if now - spawn_time > 60:
                         to_remove.append(name)
                         continue
                 # Recovered agent fallback

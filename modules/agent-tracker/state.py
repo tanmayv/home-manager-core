@@ -1,4 +1,5 @@
 import threading
+import time
 import uuid
 import logging
 import subprocess
@@ -95,6 +96,7 @@ def init_state() -> None:
                         "waiting_approval": False,
                         "agent_id": resolved_agent_id,
                         "uuid": resolved_agent_id,
+                        "recovered_at": time.time(),
                         "agent_type": agent_type,
                         "agent_cmd": agent_cmd or discovered_cmd or "unknown",
                         "pending_notifications": []

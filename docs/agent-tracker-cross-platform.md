@@ -274,11 +274,12 @@ We want to preserve these current behaviors:
 Implementation status:
 - P0: done
 - P1: done in `e992949` (lazy-start/bootstrap, shared startup lock, stale-socket handling under lock, Nix-derived socket path propagation to ctl/systemd/wrapper/hooks)
-- P2: done in next commit after `d64aa12` (wrapper-driven heartbeat loop, explicit heartbeat RPC, cleanup stop/unregister, and same-agent_id re-register preserving runtime state)
+- P2: done in `f44c1c8` (wrapper-driven heartbeat loop, explicit heartbeat RPC, cleanup stop/unregister, and same-agent_id re-register preserving runtime state)
 - P3: partially done in `e6bfca7` (hooks send `agent_id` explicitly when available; procfs/tmux-pane/name fallbacks still remain until later precedence cleanup)
 - P4: partially done (internal tracker state keyed by `agent_id` with a name index; external CLI/name UX and compatibility aliases preserved)
-- P5: partially done in next commit after `f44c1c8` (restart recovery rebuilds records from tmux metadata even without a discovered live child process, initializing recovered agents as `unknown`)
-- P6+: pending
+- P5: partially done in `713216f` (restart recovery rebuilds records from tmux metadata even without a discovered live child process, initializing recovered agents as `unknown`)
+- P6: partially done (explicit heartbeat freshness/stale/expired semantics in monitor; heartbeat/recovered-at timing used as primary liveness policy before pane tty fallback eviction)
+- P7+: pending
 
 ### P0: protocol + invariants doc
 - write this design
@@ -314,8 +315,8 @@ Implementation status:
 - [done] recover inbox/state shape without requiring PID recovery
 
 ### P6: liveness policy
-- heartbeat timeout + pane existence as core policy
-- keep Linux procfs fallback only as optional best-effort recovery/debug aid
+- [done] heartbeat timeout + pane existence as core policy
+- [partial] keep Linux procfs fallback only as optional best-effort recovery/debug aid
 
 ### P7: validation/tests
 - Linux + macOS eval
