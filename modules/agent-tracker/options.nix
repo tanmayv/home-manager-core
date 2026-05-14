@@ -21,5 +21,23 @@ with lib;
       default = {};
       description = "Map of agent aliases to their executable paths.";
     };
+
+    pollInterval = mkOption {
+      type = types.ints.positive;
+      default = 5;
+      description = "Monitor poll interval in seconds.";
+    };
+
+    heartbeatStaleSeconds = mkOption {
+      type = types.ints.positive;
+      default = 20;
+      description = "Heartbeat age in seconds after which an agent becomes stale.";
+    };
+
+    heartbeatGraceSeconds = mkOption {
+      type = types.ints.positive;
+      default = 30;
+      description = "Heartbeat age in seconds after which the monitor may evict an agent if no live pane process is found.";
+    };
   };
 }

@@ -16,6 +16,12 @@ let
   cacheHome = config.xdg.cacheHome or "${config.home.homeDirectory}/.cache";
   socketPath = "${cacheHome}/agent-tracker/agent-tracker.sock";
   daemonCmd = "${pkgs.python3}/bin/python3 ${agentTrackerFiles}/agent-tracker.py";
+  monitorEnv = [
+    "AGENT_TRACKER_SOCKET=${socketPath}"
+    "POLL_INTERVAL=${toString cfg.pollInterval}"
+    "HEARTBEAT_STALE_SECONDS=${toString cfg.heartbeatStaleSeconds}"
+    "HEARTBEAT_GRACE_SECONDS=${toString cfg.heartbeatGraceSeconds}"
+  ];
 in
 {
   imports = [
@@ -30,6 +36,9 @@ in
           import os
           os.environ.setdefault("AGENT_TRACKER_SOCKET", "${socketPath}")
           os.environ.setdefault("AGENT_TRACKER_DAEMON", "${daemonCmd}")
+          os.environ.setdefault("POLL_INTERVAL", "${toString cfg.pollInterval}")
+          os.environ.setdefault("HEARTBEAT_STALE_SECONDS", "${toString cfg.heartbeatStaleSeconds}")
+          os.environ.setdefault("HEARTBEAT_GRACE_SECONDS", "${toString cfg.heartbeatGraceSeconds}")
           ${builtins.readFile ./agent-tracker-ctl.py}
         '')
       ] ++ (lib.mapAttrsToList (alias: path: 
@@ -46,7 +55,7 @@ in
           Description = "Agent Tracker Daemon";
         };
         Service = {
-          Environment = [ "AGENT_TRACKER_SOCKET=${socketPath}" ];
+          Environment = monitorEnv;
           ExecStart = daemonCmd;
           Restart = "always";
         };
