@@ -56,6 +56,11 @@ in
           os.environ.setdefault("POLL_INTERVAL", "${toString cfg.pollInterval}")
           os.environ.setdefault("HEARTBEAT_STALE_SECONDS", "${toString cfg.heartbeatStaleSeconds}")
           os.environ.setdefault("HEARTBEAT_GRACE_SECONDS", "${toString cfg.heartbeatGraceSeconds}")
+          os.environ.setdefault("PALETTE_COLOR8", "${palette.color8}")
+          os.environ.setdefault("PALETTE_COLOR1", "${palette.color1}")
+          os.environ.setdefault("PALETTE_COLOR3", "${palette.color3}")
+          os.environ.setdefault("PALETTE_COLOR6", "${palette.color6}")
+          os.environ.setdefault("PALETTE_COLOR2", "${palette.color2}")
           ${builtins.readFile ./agent-tracker-ctl.py}
         '')
       ] ++ (lib.mapAttrsToList (alias: path:

@@ -173,24 +173,30 @@ def main():
         except subprocess.CalledProcessError:
             current_pane = ""
 
+        color8 = os.environ.get("PALETTE_COLOR8", "#414868")
+        color1 = os.environ.get("PALETTE_COLOR1", "#db4b4b")
+        color3 = os.environ.get("PALETTE_COLOR3", "#e0af68")
+        color6 = os.environ.get("PALETTE_COLOR6", "#7dcfff")
+        color2 = os.environ.get("PALETTE_COLOR2", "#9ece6a")
+
         formatted = []
         for name, info in agents.items():
             pane = info.get("tmux_pane")
             waiting_approval = info.get("waiting_approval", False)
             status = info.get("status", "")
             
-            color = "#414868" # Fallback (Gray)
+            color = color8
             if waiting_approval:
-                color = "#db4b4b" # Red for Waiting for Approval
+                color = color1
             elif pane == current_pane:
-                color = "#e0af68" # Yellow for Active Pane
+                color = color3
             elif status == "working":
-                color = "#7dcfff" # Cyan for Working
+                color = color6
             elif status == "idle":
-                color = "#9ece6a" # Green for Idle
+                color = color2
 
             range_arg = f"agent:{pane}"
-            formatted.append(f"#[range=user|{range_arg}]#[fg={color},bold]{name}#[fg=#414868,nobold]#[norange]")
+            formatted.append(f"#[range=user|{range_arg}]#[fg={color},bold]{name}#[fg={color8},nobold]#[norange]")
 
         print(" · ".join(formatted))
 
