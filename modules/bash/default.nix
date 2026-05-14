@@ -1,4 +1,4 @@
-{ pkgs, config, userSettings, ... }:
+{ pkgs, config, userSettings, lib, ... }:
 let
   palette = import ../palette.nix;
   username = config.home.username;
@@ -17,6 +17,13 @@ in
     shellAliases = {};
 
     initExtra = ''
+      ${lib.optionalString pkgs.stdenv.isDarwin ''
+      # Nix
+      if [ -e '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh' ]; then
+          . '/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh'
+      fi
+      ''}
+
       export COLORTERM=truecolor
       # Basic Bash config
       HISTCONTROL=ignoredups:erasedups
