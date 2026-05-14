@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest import mock
 
@@ -56,6 +57,31 @@ class TestRpcHandler(unittest.TestCase):
         self.assertEqual(info["wrapper_pid"], 222)
         self.assertIn("last_heartbeat", info)
         self.assertEqual(len(state.state), 1)
+
+    def test_send_message_targets_agent_id(self):
+        inbox_path = "/tmp/agent-inboxes/id-1.inbox"
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent(
+                "agent1",
+                {
+                    "agent_id": "id-1",
+                    "status": "working",
+                    "waiting_approval": False,
+                    "pending_notifications": [],
+                    "tmux_pane": "%1",
+                    "tmux_socket": "sock",
+                },
+            )
+            self.assertTrue(
+                rpc_handler.handle_send_message({"agent_id": "id-1", "message": "hello", "sender_name": "tester"})
+            )
+            info = state.get_agent("agent1")
+            self.assertEqual(info["pending_notifications"], ["tester"])
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
 
 
 if __name__ == "__main__":

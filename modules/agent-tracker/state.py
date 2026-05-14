@@ -146,6 +146,12 @@ def get_agent_name_by_id(agent_id: str) -> str | None:
         return info.get("name") if info else None
 
 
+def get_agent_id_by_name(name: str) -> str | None:
+    """Returns the stable agent_id for a given display name."""
+    with state_lock:
+        return name_index.get(name)
+
+
 def get_agent_name_by_pane(tmux_pane: str) -> str | None:
     """Returns the agent name for a given tmux pane."""
     with state_lock:

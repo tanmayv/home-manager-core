@@ -205,6 +205,21 @@ def handle_unregister(params: dict, caller_pid: int = None) -> bool:
     state.delete_agent(agent_name)
     return True
 
+def _resolve_target_agent_name(params: dict) -> str | None:
+    """Resolves a target agent by explicit agent_id first, then display name."""
+    agent_id = params.get("agent_id")
+    if agent_id:
+        resolved_name = state.get_agent_name_by_id(agent_id)
+        if resolved_name:
+            return resolved_name
+
+    agent_name = params.get("agent_name")
+    if agent_name and state.get_agent(agent_name):
+        return agent_name
+
+    return None
+
+
 def handle_spin_agent(params: dict) -> str:
     """Spins a new agent in a new tmux pane."""
     session = params.get("session")
@@ -240,7 +255,7 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
     if not sender_name:
         sender_name = "cli-user"
         
-    agent_name = params.get("agent_name")
+    agent_name = _resolve_target_agent_name(params)
     msg = params.get("message")
     
     if not (agent_name and msg):

@@ -94,12 +94,14 @@ def main():
     subparsers.add_parser("daemon", help="Run the tracker daemon in the foreground")
 
     send_parser = subparsers.add_parser("send-message", help="Send message to agent")
-    send_parser.add_argument("agent_name", help="Target agent name")
+    send_parser.add_argument("agent_name", nargs="?", help="Target agent name")
     send_parser.add_argument("message", help="Message text")
+    send_parser.add_argument("--id", dest="agent_id", help="Target agent ID")
 
     focus_parser = subparsers.add_parser("focus", help="Focus agent pane")
     focus_group = focus_parser.add_mutually_exclusive_group(required=True)
     focus_group.add_argument("agent_name", nargs="?", help="Agent name to focus")
+    focus_group.add_argument("--id", dest="agent_id", help="Agent ID to focus")
     focus_group.add_argument("--next", action="store_true", help="Focus next agent")
     focus_group.add_argument("--prev", action="store_true", help="Focus previous agent")
 
@@ -114,6 +116,7 @@ def main():
     read_inbox_parser = subparsers.add_parser("read-inbox", help="Read agent inbox")
     read_inbox_parser.add_argument("--clear", action="store_true", help="Clear inbox after reading")
     read_inbox_parser.add_argument("--name", help="Agent name to read inbox for (defaults to current agent)")
+    read_inbox_parser.add_argument("--id", dest="agent_id", help="Agent ID to read inbox for")
     read_inbox_parser.add_argument("--last", "-l", type=int, help="Read last N messages")
 
     subparsers.add_parser("whoami", help="Show current agent identity")
@@ -121,6 +124,7 @@ def main():
     unregister_parser = subparsers.add_parser("unregister", help="Unregister agent")
     group = unregister_parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--name", help="Agent name to unregister")
+    group.add_argument("--id", dest="agent_id", help="Agent ID to unregister")
     group.add_argument("--pane", help="Tmux pane ID to unregister")
 
     args = parser.parse_args()
@@ -178,7 +182,14 @@ def main():
         print(" · ".join(formatted))
 
     elif args.subcommand == "send-message":
-        params = {"agent_name": args.agent_name, "message": args.message}
+        if not args.agent_name and not args.agent_id:
+            print("Error: send-message requires <agent_name> or --id <agent_id>", file=sys.stderr)
+            sys.exit(1)
+        params = {"message": args.message}
+        if args.agent_id:
+            params["agent_id"] = args.agent_id
+        else:
+            params["agent_name"] = args.agent_name
         call_rpc("send_message", params)
         print("Message sent.")
 
@@ -214,6 +225,8 @@ def main():
                 target_agent = agent_names[target_index]
         else:
             target_agent = args.agent_name
+            if args.agent_id and not target_agent:
+                target_agent = next((name for name, info in agents.items() if info.get("agent_id") == args.agent_id or info.get("uuid") == args.agent_id), None)
 
         if target_agent in agents:
             info = agents[target_agent]
@@ -261,7 +274,9 @@ def main():
         agent_name = args.name
         params = {"clear": args.clear}
         
-        if agent_name:
+        if args.agent_id:
+            params["agent_id"] = args.agent_id
+        elif agent_name:
             params["agent_name"] = agent_name
             
         if args.last is not None:
@@ -308,6 +323,8 @@ def main():
         params = {}
         if args.name:
             params["agent_name"] = args.name
+        if args.agent_id:
+            params["agent_id"] = args.agent_id
         if args.pane:
             params["tmux_pane"] = args.pane
         call_rpc("unregister", params)

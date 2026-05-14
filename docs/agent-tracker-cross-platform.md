@@ -275,8 +275,8 @@ Implementation status:
 - P0: done
 - P1: done in `e992949` (lazy-start/bootstrap, shared startup lock, stale-socket handling under lock, Nix-derived socket path propagation to ctl/systemd/wrapper/hooks)
 - P2: done in `f44c1c8` (wrapper-driven heartbeat loop, explicit heartbeat RPC, cleanup stop/unregister, and same-agent_id re-register preserving runtime state)
-- P3: done in next commit after `583d87f` (hooks send `agent_id` explicitly when available and no longer depend on /proc for caller identification; tmux/name fallbacks remain only as compatibility paths)
-- P4: partially done (internal tracker state keyed by `agent_id` with a name index; external CLI/name UX and compatibility aliases preserved)
+- P3: done in `7facea1` (hooks send `agent_id` explicitly when available and no longer depend on /proc for caller identification; tmux/name fallbacks remain only as compatibility paths)
+- P4: done (internal tracker state keyed by `agent_id` with a name index; explicit `agent_id` precedence now covers targeted delivery and CLI `--id` targeting while preserving name-based UX)
 - P5: partially done in `713216f` (restart recovery rebuilds records from tmux metadata even without a discovered live child process, initializing recovered agents as `unknown`)
 - P6: partially done (explicit heartbeat freshness/stale/expired semantics in monitor; heartbeat/recovered-at timing used as primary liveness policy before pane tty fallback eviction)
 - P7+: pending
@@ -308,7 +308,7 @@ Implementation status:
 - [done] state keyed by `agent_id`
 - [done] maintain name index for CLI lookup / rename UX
 - [done] define registration conflict resolution and idempotency
-- [pending] update RPC handlers to treat `agent_name` as lookup/display only
+- [done] update RPC handlers to treat `agent_name` as lookup/display only
 
 ### P5: restart recovery from tmux metadata
 - [done] rebuild state from pane metadata instead of procfs
