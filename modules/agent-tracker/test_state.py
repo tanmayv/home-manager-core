@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 import state
 
 class TestState(unittest.TestCase):
@@ -46,6 +47,25 @@ class TestState(unittest.TestCase):
         self.assertIsNone(state.get_agent("spawn-id"))
         self.assertEqual(state.get_agent("agent1")["agent_id"], "real-id")
         self.assertEqual(state.get_agent_name_by_id("real-id"), "agent1")
+
+    @mock.patch("state.discover_agent_process", return_value=None)
+    @mock.patch("tmux_util.get_pane_info", return_value={"tty": "/dev/pts/1", "session": "sess", "pid": 101})
+    @mock.patch("tmux_util.list_panes", return_value=[{
+        "pane_id": "%1",
+        "agent_name": "agent1",
+        "agent_id": "id-1",
+        "agent_uuid": "id-1",
+        "agent_type": "pi",
+        "agent_cmd": "pi",
+        "pane_active": False,
+    }])
+    def test_init_state_recovers_without_live_process(self, _list_panes, _get_pane_info, _discover_agent_process):
+        state.init_state()
+        info = state.get_agent("agent1")
+        self.assertIsNotNone(info)
+        self.assertEqual(info["agent_id"], "id-1")
+        self.assertEqual(info["status"], "unknown")
+        self.assertIsNone(info["pid"])
 
 if __name__ == '__main__':
     unittest.main()

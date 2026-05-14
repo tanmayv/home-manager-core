@@ -80,10 +80,10 @@ def init_state() -> None:
             try:
                 info = tmux_util.get_pane_info(pane_id)
                 proc = discover_agent_process(pane_id, agent_cmd)
-                if info and proc:
+                if info:
                     session = info["session"]
-                    agent_pid = proc["pid"]
-                    discovered_cmd = proc["comm"]
+                    agent_pid = proc["pid"] if proc else None
+                    discovered_cmd = proc["comm"] if proc else None
                     resolved_agent_id = agent_id or agent_uuid or str(uuid.uuid4())
                     set_agent(agent_name, {
                         "session": session,
@@ -91,7 +91,7 @@ def init_state() -> None:
                         "pid": agent_pid,
                         "tmux_socket": "", # Fallback to default
                         "wrapper_pid": None,
-                        "status": "idle",
+                        "status": "unknown",
                         "waiting_approval": False,
                         "agent_id": resolved_agent_id,
                         "uuid": resolved_agent_id,

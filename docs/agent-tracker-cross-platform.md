@@ -277,7 +277,8 @@ Implementation status:
 - P2: done in next commit after `d64aa12` (wrapper-driven heartbeat loop, explicit heartbeat RPC, cleanup stop/unregister, and same-agent_id re-register preserving runtime state)
 - P3: partially done in `e6bfca7` (hooks send `agent_id` explicitly when available; procfs/tmux-pane/name fallbacks still remain until later precedence cleanup)
 - P4: partially done (internal tracker state keyed by `agent_id` with a name index; external CLI/name UX and compatibility aliases preserved)
-- P5+: pending
+- P5: partially done in next commit after `f44c1c8` (restart recovery rebuilds records from tmux metadata even without a discovered live child process, initializing recovered agents as `unknown`)
+- P6+: pending
 
 ### P0: protocol + invariants doc
 - write this design
@@ -309,8 +310,8 @@ Implementation status:
 - [pending] update RPC handlers to treat `agent_name` as lookup/display only
 
 ### P5: restart recovery from tmux metadata
-- rebuild state from pane metadata instead of procfs
-- recover inbox/state shape without requiring PID recovery
+- [done] rebuild state from pane metadata instead of procfs
+- [done] recover inbox/state shape without requiring PID recovery
 
 ### P6: liveness policy
 - heartbeat timeout + pane existence as core policy
