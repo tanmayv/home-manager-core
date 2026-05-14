@@ -27,16 +27,18 @@ def handle_register(params: dict) -> str:
         raise ValueError("Invalid params")
         
     agents = state.get_all_agents()
-    
-    # Remove any existing agent for the same pane to prevent duplicates
-    for existing_name, info in agents.items():
-        if info.get("tmux_pane") == tmux_pane:
+    existing_name_for_id = state.get_agent_name_by_id(agent_id)
+
+    # Remove any existing agent for the same pane to prevent duplicates.
+    for existing_name, info in list(agents.items()):
+        if info.get("tmux_pane") == tmux_pane and existing_name != existing_name_for_id:
             logging.info(f"Removing existing agent {existing_name} for pane {tmux_pane} before re-registering")
             state.delete_agent(existing_name)
-            # Refresh agents list after deletion
             agents = state.get_all_agents()
 
-    if name:
+    if existing_name_for_id:
+        agent_name = existing_name_for_id
+    elif name:
         num = 1
         agent_name = name
         while agent_name in agents and agents[agent_name].get("status") != "spawning":
@@ -162,11 +164,7 @@ def handle_unregister(params: dict, caller_pid: int = None) -> bool:
         # Try to find by tmux_pane if provided
         tmux_pane = params.get("tmux_pane")
         if tmux_pane:
-            agents = state.get_all_agents()
-            for name, info in agents.items():
-                if info.get("tmux_pane") == tmux_pane:
-                    agent_name = name
-                    break
+            agent_name = state.get_agent_name_by_pane(tmux_pane)
                     
     if not agent_name:
         raise ValueError("Agent not identified")
@@ -323,9 +321,9 @@ def _identify_agent(params: dict, caller_pid: int = None) -> str:
     agents = state.get_all_agents()
     
     if tmux_pane:
-        for name, info in agents.items():
-            if info.get("tmux_pane") == tmux_pane:
-                return name
+        resolved_name = state.get_agent_name_by_pane(tmux_pane)
+        if resolved_name:
+            return resolved_name
                 
     if caller_pid:
         # Trace up the process tree to find a match with wrapper_pid or pid

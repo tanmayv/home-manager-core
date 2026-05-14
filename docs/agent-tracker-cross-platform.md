@@ -275,8 +275,9 @@ Implementation status:
 - P0: done
 - P1: done in `e992949` (lazy-start/bootstrap, shared startup lock, stale-socket handling under lock, Nix-derived socket path propagation to ctl/systemd/wrapper/hooks)
 - P2: partially done in `bbb815c` (stable `agent_id` generation/export, register payload/storage, tmux metadata, and tracker exposure landed; heartbeat/re-register work still pending)
-- P3: partially done in next commit after `bbb815c` (hooks send `agent_id` explicitly when available; procfs/tmux-pane/name fallbacks still remain until later precedence cleanup)
-- P4+: pending
+- P3: partially done in `e6bfca7` (hooks send `agent_id` explicitly when available; procfs/tmux-pane/name fallbacks still remain until later precedence cleanup)
+- P4: partially done (internal tracker state keyed by `agent_id` with a name index; external CLI/name UX and compatibility aliases preserved)
+- P5+: pending
 
 ### P0: protocol + invariants doc
 - write this design
@@ -302,10 +303,10 @@ Implementation status:
 - [done] keep tmux/env fallback only where needed
 
 ### P4: tracker core keyed by `agent_id`
-- state keyed by `agent_id`
-- maintain name index for CLI lookup / rename UX
-- define registration conflict resolution and idempotency
-- update RPC handlers to treat `agent_name` as lookup/display only
+- [done] state keyed by `agent_id`
+- [done] maintain name index for CLI lookup / rename UX
+- [done] define registration conflict resolution and idempotency
+- [pending] update RPC handlers to treat `agent_name` as lookup/display only
 
 ### P5: restart recovery from tmux metadata
 - rebuild state from pane metadata instead of procfs

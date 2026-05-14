@@ -6,7 +6,8 @@ import os
 import json
 import tmux_util
 
-state = {}
+state = {}  # keyed by stable agent_id
+name_index = {}  # agent_name -> agent_id
 state_lock = threading.Lock()
 
 TRANSIENT_COMMS = {
@@ -84,21 +85,20 @@ def init_state() -> None:
                     agent_pid = proc["pid"]
                     discovered_cmd = proc["comm"]
                     resolved_agent_id = agent_id or agent_uuid or str(uuid.uuid4())
-                    with state_lock:
-                        state[agent_name] = {
-                            "session": session,
-                            "tmux_pane": pane_id,
-                            "pid": agent_pid,
-                            "tmux_socket": "", # Fallback to default
-                            "wrapper_pid": None,
-                            "status": "idle",
-                            "waiting_approval": False,
-                            "agent_id": resolved_agent_id,
-                            "uuid": resolved_agent_id,
-                            "agent_type": agent_type,
-                            "agent_cmd": agent_cmd or discovered_cmd or "unknown",
-                            "pending_notifications": []
-                        }
+                    set_agent(agent_name, {
+                        "session": session,
+                        "tmux_pane": pane_id,
+                        "pid": agent_pid,
+                        "tmux_socket": "", # Fallback to default
+                        "wrapper_pid": None,
+                        "status": "idle",
+                        "waiting_approval": False,
+                        "agent_id": resolved_agent_id,
+                        "uuid": resolved_agent_id,
+                        "agent_type": agent_type,
+                        "agent_cmd": agent_cmd or discovered_cmd or "unknown",
+                        "pending_notifications": []
+                    })
 
                     # If we didn't have an agent_id in tmux, persist the recovered one.
                     if not agent_id:
@@ -110,51 +110,102 @@ def init_state() -> None:
             except Exception as e:
                 logging.error(f"Error recovering agent {agent_name}: {e}")
 
-def get_all_agents() -> dict:
-    """Returns a copy of all agents in state."""
-    with state_lock:
-        return {k: v.copy() for k, v in state.items()}
+def _resolve_agent_id(name_or_id: str) -> str | None:
+    if name_or_id in state:
+        return name_or_id
+    return name_index.get(name_or_id)
 
-def get_agent(name: str) -> dict | None:
-    """Returns the state of a specific agent."""
+
+def get_all_agents() -> dict:
+    """Returns a copy of all agents indexed by display name for compatibility."""
     with state_lock:
-        return state.get(name, None)
+        return {
+            info["name"]: {k: v for k, v in info.items() if k != "name"}
+            for info in state.values()
+        }
+
+
+def get_agent(name_or_id: str) -> dict | None:
+    """Returns the state of a specific agent by display name or agent_id."""
+    with state_lock:
+        agent_id = _resolve_agent_id(name_or_id)
+        if not agent_id:
+            return None
+        info = state.get(agent_id)
+        if not info:
+            return None
+        return {k: v for k, v in info.items() if k != "name"}
 
 
 def get_agent_name_by_id(agent_id: str) -> str | None:
     """Returns the agent name for a given stable agent_id."""
     with state_lock:
-        for name, info in state.items():
-            if info.get("agent_id") == agent_id or info.get("uuid") == agent_id:
-                return name
+        info = state.get(agent_id)
+        return info.get("name") if info else None
+
+
+def get_agent_name_by_pane(tmux_pane: str) -> str | None:
+    """Returns the agent name for a given tmux pane."""
+    with state_lock:
+        for info in state.values():
+            if info.get("tmux_pane") == tmux_pane:
+                return info.get("name")
     return None
 
+
 def set_agent(name: str, info: dict) -> None:
-    """Sets the state of a specific agent."""
+    """Sets or upserts an agent keyed by stable agent_id."""
     with state_lock:
-        state[name] = info
+        normalized = info.copy()
+        agent_id = normalized.get("agent_id") or normalized.get("uuid") or str(uuid.uuid4())
+        normalized["agent_id"] = agent_id
+        normalized["uuid"] = agent_id
+        normalized["name"] = name
 
-def delete_agent(name: str) -> None:
-    """Deletes an agent from state."""
+        existing = state.get(agent_id)
+        if existing and existing.get("name") and existing.get("name") != name:
+            name_index.pop(existing["name"], None)
+
+        existing_id_for_name = name_index.get(name)
+        if existing_id_for_name and existing_id_for_name != agent_id:
+            state.pop(existing_id_for_name, None)
+            name_index.pop(name, None)
+
+        state[agent_id] = normalized
+        name_index[name] = agent_id
+
+
+def delete_agent(name_or_id: str) -> None:
+    """Deletes an agent from state by display name or agent_id."""
     with state_lock:
-        if name in state:
-            del state[name]
+        agent_id = _resolve_agent_id(name_or_id)
+        if not agent_id:
+            return
+        info = state.pop(agent_id, None)
+        if info and info.get("name"):
+            name_index.pop(info["name"], None)
 
-def update_agent(name: str, **kwargs) -> bool:
+
+def update_agent(name_or_id: str, **kwargs) -> bool:
     """Updates specific fields of an agent's state."""
     with state_lock:
-        if name in state:
-            for k, v in kwargs.items():
-                state[name][k] = v
-            return True
-        return False
+        agent_id = _resolve_agent_id(name_or_id)
+        if not agent_id or agent_id not in state:
+            return False
+        for k, v in kwargs.items():
+            state[agent_id][k] = v
+        return True
+
 
 def rename_agent(old_name: str, new_name: str) -> bool:
-    """Renames an agent in state."""
+    """Renames an agent in state without changing its stable agent_id."""
     with state_lock:
         if old_name == new_name:
             return True
-        if old_name in state and new_name not in state:
-            state[new_name] = state.pop(old_name)
-            return True
-        return False
+        agent_id = name_index.get(old_name)
+        if not agent_id or new_name in name_index:
+            return False
+        name_index.pop(old_name, None)
+        name_index[new_name] = agent_id
+        state[agent_id]["name"] = new_name
+        return True
