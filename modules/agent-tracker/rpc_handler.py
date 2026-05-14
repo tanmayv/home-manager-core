@@ -9,12 +9,39 @@ import os
 import uuid
 import subprocess
 import struct
+import re
 
 BUFFER_SIZE = 4096
 
 
 def _utc_now_isoformat() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+def _generate_unique_agent_name(name: str, session: str = None) -> str:
+    agents = state.get_all_agents()
+    if name:
+        agent_name = name
+        base_name = name
+        num = 1
+        m = re.match(r'^(.*)-(\d+)$', name)
+        if m:
+            base_name = m.group(1)
+            num = int(m.group(2))
+            if not (state.get_agent_id_by_name(agent_name) and (state.get_agent(agent_name) or {}).get("status") != "spawning"):
+                return agent_name
+            num += 1
+            agent_name = f"{base_name}-{num}"
+
+        while state.get_agent_id_by_name(agent_name) and (state.get_agent(agent_name) or {}).get("status") != "spawning":
+            num += 1
+            agent_name = f"{base_name}-{num}"
+        return agent_name
+    else:
+        num = 1
+        while f"{session}-agent-{num}" in agents:
+            num += 1
+        return f"{session}-agent-{num}"
 
 
 def handle_register(params: dict) -> str:
@@ -43,17 +70,8 @@ def handle_register(params: dict) -> str:
 
     if existing_name_for_id:
         agent_name = existing_name_for_id
-    elif name:
-        num = 1
-        agent_name = name
-        while state.get_agent_id_by_name(agent_name) and (state.get_agent(agent_name) or {}).get("status") != "spawning":
-            agent_name = f"{name}-{num}"
-            num += 1
     else:
-        num = 1
-        while f"{session}-agent-{num}" in agents:
-            num += 1
-        agent_name = f"{session}-agent-{num}"
+        agent_name = _generate_unique_agent_name(name, session)
         
     existing_info = state.get_agent(existing_name_for_id) if existing_name_for_id else None
     state.set_agent(agent_name, {
@@ -236,12 +254,7 @@ def handle_spin_agent(params: dict) -> str:
     if not (session and command and name):
         raise ValueError("Invalid params")
         
-    agents = state.get_all_agents()
-    num = 1
-    agent_name = name
-    while state.get_agent_id_by_name(agent_name) and (state.get_agent(agent_name) or {}).get("status") != "spawning":
-        agent_name = f"{name}-{num}"
-        num += 1
+    agent_name = _generate_unique_agent_name(name, session)
         
     state.set_agent(agent_name, {"status": "spawning", "timestamp": time.time()})
     
