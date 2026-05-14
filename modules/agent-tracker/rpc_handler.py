@@ -148,7 +148,7 @@ def handle_rename(params: dict, caller_pid: int = None) -> bool:
     new_name = params.get("new_name")
     force = params.get("force", False)
     
-    caller_name = _identify_agent({}, caller_pid)
+    caller_name = _identify_agent(params, caller_pid)
     
     if not caller_name and not force:
         raise ValueError("Could not identify caller. Use --force and provide old_name to rename.")

@@ -155,7 +155,10 @@ def main():
         sys.exit(1)
 
     if args.subcommand == "list":
-        agents = call_rpc("list")
+        params = {}
+        if "AGENT_NAME" in os.environ:
+            params["agent_name"] = os.environ["AGENT_NAME"]
+        agents = call_rpc("list", params)
         print(json.dumps(agents))
 
     elif args.subcommand == "status-bar":
@@ -194,6 +197,8 @@ def main():
             print("Error: send-message requires <agent_name> or --id <agent_id>", file=sys.stderr)
             sys.exit(1)
         params = {"message": args.message}
+        if "AGENT_NAME" in os.environ:
+            params["sender_name"] = os.environ["AGENT_NAME"]
         if args.agent_id:
             params["agent_id"] = args.agent_id
         else:
@@ -266,7 +271,10 @@ def main():
             old_name = None
             new_name = args.names[0]
             
-        call_rpc("rename", {"old_name": old_name, "new_name": new_name, "force": force})
+        params = {"old_name": old_name, "new_name": new_name, "force": force}
+        if "AGENT_NAME" in os.environ:
+            params["agent_name"] = os.environ["AGENT_NAME"]
+        call_rpc("rename", params)
         print("Agent renamed.")
     elif args.subcommand == "spin":
         try:
@@ -286,6 +294,8 @@ def main():
             params["agent_id"] = args.agent_id
         elif agent_name:
             params["agent_name"] = agent_name
+        elif "AGENT_NAME" in os.environ:
+            params["agent_name"] = os.environ["AGENT_NAME"]
             
         if args.last is not None:
             params["last_n"] = args.last
@@ -319,7 +329,10 @@ def main():
             print("No messages found.")
 
     elif args.subcommand == "whoami":
-        info = call_rpc("whoami")
+        params = {}
+        if "AGENT_NAME" in os.environ:
+            params["agent_name"] = os.environ["AGENT_NAME"]
+        info = call_rpc("whoami", params)
         if info:
             print(f"Name:     {info.get('name')}")
             print(f"Agent ID: {info.get('agent_id') or info.get('uuid')}")
