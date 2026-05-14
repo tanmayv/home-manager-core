@@ -24,6 +24,10 @@
           path = ./flake-template;
           description = "Pure, standalone Home Manager starter configuration";
         };
+        gmac = {
+          path = ./flake-template-gmac;
+          description = "macOS ARM (Apple Silicon) Home Manager starter configuration with AI Agents and Neovim";
+        };
       };
     };
 }

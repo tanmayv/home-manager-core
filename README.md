@@ -69,14 +69,22 @@ We support a **User-Visible Knowledge Base** (markdown notes in `~/agent_knowled
 
 ## Installation & Setup
 
-### Quick Start (Pure Starter)
+### Quick Start (Starter Templates)
 
 You can instantly bootstrap a clean, standalone starter configuration using Flake templates:
 
+#### Linux (x86_64) Starter
 ```bash
 mkdir -p ~/.config/home-manager
 cd ~/.config/home-manager
 nix flake init -t github:tanmayv/home-manager-core#pure
+```
+
+#### macOS ARM (Apple Silicon) Starter
+```bash
+mkdir -p ~/.config/home-manager
+cd ~/.config/home-manager
+nix flake init -t github:tanmayv/home-manager-core#gmac
 ```
 
 For Google3/Cloudtop specific setup or detailed instructions, please refer to [docs/GettingStarted.md](docs/GettingStarted.md).
