@@ -50,19 +50,22 @@ def handle_register(params: dict) -> str:
             num += 1
         agent_name = f"{session}-agent-{num}"
         
+    existing_info = state.get_agent(existing_name_for_id) if existing_name_for_id else None
     state.set_agent(agent_name, {
-        "session": session, 
-        "tmux_pane": tmux_pane, 
-        "wrapper_pid": wrapper_pid, 
-        "tmux_socket": tmux_socket, 
-        "pid": None,
-        "status": "idle",
-        "waiting_approval": False,
+        **(existing_info or {}),
+        "session": session,
+        "tmux_pane": tmux_pane,
+        "wrapper_pid": wrapper_pid,
+        "tmux_socket": tmux_socket,
+        "pid": (existing_info or {}).get("pid"),
+        "status": (existing_info or {}).get("status", "idle"),
+        "waiting_approval": (existing_info or {}).get("waiting_approval", False),
         "agent_id": agent_id,
         "uuid": agent_id,
-        "agent_type": agent_type,
-        "agent_cmd": agent_cmd,
-        "pending_notifications": []
+        "agent_type": agent_type or (existing_info or {}).get("agent_type", "unknown"),
+        "agent_cmd": agent_cmd or (existing_info or {}).get("agent_cmd", "unknown"),
+        "last_heartbeat": time.time(),
+        "pending_notifications": (existing_info or {}).get("pending_notifications", [])
     })
     
     # Persist both new and legacy identity keys in tmux during migration.
@@ -109,9 +112,22 @@ def handle_update_agent(params: dict, caller_pid: int = None) -> bool:
     if not agent_name:
         raise ValueError("Agent not identified")
         
-    kwargs = {k: v for k, v in params.items() if k not in ["agent_name", "tmux_pane"]}
+    kwargs = {k: v for k, v in params.items() if k not in ["agent_id", "agent_name", "tmux_pane"]}
     if state.update_agent(agent_name, **kwargs):
         _flush_notifications(agent_name)
+        return True
+    raise ValueError(f"Agent '{agent_name}' not found")
+
+
+def handle_heartbeat(params: dict, caller_pid: int = None) -> bool:
+    """Records a liveness heartbeat for an identified agent."""
+    agent_name = _identify_agent(params, caller_pid)
+    if not agent_name:
+        raise ValueError("Agent not identified")
+
+    kwargs = {k: v for k, v in params.items() if k not in ["agent_id", "agent_name"]}
+    kwargs["last_heartbeat"] = time.time()
+    if state.update_agent(agent_name, **kwargs):
         return True
     raise ValueError(f"Agent '{agent_name}' not found")
 
@@ -393,6 +409,7 @@ dispatcher = {
     "register": handle_register,
     "list": handle_list,
     "update_agent": handle_update_agent,
+    "heartbeat": handle_heartbeat,
     "rename": handle_rename,
     "spin_agent": handle_spin_agent,
     "send_message": handle_send_message,
@@ -441,7 +458,7 @@ def handle_client(conn: socket.socket) -> None:
         if handler:
             try:
                 # Pass caller_pid to handlers that might need it
-                if method in ["get_inbox", "update_agent", "send_message", "whoami", "list", "rename"]:
+                if method in ["get_inbox", "update_agent", "heartbeat", "send_message", "whoami", "list", "rename", "unregister"]:
                     result = handler(params, caller_pid=caller_pid)
                 else:
                     result = handler(params)

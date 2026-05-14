@@ -48,8 +48,35 @@ in
           agent_id="''${AGENT_ID:-$(python3 -c 'import uuid; print(uuid.uuid4())')}"
           export AGENT_ID="$agent_id"
           agent_name=$(python3 -c "import socket, json, os, sys; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.connect(os.environ.get('AGENT_TRACKER_SOCKET', os.path.join(os.path.expanduser('~/.cache'), 'agent-tracker', 'agent-tracker.sock'))); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'register', 'params': {'session': sys.argv[1], 'tmux_pane': sys.argv[2], 'wrapper_pid': int(sys.argv[3]), 'tmux_socket': sys.argv[4], 'name': sys.argv[5], 'agent_type': sys.argv[6], 'agent_cmd': sys.argv[7], 'agent_id': sys.argv[8]}, 'id': 1}).encode()); s.shutdown(socket.SHUT_WR); resp = s.recv(1024); data = json.loads(resp.decode()); print(data.get(\"result\", \"\"))" "$session_name" "$pane_id" "$wrapper_pid" "$tmux_socket" "$suggested_name" "$agent_type" "$(basename "$cmd")" "$agent_id" 2>>/tmp/wrapper.log)
-          
+
+          send_heartbeat() {
+            python3 -c "import json, os, socket, sys; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(2.0); s.connect(os.environ['AGENT_TRACKER_SOCKET']); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'heartbeat', 'params': {'agent_id': sys.argv[1], 'session': sys.argv[2], 'tmux_pane': sys.argv[3], 'tmux_socket': sys.argv[4], 'wrapper_pid': int(sys.argv[5])}, 'id': 1}).encode()); s.shutdown(socket.SHUT_WR); data = json.loads(s.recv(1024).decode()); sys.exit(0 if 'result' in data else 1)" "$agent_id" "$session_name" "$pane_id" "$tmux_socket" "$wrapper_pid" >/dev/null 2>>/tmp/wrapper.log
+          }
+
+          reregister_agent() {
+            current_name=$(tmux display-message -p -t "$pane_id" '#{@agent_name}' 2>/dev/null || true)
+            python3 -c "import socket, json, os, sys; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(2.0); s.connect(os.environ['AGENT_TRACKER_SOCKET']); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'register', 'params': {'session': sys.argv[1], 'tmux_pane': sys.argv[2], 'wrapper_pid': int(sys.argv[3]), 'tmux_socket': sys.argv[4], 'name': sys.argv[5], 'agent_type': sys.argv[6], 'agent_cmd': sys.argv[7], 'agent_id': sys.argv[8]}, 'id': 1}).encode()); s.shutdown(socket.SHUT_WR); data = json.loads(s.recv(1024).decode()); print(data.get('result', ''))" "$session_name" "$pane_id" "$wrapper_pid" "$tmux_socket" "$current_name" "$agent_type" "$(basename "$cmd")" "$agent_id" >/dev/null 2>>/tmp/wrapper.log || true
+          }
+
+          start_heartbeat() {
+            (
+              while true; do
+                if ! send_heartbeat; then
+                  agent-tracker-ctl ensure-running >/dev/null 2>&1 || true
+                  reregister_agent
+                fi
+                sleep 5
+              done
+            ) &
+            heartbeat_pid=$!
+          }
+
+          heartbeat_pid=""
+
           cleanup() {
+            if [[ -n "$heartbeat_pid" ]]; then
+              kill "$heartbeat_pid" >/dev/null 2>&1 || true
+            fi
             tty=$(tmux display-message -p -t "''${pane_id}" '#{pane_tty}' 2>/dev/null || true)
             shell_pid=$(tmux display-message -p -t "''${pane_id}" '#{pane_pid}' 2>/dev/null || true)
 
@@ -67,6 +94,7 @@ in
               fi
             fi
 
+            agent-tracker-ctl unregister --pane "$pane_id" >/dev/null 2>&1 || true
             tmux set-option -p -u -t "''${pane_id}" @agent_name
             tmux set-option -p -u -t "''${pane_id}" @agent_id
             tmux set-option -p -u -t "''${pane_id}" @agent_uuid
@@ -86,6 +114,7 @@ in
             tmux set-option -p -t "''${pane_id}" @agent_cmd "$(basename "$cmd")"
             tmux select-pane -t "''${pane_id}" -T "$agent_name"
             export AGENT_NAME="$agent_name"
+            start_heartbeat
             tmux-status-refresh
 
             # Open observer if requested and nvim is available
