@@ -278,7 +278,7 @@ Implementation status:
 - P3: done in `7facea1` (hooks send `agent_id` explicitly when available and no longer depend on /proc for caller identification; tmux/name fallbacks remain only as compatibility paths)
 - P4: done in `a5c953a` (internal tracker state keyed by `agent_id` with a name index; explicit `agent_id` precedence now covers targeted delivery and CLI `--id` targeting while preserving name-based UX)
 - P5: partially done in `713216f` (restart recovery rebuilds records from tmux metadata even without a discovered live child process, initializing recovered agents as `unknown`)
-- P6: partially done in `583d87f` (explicit heartbeat freshness/stale/expired semantics in monitor; heartbeat/recovered-at timing used as primary liveness policy before pane tty fallback eviction)
+- P6: partially done in `583d87f` (explicit heartbeat freshness/stale/expired semantics in monitor; heartbeat/recovered-at timing used as primary liveness policy before pane tty fallback eviction; monitor tests now cover expired-with-live-pane-process and expired-without-live-pane-process branches)
 - Follow-up reliability fix: done in `a62be9d` (`agent-tracker-ctl` now reads RPC responses until EOF, fixing large `read-inbox` responses)
 - P7+: pending
 
@@ -407,7 +407,7 @@ Current state:
 - after grace expiry, tty/process discovery is only a best-effort fallback before eviction
 
 Suggested completion steps:
-1. Add monitor tests for the two most important branches:
+1. [done] Add monitor tests for the two most important branches:
    - expired entry + live pane process found => keep record
    - expired entry + no live pane process found => evict record
 2. Add an integration-style test or scripted repro for:
