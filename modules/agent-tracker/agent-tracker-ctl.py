@@ -71,7 +71,15 @@ def call_rpc(method, params={}):
         s.connect(SOCKET_PATH)
         s.sendall(json.dumps({"jsonrpc": "2.0", "method": method, "params": params, "id": 1}).encode())
         s.shutdown(socket.SHUT_WR)
-        resp = s.recv(4096)
+
+        chunks = []
+        while True:
+            chunk = s.recv(4096)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        resp = b"".join(chunks)
+
         data = json.loads(resp.decode())
         if "error" in data:
             print(f"Error: {data['error']['message']}", file=sys.stderr)
