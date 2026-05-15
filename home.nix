@@ -3,6 +3,7 @@
   imports = [
     ./modules/tmux
     ./modules/tmux-palette.nix
+    ./modules/terminal
     ./modules/scripts
     ./modules/agent-tracker
     ./modules/git
