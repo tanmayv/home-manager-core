@@ -1,7 +1,10 @@
 { pkgs, lib, config, userSettings, ... }:
 with lib;
 let
-  palette = import ../palette.nix { inherit userSettings; };
+  tmuxUserSettings = userSettings // lib.optionalAttrs (userSettings ? tmuxTheme) {
+    theme = userSettings.tmuxTheme;
+  };
+  palette = import ../palette.nix { userSettings = tmuxUserSettings; };
   
   # Check if AI features are enabled
   enableAiWorkflow = userSettings.enable-ai-workflow or false;
@@ -93,7 +96,7 @@ let
         with open(config_path, "r") as f:
             config = json.load(f)
 
-        palette = config.get("palette", {})
+        palette = config.get("palette", config)
         color4 = palette.get("color4", "#7aa2f7")
         color8 = palette.get("color8", "#414868")
 
