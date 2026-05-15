@@ -225,9 +225,9 @@ in
         
         # Pane border and title configuration
         set -g pane-border-status bottom
-        set -g pane-border-format "#[fg=${palette.color8}]─(#[fg=${palette.color5}] #D #[fg=${palette.color8}]| ${if enableAgentComms then "#[fg=${palette.color4}]#{?@agent_name,#{@agent_name},no-name} #[fg=${palette.color8}]| " else ""}#[fg=${palette.color2}]#T #[fg=${palette.color8}])─"
-        set -g pane-border-style "fg=${palette.color8}"
-        set -g pane-active-border-style "fg=${palette.color4}"
+        set -g pane-border-format "#[bg=${palette.background},fg=${palette.color8}]─(#[bg=${palette.background},fg=${palette.color5}] #D #[bg=${palette.background},fg=${palette.color8}]| ${if enableAgentComms then "#[bg=${palette.background},fg=${palette.color4}]#{?@agent_name,#{@agent_name},no-name} #[bg=${palette.background},fg=${palette.color8}]| " else ""}#[bg=${palette.background},fg=${palette.color2}]#T #[bg=${palette.background},fg=${palette.color8}])─"
+        set -g pane-border-style "bg=${palette.background},fg=${palette.color8}"
+        set -g pane-active-border-style "bg=${palette.background},fg=${palette.color4}"
         
         # Tmux Sessionizer integration
         bind-key C-t display-popup -w 95% -h 80% -E "tmux-sessionizer"
