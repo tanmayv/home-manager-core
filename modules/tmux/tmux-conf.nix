@@ -247,10 +247,12 @@ in
         set -g status-right-length 120
         set -g status-right "#{?#{!=:#{status},on},,${concatStringsSep " " config.programs.tmux.statusBar.row0.right} }#[range=user|palette]#[fg=${palette.color6}] [CMDS] #[norange]"
         set -g window-status-format " #W "
-        set -g window-status-current-format "#[bg=default,fg=${palette.color3},bold] #W #[fg=${palette.color4},bg=default]#{?window_zoomed_flag,󰊓,}#[fg=default,bg=default]"
+        set -g window-status-current-format "#[bg=${palette.background},fg=${palette.color3},bold] #W #[fg=${palette.color4},bg=${palette.background}]#{?window_zoomed_flag,󰊓,}#[fg=${palette.color8},bg=${palette.background}]"
         set -g window-status-separator " • "
-        set -g status-style "bg=default,fg=${palette.color8}"
-        set -g window-status-style "bg=default,fg=${palette.color8}"
+        set -g status-style "bg=${palette.background},fg=${palette.color8}"
+        set -g window-status-style "bg=${palette.background},fg=${palette.color8}"
+        set -g window-style "bg=${palette.background},fg=${palette.foreground}"
+        set -g window-active-style "bg=${palette.background},fg=${palette.foreground}"
 
         # Smart pane switching with awareness of Vim splits.
         is_vim="ps -o state= -o comm= -t '#{pane_tty}' \

@@ -57,6 +57,14 @@ in
       zmodload zsh/nearcolor
       export COLORTERM=truecolor
 
+      # Apply palette colors to the terminal itself so shell backgrounds do not
+      # depend on the emulator default. OSC 10/11/12 set foreground/background/cursor.
+      if [[ -o interactive && "''${TERM:-}" != "dumb" ]]; then
+        printf '\033]10;${palette.foreground}\007'
+        printf '\033]11;${palette.background}\007'
+        printf '\033]12;${palette.cursorColor}\007'
+      fi
+
       # Ghostty advertises TERM=xterm-ghostty, but SSH only forwards TERM, not
       # Ghostty's local TERMINFO path. Prefer a user-installed terminfo when it
       # exists; otherwise fall back to the widely available xterm-256color so
