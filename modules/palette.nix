@@ -3,7 +3,7 @@
 let
   theme = userSettings.theme or "tokyonight";
 
-  palettes = {
+  palettes = rec {
     tokyonight = {
       background = "#1a1b26";
       foreground = "#c0caf5";
@@ -110,6 +110,8 @@ let
       color14 = "#179299"; # bright cyan
       color15 = "#bcc0cc"; # bright white
     };
+
+    gruvbox = gruvbox-dark;
   };
 in
 palettes.${theme} or palettes.tokyonight
