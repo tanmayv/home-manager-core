@@ -57,6 +57,19 @@ in
       zmodload zsh/nearcolor
       export COLORTERM=truecolor
 
+      # Ghostty advertises TERM=xterm-ghostty, but SSH only forwards TERM, not
+      # Ghostty's local TERMINFO path. Prefer a user-installed terminfo when it
+      # exists; otherwise fall back to the widely available xterm-256color so
+      # curses/tmux/nvim do not fail with "missing or unsuitable terminal".
+      if [[ "''${TERM:-}" == "xterm-ghostty" ]]; then
+        if [[ -d "''${HOME}/.terminfo" ]]; then
+          export TERMINFO_DIRS="''${HOME}/.terminfo''${TERMINFO_DIRS:+:''${TERMINFO_DIRS}}:/usr/share/terminfo"
+        fi
+        if ! infocmp "''${TERM}" >/dev/null 2>&1; then
+          export TERM=xterm-256color
+        fi
+      fi
+
       # Enable Bash-style sub-word deletion boundaries (stops at slashes, etc.)
       autoload -Uz select-word-style
       select-word-style bash
