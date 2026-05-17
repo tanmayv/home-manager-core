@@ -64,18 +64,34 @@ def monitor_once(now: float | None = None):
     if active_panes is None:
         logging.warning("Skipping monitor pass because tmux panes could not be listed.")
         return
-    active_pane_ids = [p["pane_id"] for p in active_panes]
+
+    active_pane_ids = {pane["pane_id"] for pane in active_panes}
+    pane_info_by_id = {pane["pane_id"]: pane for pane in active_panes}
+    alive_cache = {}
+    discovered_proc_cache = {}
+
+    def cached_is_process_alive(pid):
+        if not pid:
+            return False
+        if pid not in alive_cache:
+            alive_cache[pid] = is_process_alive(pid)
+        return alive_cache[pid]
+
+    def cached_discover_agent_process(pane_id, agent_cmd):
+        cache_key = (pane_id, agent_cmd)
+        if cache_key not in discovered_proc_cache:
+            discovered_proc_cache[cache_key] = state.discover_agent_process(pane_id, agent_cmd)
+        return discovered_proc_cache[cache_key]
 
     for name, info in agents_snapshot.items():
         pane_id = info.get("tmux_pane")
+        pane_info = pane_info_by_id.get(pane_id) if pane_id else None
 
         # Acknowledgment logic
-        if info.get("status") == "waiting":
-            pane_info = next((p for p in active_panes if p["pane_id"] == pane_id), None)
-            if pane_info and pane_info.get("pane_active"):
-                logging.info(f"Agent {name} acknowledged by user (pane active). Transitioning to idle.")
-                state.update_agent(name, status="idle")
-                info["status"] = "idle"
+        if info.get("status") == "waiting" and pane_info and pane_info.get("pane_active"):
+            logging.info(f"Agent {name} acknowledged by user (pane active). Transitioning to idle.")
+            state.update_agent(name, status="idle")
+            info["status"] = "idle"
 
         if pane_id and pane_id not in active_pane_ids:
             logging.info(f"Pane {pane_id} for agent {name} no longer exists.")
@@ -84,7 +100,7 @@ def monitor_once(now: float | None = None):
 
         liveness_phase = get_liveness_phase(info, now)
         if pane_id and liveness_phase == "expired":
-            proc = state.discover_agent_process(pane_id, info.get("agent_cmd"))
+            proc = cached_discover_agent_process(pane_id, info.get("agent_cmd"))
             if proc:
                 logging.info(f"Keeping stale agent {name}; found live pane process PID {proc['pid']} ({proc['comm']})")
                 state.update_agent(name, pid=proc["pid"], wrapper_pid=None)
@@ -97,8 +113,8 @@ def monitor_once(now: float | None = None):
         pid = info.get("pid")
         use_procfs_fallback = (liveness_phase == "none")
 
-        wrapper_alive = wrapper_pid and is_process_alive(wrapper_pid) if use_procfs_fallback else False
-        child_alive = pid and is_process_alive(pid) if use_procfs_fallback else False
+        wrapper_alive = cached_is_process_alive(wrapper_pid) if use_procfs_fallback else False
+        child_alive = cached_is_process_alive(pid) if use_procfs_fallback else False
 
         # Update child PID if not already known, or recover if the tracked child died.
         if use_procfs_fallback and wrapper_pid and (not info.get("pid") or (pid and not child_alive)):
@@ -108,13 +124,13 @@ def monitor_once(now: float | None = None):
                     actual_pid = int(out.split()[0])
                     state.update_agent(name, pid=actual_pid)
                     pid = actual_pid
-                    child_alive = is_process_alive(actual_pid)
+                    child_alive = cached_is_process_alive(actual_pid)
             except Exception as e:
                 logging.debug(f"Failed to pgrep child PID for {name}: {e}")
 
         # If wrapper/child tracking is stale, fall back to inspecting the pane's tty.
         if use_procfs_fallback and pane_id and ((wrapper_pid and not wrapper_alive and not child_alive) or (pid and not child_alive)):
-            proc = state.discover_agent_process(pane_id, info.get("agent_cmd"))
+            proc = cached_discover_agent_process(pane_id, info.get("agent_cmd"))
             if proc:
                 logging.info(f"Recovered live pane process for {name}: PID {proc['pid']} ({proc['comm']})")
                 state.update_agent(name, pid=proc["pid"], wrapper_pid=None)

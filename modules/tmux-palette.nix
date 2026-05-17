@@ -1,6 +1,59 @@
 { pkgs, userSettings, ... }:
 
 let
+  tmux-move-pane-to-window = pkgs.writeShellScriptBin "tmux-move-pane-to-window" ''
+    set -euo pipefail
+
+    tmux_bin=${pkgs.tmux}/bin/tmux
+    fzf_bin=${pkgs.fzf}/bin/fzf
+    cut_bin=${pkgs.coreutils}/bin/cut
+
+    source_pane="''${1:-}"
+    if [[ -z "$source_pane" ]]; then
+      echo "Usage: tmux-move-pane-to-window <source-pane-id>" >&2
+      exit 1
+    fi
+
+    source_info="$($tmux_bin display-message -p -t "$source_pane" '#{session_name}	#{window_id}	#{window_index}:#{window_name}' 2>/dev/null || true)"
+    if [[ -z "$source_info" ]]; then
+      $tmux_bin display-message "Source pane $source_pane not found."
+      exit 1
+    fi
+
+    source_session="$(printf '%s\n' "$source_info" | $cut_bin -f1)"
+    source_window_id="$(printf '%s\n' "$source_info" | $cut_bin -f2)"
+
+    selected_session="$($tmux_bin list-sessions -F '#{session_id}	#{session_name}	#{session_windows} windows	#{?session_attached,attached,detached}' \
+      | $fzf_bin --delimiter=$'\t' --with-nth=2,3,4 --prompt='Move pane to session> ' --header="Source pane: $source_pane ($source_session)" \
+      || true)"
+    if [[ -z "$selected_session" ]]; then
+      exit 0
+    fi
+
+    target_session_id="$(printf '%s\n' "$selected_session" | $cut_bin -f1)"
+    target_session_name="$(printf '%s\n' "$selected_session" | $cut_bin -f2)"
+
+    selected_window="$($tmux_bin list-windows -t "$target_session_id" -F '#{window_id}	#{window_index}:#{window_name}	#{window_panes} panes	#{?window_active,active,}' \
+      | $fzf_bin --delimiter=$'\t' --with-nth=2,3,4 --prompt='Move pane to window> ' --header="Destination session: $target_session_name" \
+      || true)"
+    if [[ -z "$selected_window" ]]; then
+      exit 0
+    fi
+
+    target_window_id="$(printf '%s\n' "$selected_window" | $cut_bin -f1)"
+
+    if [[ "$target_window_id" == "$source_window_id" ]]; then
+      $tmux_bin display-message "Pane $source_pane is already in the selected window."
+      exit 0
+    fi
+
+    $tmux_bin join-pane -d -s "$source_pane" -t "$target_window_id"
+    $tmux_bin switch-client -t "$target_session_id"
+    $tmux_bin select-window -t "$target_window_id"
+    $tmux_bin select-pane -t "$source_pane"
+    $tmux_bin display-message "Moved pane $source_pane to $target_session_name."
+  '';
+
   tmux-palette = pkgs.writeScriptBin "tmux-palette" ''
     #!${pkgs.python3}/bin/python3
     import os
@@ -121,6 +174,7 @@ let
 in
 {
   home.packages = [
+    tmux-move-pane-to-window
     tmux-palette
   ];
 
@@ -229,6 +283,12 @@ in
     command = "tmux resize-pane -Z"
     group = "Panes"
     mapping = "z"
+
+    [[commands]]
+    name = "Move Pane to Session Window"
+    description = "Use fzf to choose a destination session and window for the current pane"
+    command = 'tmux-move-pane-to-window "$ORIGINAL_PANE"'
+    group = "Panes"
 
     [[commands]]
     name = "Swap Pane Up"

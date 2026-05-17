@@ -92,12 +92,59 @@ def call_rpc(method, params={}):
         print(f"Failed to decode response from tracker: {e}", file=sys.stderr)
         sys.exit(1)
 
+
+def get_current_tmux_pane(fallback: str | None = None) -> str:
+    if fallback is not None:
+        return fallback
+    try:
+        return subprocess.check_output(["tmux", "display-message", "-p", "#{pane_id}"]).decode("utf-8").strip()
+    except subprocess.CalledProcessError:
+        return ""
+
+
+def format_status_bar(agents: dict, current_pane: str) -> str:
+    if not agents:
+        return ""
+
+    color8 = os.environ.get("PALETTE_COLOR8", "#414868")
+    color1 = os.environ.get("PALETTE_COLOR1", "#db4b4b")
+    color3 = os.environ.get("PALETTE_COLOR3", "#e0af68")
+    color6 = os.environ.get("PALETTE_COLOR6", "#7dcfff")
+    color2 = os.environ.get("PALETTE_COLOR2", "#9ece6a")
+    color4 = os.environ.get("PALETTE_COLOR4", "#2ac3de")
+
+    formatted = []
+    for name, info in agents.items():
+        pane = info.get("tmux_pane")
+        waiting_approval = info.get("waiting_approval", False)
+        status = info.get("status", "")
+
+        color = color8
+        if waiting_approval:
+            color = color1
+        elif pane == current_pane:
+            color = color3
+        elif status == "working":
+            color = color6
+        elif status == "idle":
+            color = color2
+
+        range_arg = f"agent:{pane}"
+        formatted.append(f"#[range=user|{range_arg}]#[fg={color},bold]{name}#[fg={color8},nobold]#[norange]")
+
+    if not formatted:
+        return ""
+
+    prefix = f"#[fg={color4},bold] Active Agents: #[fg={color8},nobold]"
+    return f"{prefix}{' · '.join(formatted)}#[default]"
+
 def main():
     parser = argparse.ArgumentParser(description="Agent Tracker Control")
     subparsers = parser.add_subparsers(dest="subcommand", help="Subcommands")
 
     subparsers.add_parser("list", help="List agents in JSON format")
-    subparsers.add_parser("status-bar", help="List agents for status bar")
+    status_bar_parser = subparsers.add_parser("status-bar", help="List agents for status bar")
+    status_bar_parser.add_argument("current_pane", nargs="?", help="Current tmux pane ID")
     subparsers.add_parser("ensure-running", help="Ensure the tracker daemon is running")
     subparsers.add_parser("daemon", help="Run the tracker daemon in the foreground")
 
@@ -165,40 +212,10 @@ def main():
 
     elif args.subcommand == "status-bar":
         agents = call_rpc("list")
-        if not agents:
-            sys.exit(0)
-
-        try:
-            current_pane = subprocess.check_output(["tmux", "display-message", "-p", "#{pane_id}"]).decode("utf-8").strip()
-        except subprocess.CalledProcessError:
-            current_pane = ""
-
-        color8 = os.environ.get("PALETTE_COLOR8", "#414868")
-        color1 = os.environ.get("PALETTE_COLOR1", "#db4b4b")
-        color3 = os.environ.get("PALETTE_COLOR3", "#e0af68")
-        color6 = os.environ.get("PALETTE_COLOR6", "#7dcfff")
-        color2 = os.environ.get("PALETTE_COLOR2", "#9ece6a")
-
-        formatted = []
-        for name, info in agents.items():
-            pane = info.get("tmux_pane")
-            waiting_approval = info.get("waiting_approval", False)
-            status = info.get("status", "")
-            
-            color = color8
-            if waiting_approval:
-                color = color1
-            elif pane == current_pane:
-                color = color3
-            elif status == "working":
-                color = color6
-            elif status == "idle":
-                color = color2
-
-            range_arg = f"agent:{pane}"
-            formatted.append(f"#[range=user|{range_arg}]#[fg={color},bold]{name}#[fg={color8},nobold]#[norange]")
-
-        print(" · ".join(formatted))
+        current_pane = get_current_tmux_pane(args.current_pane)
+        status_bar = format_status_bar(agents, current_pane)
+        if status_bar:
+            print(status_bar, end="")
 
     elif args.subcommand == "send-message":
         if not args.agent_name and not args.agent_id:

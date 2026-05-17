@@ -31,7 +31,7 @@ pkgs.writeShellApplication {
 
     if [[ -n "''${TMUX:-}" ]]; then
       pane_id="$TMUX_PANE"
-      session_name=$(tmux display-message -p '#S')
+      session_name=$(tmux display-message -p -t "$pane_id" '#S')
 
       export AGENT_TRACKER_SOCKET="''${AGENT_TRACKER_SOCKET:-${trackerSocketPath}}"
       agent-tracker-ctl ensure-running >/dev/null 2>&1 || true
@@ -39,19 +39,77 @@ pkgs.writeShellApplication {
       # Register with agent-tracker and get name! (Foreground)
       tmux_socket="''${TMUX%%,*}"
       wrapper_pid="$$"
+      last_sent_session="$session_name"
+      last_sent_pane="$pane_id"
+      last_sent_socket="$tmux_socket"
       suggested_name="''${SUGGESTED_AGENT_NAME:-}"
       agent_type=$(basename "$cmd")
       agent_id="''${AGENT_ID:-$(python3 -c 'import uuid; print(uuid.uuid4())')}"
       export AGENT_ID="$agent_id"
       agent_name=$(python3 -c "import socket, json, os, sys; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.connect(os.environ.get('AGENT_TRACKER_SOCKET', os.path.join(os.path.expanduser('~/.cache'), 'agent-tracker', 'agent-tracker.sock'))); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'register', 'params': {'session': sys.argv[1], 'tmux_pane': sys.argv[2], 'wrapper_pid': int(sys.argv[3]), 'tmux_socket': sys.argv[4], 'name': sys.argv[5], 'agent_type': sys.argv[6], 'agent_cmd': sys.argv[7], 'agent_id': sys.argv[8]}, 'id': 1}).encode()); s.shutdown(socket.SHUT_WR); resp = s.recv(1024); data = json.loads(resp.decode()); print(data.get(\"result\", \"\"))" "$session_name" "$pane_id" "$wrapper_pid" "$tmux_socket" "$suggested_name" "$agent_type" "$(basename "$cmd")" "$agent_id" 2>>/tmp/wrapper.log)
 
+      resolve_tmux_location() {
+        local current_session current_pane current_socket
+        current_session=$(tmux display-message -p -t "$pane_id" '#S' 2>/dev/null || true)
+        current_pane=$(tmux display-message -p -t "$pane_id" '#{pane_id}' 2>/dev/null || true)
+        current_socket=$(tmux display-message -p -t "$pane_id" '#{socket_path}' 2>/dev/null || true)
+
+        if [[ -z "$current_socket" ]]; then
+          current_socket="$tmux_socket"
+        fi
+
+        printf '%s\t%s\t%s\n' "$current_session" "$current_pane" "$current_socket"
+      }
+
       send_heartbeat() {
-        python3 -c "import json, os, socket, sys; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(2.0); s.connect(os.environ['AGENT_TRACKER_SOCKET']); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'heartbeat', 'params': {'agent_id': sys.argv[1], 'session': sys.argv[2], 'tmux_pane': sys.argv[3], 'tmux_socket': sys.argv[4], 'wrapper_pid': int(sys.argv[5])}, 'id': 1}).encode()); s.shutdown(socket.SHUT_WR); data = json.loads(s.recv(1024).decode()); sys.exit(0 if 'result' in data else 1)" "$agent_id" "$session_name" "$pane_id" "$tmux_socket" "$wrapper_pid" >/dev/null 2>>/tmp/wrapper.log
+        local location current_session current_pane current_socket session_arg pane_arg socket_arg
+        location=$(resolve_tmux_location)
+        IFS=$'\t' read -r current_session current_pane current_socket <<< "$location"
+
+        session_arg="__UNCHANGED__"
+        pane_arg="__UNCHANGED__"
+        socket_arg="__UNCHANGED__"
+
+        if [[ -n "$current_session" && "$current_session" != "$last_sent_session" ]]; then
+          session_arg="$current_session"
+        fi
+        if [[ -n "$current_pane" && "$current_pane" != "$last_sent_pane" ]]; then
+          pane_arg="$current_pane"
+        fi
+        if [[ -n "$current_socket" && "$current_socket" != "$last_sent_socket" ]]; then
+          socket_arg="$current_socket"
+        fi
+
+        if python3 -c "import json, os, socket, sys; params = {'agent_id': sys.argv[1], 'wrapper_pid': int(sys.argv[5])}; sentinel = '__UNCHANGED__'; session = sys.argv[2]; pane = sys.argv[3]; tmux_socket = sys.argv[4]; session != sentinel and params.__setitem__('session', session); pane != sentinel and params.__setitem__('tmux_pane', pane); tmux_socket != sentinel and params.__setitem__('tmux_socket', tmux_socket); s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(2.0); s.connect(os.environ['AGENT_TRACKER_SOCKET']); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'heartbeat', 'params': params, 'id': 1}).encode()); s.shutdown(socket.SHUT_WR); data = json.loads(s.recv(1024).decode()); sys.exit(0 if 'result' in data else 1)" "$agent_id" "$session_arg" "$pane_arg" "$socket_arg" "$wrapper_pid" >/dev/null 2>>/tmp/wrapper.log; then
+          if [[ -n "$current_session" ]]; then
+            last_sent_session="$current_session"
+          fi
+          if [[ -n "$current_pane" ]]; then
+            last_sent_pane="$current_pane"
+          fi
+          if [[ -n "$current_socket" ]]; then
+            last_sent_socket="$current_socket"
+          fi
+          return 0
+        fi
+        return 1
       }
 
       reregister_agent() {
-        current_name=$(tmux display-message -p -t "$pane_id" '#{@agent_name}' 2>/dev/null || true)
-        python3 -c "import socket, json, os, sys; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(2.0); s.connect(os.environ['AGENT_TRACKER_SOCKET']); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'register', 'params': {'session': sys.argv[1], 'tmux_pane': sys.argv[2], 'wrapper_pid': int(sys.argv[3]), 'tmux_socket': sys.argv[4], 'name': sys.argv[5], 'agent_type': sys.argv[6], 'agent_cmd': sys.argv[7], 'agent_id': sys.argv[8]}, 'id': 1}).encode()); s.shutdown(socket.SHUT_WR); data = json.loads(s.recv(1024).decode()); print(data.get(\"result\", \"\"))" "$session_name" "$pane_id" "$wrapper_pid" "$tmux_socket" "$current_name" "$agent_type" "$(basename "$cmd")" "$agent_id" >/dev/null 2>>/tmp/wrapper.log || true
+        local location current_session current_pane current_socket current_name
+        location=$(resolve_tmux_location)
+        IFS=$'\t' read -r current_session current_pane current_socket <<< "$location"
+        current_session="''${current_session:-$last_sent_session}"
+        current_pane="''${current_pane:-$last_sent_pane}"
+        current_socket="''${current_socket:-$last_sent_socket}"
+        current_name=$(tmux display-message -p -t "$current_pane" '#{@agent_name}' 2>/dev/null || true)
+        if python3 -c "import socket, json, os, sys; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(2.0); s.connect(os.environ['AGENT_TRACKER_SOCKET']); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'register', 'params': {'session': sys.argv[1], 'tmux_pane': sys.argv[2], 'wrapper_pid': int(sys.argv[3]), 'tmux_socket': sys.argv[4], 'name': sys.argv[5], 'agent_type': sys.argv[6], 'agent_cmd': sys.argv[7], 'agent_id': sys.argv[8]}, 'id': 1}).encode()); s.shutdown(socket.SHUT_WR); data = json.loads(s.recv(1024).decode()); print(data.get(\"result\", \"\"))" "$current_session" "$current_pane" "$wrapper_pid" "$current_socket" "$current_name" "$agent_type" "$(basename "$cmd")" "$agent_id" >/dev/null 2>>/tmp/wrapper.log; then
+          last_sent_session="$current_session"
+          last_sent_pane="$current_pane"
+          last_sent_socket="$current_socket"
+          return 0
+        fi
+        return 1
       }
 
       start_heartbeat() {

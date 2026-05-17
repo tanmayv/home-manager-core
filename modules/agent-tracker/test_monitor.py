@@ -9,6 +9,7 @@ class TestMonitor(unittest.TestCase):
     def setUp(self):
         state.state = {}
         state.name_index = {}
+        state.pane_index = {}
 
     def test_get_liveness_phase_from_heartbeat(self):
         now = 100.0

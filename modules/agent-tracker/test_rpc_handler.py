@@ -12,6 +12,7 @@ class TestRpcHandler(unittest.TestCase):
     def setUp(self):
         state.state = {}
         state.name_index = {}
+        state.pane_index = {}
         state.INBOX_DIR = "/tmp/test-agent-inboxes"
 
     @mock.patch("tmux_util.set_agent_uuid")
