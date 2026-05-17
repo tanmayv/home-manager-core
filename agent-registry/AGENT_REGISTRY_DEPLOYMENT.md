@@ -208,7 +208,113 @@ services.agent-tracker = {
 };
 ```
 
-## 7. Notes / current slice scope
+## 7. Managed agents on the registry host
+
+The NixOS module can keep selected agents running locally on the registry host inside tmux.
+
+### 7.1 What you need first
+
+For each managed agent, the target user must already be able to run:
+
+- `tmux`
+- the agent command itself, for example `pi` or `claude`
+- the wrapper executable referenced by `wrapperPath` (default: `agent-wrapper`)
+
+Those can be provided either through the target user's normal PATH or by using absolute store paths in `command` / `wrapperPath`.
+
+### 7.2 Add a managed agent
+
+Example:
+
+```nix
+services.agent-registry = {
+  enable = true;
+  auth = false;
+
+  managedAgents.nixos-expert = {
+    user = "tanmay";
+    session = "nix-homelab-config";
+    cwd = "~";
+    command = "pi";
+
+    # Defaults shown explicitly:
+    wrapperPath = "agent-wrapper";
+    reconcileIntervalSeconds = 30;
+    tmuxSocketPath = "/home/tanmay/.cache/agent-registry/tmux.sock";
+    # Or point at your normal tmux socket if you intentionally want to share it.
+    # tmuxSocketPath = "/run/user/1000/tmux-1000/default";
+
+    restart = {
+      enable = true;
+      intervalSeconds = 86400;
+      warningLeadTimeSeconds = 300;
+      warningMessage = "Restarting in 5 minutes";
+    };
+  };
+};
+```
+
+This creates:
+
+- a reconcile service/timer:
+  - `agent-registry-managed-nixos-expert.service`
+  - `agent-registry-managed-nixos-expert.timer`
+- and, if `restart.enable = true`, a restart service/timer:
+  - `agent-registry-restart-nixos-expert.service`
+  - `agent-registry-restart-nixos-expert.timer`
+
+Apply it normally:
+
+```bash
+sudo nixos-rebuild switch --flake .#your-host
+```
+
+### 7.3 Important options
+
+| Option | Meaning |
+| --- | --- |
+| `user` | User that owns the tmux session and runs the agent. |
+| `session` | tmux session name to create/reuse. |
+| `cwd` | Working directory for the agent process. `"~"` resolves to the target user's home. |
+| `command` | Agent command to run, for example `pi`, `claude`, or an absolute path. |
+| `wrapperPath` | Wrapper executable used to launch the agent. Default: `agent-wrapper`. |
+| `trackerSocketPath` | Optional override for the target user's tracker socket. |
+| `tmuxSocketPath` | Optional override for the tmux socket. Default is a dedicated socket under `~/.cache/agent-registry/tmux.sock`. |
+| `reconcileIntervalSeconds` | How often the registry host re-checks that the agent exists. |
+| `restart.enable` | Enables scheduled restarts. |
+| `restart.onCalendar` | systemd `OnCalendar` restart schedule. |
+| `restart.intervalSeconds` | systemd `OnUnitActiveSec` restart schedule. |
+| `restart.warningLeadTimeSeconds` | How long to wait after sending the warning before restarting. Default: `300`. |
+| `restart.warningMessage` | Optional custom warning message sent into the pane before restart. |
+
+### 7.4 Behavior notes
+
+- Reconcile and restart units run as the target user, not root.
+- The module sets explicit `HOME`, `PATH`, `XDG_RUNTIME_DIR`, tracker socket, and tmux socket context.
+- **Important:** by default managed agents use a dedicated tmux socket at `~/.cache/agent-registry/tmux.sock` so they keep working without relying on an interactive login session. If you want them to appear on your usual tmux server, override `tmuxSocketPath` explicitly.
+- Managed agents use tmux pane metadata (`@agent_name`) as the idempotency source of truth.
+  Manual pane or agent renames can therefore break reconciliation and may cause a duplicate pane to be spawned.
+- If tmux is not already running for that socket, the reconcile unit starts it automatically.
+- If a scheduled restart finds no live pane for the managed agent, it skips the warning and just starts/reconciles the agent immediately.
+
+### 7.5 Verifying it
+
+Useful checks:
+
+```bash
+systemctl status agent-registry-managed-nixos-expert.service
+systemctl status agent-registry-managed-nixos-expert.timer
+systemctl status agent-registry-restart-nixos-expert.timer
+```
+
+If using the default dedicated tmux socket:
+
+```bash
+sudo -u tanmay tmux -S /home/tanmay/.cache/agent-registry/tmux.sock ls
+sudo -u tanmay tmux -S /home/tanmay/.cache/agent-registry/tmux.sock list-panes -a -F '#S #{pane_id} #{@agent_name}'
+```
+
+## 8. Notes / current slice scope
 
 This deployment guide reflects the current vertical slice.
 Deferred follow-up items include:
