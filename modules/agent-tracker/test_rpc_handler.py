@@ -219,6 +219,32 @@ class TestRpcHandler(unittest.TestCase):
             if os.path.exists(inbox_path):
                 os.remove(inbox_path)
 
+    def test_deliver_local_message_is_idempotent_for_message_id(self):
+        inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent(
+                "agent1",
+                {
+                    "agent_id": "id-1",
+                    "status": "working",
+                    "waiting_approval": False,
+                    "pending_notifications": [],
+                    "tmux_pane": "%1",
+                    "tmux_socket": "sock",
+                },
+            )
+            msg = {"sender": "tester", "timestamp": rpc_handler._utc_now_isoformat(), "message": "hello", "read": False, "message_id": "m1"}
+            rpc_handler.deliver_local_message("agent1", msg, "tester")
+            rpc_handler.deliver_local_message("agent1", msg, "tester")
+            with open(inbox_path, "r") as f:
+                lines = [line for line in f if line.strip()]
+            self.assertEqual(len(lines), 1)
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
     @mock.patch("tmux_util.send_keys")
     def test_send_message_notifies_recovered_unknown_agent(self, send_keys):
         inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")

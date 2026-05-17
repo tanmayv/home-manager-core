@@ -75,6 +75,7 @@ export TRACKER_STALE_SECONDS=60
 export TRACKER_GONE_SECONDS=180
 export AGENT_REGISTRY_AUTH=true
 export AGENT_REGISTRY_TOKEN="your-shared-token"
+export AGENT_REGISTRY_STATE_PATH="$HOME/.local/state/agent-registry/state.json"
 nix run path:/path/to/home-manager-core/agent-registry
 ```
 
@@ -118,6 +119,10 @@ When `auth = false`:
 ## 5. Tracker-side configuration
 
 Trackers do **not** talk to the registry unless `registryUrl` is set.
+
+**Delivery model:** cross-tracker messages are now queued at the registry and pulled by each tracker via authenticated long-polling. That means the registry does **not** need to open inbound HTTP connections back to tracker hosts for normal message delivery. Tracker-side inbound reachability is therefore no longer required for registry messaging.
+
+**Durability/semantics:** the registry persists its pending-delivery queue on disk before returning `202` from `POST /messages`. Delivery is at-least-once across registry restarts. Trackers ack only after successful local inbox delivery, and tracker-side inbox writes de-duplicate by `message_id`.
 
 Home Manager tracker options added by this slice:
 
@@ -221,6 +226,13 @@ For each managed agent, the target user must already be able to run:
 - the wrapper executable referenced by `wrapperPath` (default: `agent-wrapper`)
 
 Those can be provided either through the target user's normal PATH or by using absolute store paths in `command` / `wrapperPath`.
+
+**Important:** `managedAgents` by itself only ensures an agent process exists in tmux. If you also want that managed agent to appear in the global registry (`/agents` on `agents.mundus.in` or another registry), the same machine/user must also be running a local `agent-tracker` with registry integration enabled. In other words:
+
+- `services.agent-registry` + `managedAgents` => starts and keeps the local tmux agent alive
+- `services.agent-tracker` + `registryUrl` => discovers that local agent and publishes it to the registry
+
+Without `agent-tracker`, the managed agent is just a local tmux process and will not be reported upstream.
 
 ### 7.2 Add a managed agent
 

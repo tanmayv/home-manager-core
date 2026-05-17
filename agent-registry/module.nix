@@ -215,11 +215,13 @@ in {
       agent-registry = {
         wantedBy = [ "multi-user.target" ];
         serviceConfig = {
+          StateDirectory = "agent-registry";
           EnvironmentFile = pkgs.writeText "agent-registry.env" ''
             AGENT_REGISTRY_PORT=${toString cfg.port}
             AGENT_REGISTRY_AUTH=${if cfg.auth then "true" else "false"}
             TRACKER_STALE_SECONDS=${toString cfg.staleSeconds}
             TRACKER_GONE_SECONDS=${toString cfg.goneSeconds}
+            AGENT_REGISTRY_STATE_PATH=/var/lib/agent-registry/state.json
           '';
           LoadCredential = lib.optional cfg.auth "registry-token:${cfg.tokenFile}";
           ExecStart = toString (pkgs.writeShellScript "agent-registry-start" ''

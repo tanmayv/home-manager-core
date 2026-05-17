@@ -10,4 +10,6 @@ Managed-agent end-to-end check:
 
 - `nix build .#checks.x86_64-linux.managed-agent --no-link -L`
 
-Deferred to follow-up: persistence/state path handling, DELETE /trackers, cross-tracker POST /messages, and broader Home Manager integration.
+Current registry delivery model: durable on-disk queue + tracker long-poll / ack for cross-tracker messages. This avoids registry→tracker callback reachability requirements while preserving messages across registry restarts.
+
+Deferred to follow-up: DELETE /trackers and broader Home Manager integration.

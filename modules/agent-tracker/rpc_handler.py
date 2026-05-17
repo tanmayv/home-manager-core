@@ -298,11 +298,24 @@ def deliver_local_message(target_name_or_id: str, msg_obj: dict, notify_sender: 
     inbox_file = os.path.join(state.INBOX_DIR, f"{uuid_str}.inbox")
     notify_sender = notify_sender or msg_obj.get("sender", "unknown")
     attach_dir = None
+    msg_id = msg_obj.get("message_id")
 
     try:
+        if msg_id and os.path.exists(inbox_file):
+            with open(inbox_file, "r") as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    try:
+                        if json.loads(line).get("message_id") == msg_id:
+                            logging.info(f"Skipping duplicate delivery {msg_id} for {current_name}")
+                            return current_name
+                    except json.JSONDecodeError:
+                        continue
+
         attachments = []
         if msg_obj.get("attachments"):
-            msg_id = msg_obj.get("message_id") or str(uuid.uuid4())
+            msg_id = msg_id or str(uuid.uuid4())
             attach_dir = os.path.join(state.INBOX_DIR, "attachments", uuid_str, msg_id)
             os.makedirs(attach_dir, exist_ok=True)
             seen_names = set()

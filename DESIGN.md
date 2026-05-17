@@ -65,11 +65,12 @@ Message flow overview (cross-machine):
       ▼
   agent-registry
       │  3. Looks up tracker record for machine-2
-      │  4. POST /deliver  →  machine-2:19876
+      │  4. Durably enqueue delivery for tracker machine-2
       ▼
-  agent-tracker HTTP sidecar (machine-2)
-      │  5. Writes to gemini-1's local inbox file
-      │  6. tmux send-keys notification
+  agent-tracker (machine-2)
+      │  5. Long-poll GET /trackers/{id}/deliveries?wait=25
+      │  6. Writes to gemini-1's local inbox file
+      │  7. POST /trackers/{id}/deliveries/{message_id}/ack
       ▼
   gemini-1 (machine-2)
 ```
@@ -100,8 +101,10 @@ Field semantics:
 - `tracker_id`: stable UUID. Survives tracker daemon restarts as long as the tracker
   re-registers with the same `hostname`. On conflict (same hostname, different
   `tracker_id`), the new registration wins and updates the existing record.
-- `address`: the IP the tracker reports during registration. The registry uses this to
-  forward messages. Trackers behind the VPN report their VPN tunnel IP.
+- `address`: the IP the tracker reports during registration. This remains useful for
+  diagnostics and optional direct sidecar access, but normal cross-tracker delivery no
+  longer depends on registry→tracker callbacks. Trackers behind the VPN may still report
+  their VPN tunnel IP.
 - `status` transitions:
   - `active`: heartbeat received within `TRACKER_STALE_SECONDS` (default 60 s).
   - `stale`: no heartbeat for 60–180 s; agents are still cached but message delivery
@@ -419,26 +422,10 @@ Error responses:
 **`POST /messages`**
 
 The source tracker calls this endpoint when it resolves that the target agent is on a
-different tracker. The registry performs the delivery to the target tracker's HTTP sidecar.
+different tracker. The registry resolves the target and durably enqueues a pending
+delivery for the target tracker.
 
 Request body:
-```json
-{
-  "sender_agent_id":   "string (UUID of the sending agent)",
-  "sender_agent_name": "string (display name at time of send)",
-  "sender_tracker_id": "string (UUID of the sending tracker)",
-  "target_agent_id":   "string (UUID of the target agent; preferred)",
-  "target_agent_name": "string (display name; used only if target_agent_id is absent)",
-  "message":           "string"
-}
-```
-
-At least one of `target_agent_id` or `target_agent_name` must be provided.
-`target_agent_id` takes priority. `target_agent_name` **must** be accompanied by
-`target_hostname` to avoid ambiguity — bare name resolution is not supported at the
-registry level.
-
-Request body (updated to include `target_hostname` and optional attachments):
 ```json
 {
   "sender_agent_id":   "string",
@@ -458,54 +445,90 @@ Request body (updated to include `target_hostname` and optional attachments):
 }
 ```
 
-At least one of `message` or `attachments` must be present.
-For this slice, attachments are carried inline as base64 in JSON. This avoids introducing
-multipart parsing complexity while still supporting cross-tracker file transfer.
-Large payloads are accepted up to an implementation-defined request-body limit; larger
-requests return `413 payload_too_large`.
+At least one of `message` or `attachments` must be present. Attachments are carried
+inline as base64 JSON for this slice. Large payloads beyond the implementation-defined
+body limit return `413 payload_too_large`.
 
 Resolution logic (registry-side):
-1. If `target_agent_id` is provided, look it up in the agent cache. If found, proceed.
-2. If only `target_agent_name` is provided and `target_hostname` is absent, return `400`
-   with `"error": "hostname_required"` — bare-name global resolution is not supported.
-3. If `target_agent_name` + `target_hostname` are provided, filter the agent cache to
-   agents on that tracker hostname and match on `name` or `aliases`. If no match, `404`.
-4. If the resolved agent's tracker is the same as `sender_tracker_id`, return `400` with
-   `"error": "same_tracker"` — local send must be used instead.
-5. Check that the target tracker's `status` is `active`. If `stale` or `gone`, return `503`.
-6. Forward the message to the target tracker via `POST /deliver` on its HTTP sidecar.
+1. If `target_agent_id` is provided, look it up in the agent cache.
+2. Otherwise require `target_agent_name` + `target_hostname`; bare-name global resolution
+   is not supported.
+3. If the resolved agent's tracker is the same as `sender_tracker_id`, return `400`
+   `same_tracker`.
+4. Check that the target tracker's `status` is `active`. If `stale` or `gone`, return `503`.
+5. Persist a `PendingDelivery` record to the registry state file before responding.
 
-Response `202 Accepted` (delivery accepted by target tracker):
+Response `202 Accepted` (durably queued):
 ```json
 {
-  "ok":             true,
+  "ok":              true,
+  "queued":          true,
+  "message_id":      "string (UUID)",
   "target_agent_id": "string",
-  "target_name":    "string",
-  "target_tracker": "string (hostname)"
+  "target_name":     "string",
+  "target_tracker":  "string (hostname)"
 }
 ```
 
+Semantics: once `202` is returned, the message has been durably recorded in the
+registry's state file and survives registry restarts. Delivery is **at-least-once**:
+trackers ack only after local delivery succeeds, and local inbox writes de-duplicate by
+`message_id` so ack retries do not duplicate inbox entries.
+
 Error responses:
 - `400 Bad Request`:
-  - `{"error": "invalid_request", "message": "message text is required"}`
+  - `{"error": "invalid_request", "message": "message text or attachments are required"}`
   - `{"error": "same_tracker", "message": "target agent is on the same tracker; use local send"}`
   - `{"error": "missing_target", "message": "provide target_agent_id or target_agent_name"}`
   - `{"error": "hostname_required", "message": "target_hostname is required when using target_agent_name; bare-name global resolution is not supported"}`
 - `401 Unauthorized`.
 - `404 Not Found` — `{"error": "agent_not_found", "message": "no agent with that ID or name is registered on the specified tracker"}`.
-- `503 Service Unavailable`:
-  - `{"error": "tracker_offline", "message": "target tracker is stale or gone", "tracker_status": "stale|gone"}`
-  - `{"error": "delivery_failed", "message": "target tracker returned an error: <detail>"}`
-  - `{"error": "tracker_unreachable", "message": "could not connect to target tracker: connection refused"}`
+- `503 Service Unavailable` — `{"error": "tracker_offline", "message": "target tracker is stale or gone", "tracker_status": "stale|gone"}`.
 
-The registry does **not** queue messages. If the target tracker is offline, the caller
-receives `503` immediately and is responsible for retry logic. Rationale: queuing adds
-significant state management risk; the inbox model already handles "deliver when ready"
-at the local level once the message reaches the tracker.
+### 8. Tracker Delivery Poll / Ack
+
+**`GET /trackers/{tracker_id}/deliveries?wait=<seconds>`**
+
+Called by the target tracker in a loop. If deliveries are pending, the registry returns
+immediately; otherwise it long-polls for up to `wait` seconds (capped server-side).
+
+Response `200 OK`:
+```json
+{
+  "deliveries": [
+    {
+      "message_id":      "string",
+      "target_agent_id": "string",
+      "sender_name":     "string",
+      "sender_agent_id": "string | null",
+      "sender_tracker":  "string",
+      "message":         "string | null",
+      "attachments":     ["..."],
+      "sent_at":         "string",
+      "queued_at":       "number (unix seconds)"
+    }
+  ]
+}
+```
+
+**`POST /trackers/{tracker_id}/deliveries/{message_id}/ack`**
+
+Called only after the tracker has successfully written the message to the local inbox.
+If local delivery fails transiently (for example, inbox disk write failure), the tracker
+must **not** ack; the registry will offer the same message again on the next poll.
+
+Response `200 OK`:
+```json
+{"ok": true}
+```
+
+Error responses:
+- `404 Not Found` — unknown tracker or message.
+- `401 Unauthorized`.
 
 ---
 
-### 8. Registry Health
+### 9. Registry Health
 
 **`GET /healthz`**
 
@@ -616,62 +639,38 @@ remain unchanged. Resolution rules when `target_address` is present:
 ### Full Sequence Diagram
 
 ```
-Agent A (machine-1)      tracker-1 (machine-1)    agent-registry      tracker-2 sidecar (machine-2)   Agent B (machine-2)
+Agent A (machine-1)      tracker-1 (machine-1)    agent-registry      tracker-2 (machine-2)           Agent B (machine-2)
       │                          │                      │                          │                          │
-      │  RPC send_message(       │                      │                          │                          │
-      │   target_address=        │                      │                          │                          │
-      │   "machine-2/gemini-1",  │                      │                          │                          │
-      │   message="hello")       │                      │                          │                          │
+      │ RPC send_message(...)    │                      │                          │                          │
       │─────────────────────────►│                      │                          │                          │
-      │                          │                      │                          │                          │
-      │                          │  GET /agents         │                          │                          │
-      │                          │   ?name=gemini-1     │                          │                          │
+      │                          │ GET /agents          │                          │                          │
       │                          │─────────────────────►│                          │                          │
-      │                          │                      │                          │                          │
-      │                          │  200 [{agent_id: X,  │                          │                          │
-      │                          │   tracker_id: T2}]   │                          │                          │
+      │                          │ 200 [{agent_id:X,    │                          │                          │
+      │                          │      tracker_id:T2}] │                          │                          │
       │                          │◄─────────────────────│                          │                          │
-      │                          │                      │                          │                          │
-      │                          │  POST /messages      │                          │                          │
-      │                          │  {sender_agent_id:A, │                          │                          │
-      │                          │   target_agent_id:X, │                          │                          │
-      │                          │   message:"hello"}   │                          │                          │
+      │                          │ POST /messages       │                          │                          │
       │                          │─────────────────────►│                          │                          │
-      │                          │                      │  [resolve T2:            │                          │
-      │                          │                      │   address=10.27.0.8,     │                          │
-      │                          │                      │   port=19876,            │                          │
-      │                          │                      │   status=active]         │                          │
-      │                          │                      │                          │                          │
-      │                          │                      │  POST /deliver           │                          │
-      │                          │                      │  {target_agent_id: X,    │                          │
-      │                          │                      │   sender_name:"claude-1",│                          │
-      │                          │                      │   sender_tracker:        │                          │
-      │                          │                      │    "machine-1",          │                          │
-      │                          │                      │   message:"hello"}       │                          │
-      │                          │                      │─────────────────────────►│                          │
-      │                          │                      │                          │  write inbox file        │
-      │                          │                      │                          │  tmux send-keys          │
-      │                          │                      │                          │─────────────────────────►│
-      │                          │                      │  200 {"ok": true}        │                          │
-      │                          │                      │◄─────────────────────────│                          │
-      │                          │  202 {"ok": true}    │                          │                          │
+      │                          │                      │ persist PendingDelivery  │                          │
+      │                          │                      │ 202 {message_id:M}       │                          │
       │                          │◄─────────────────────│                          │                          │
-      │  JSON-RPC result: true   │                      │                          │                          │
+      │ JSON-RPC result: true    │                      │                          │                          │
       │◄─────────────────────────│                      │                          │                          │
+      │                          │                      │                          │ GET /trackers/T2/        │
+      │                          │                      │                          │ deliveries?wait=25       │
+      │                          │                      │◄─────────────────────────│                          │
+      │                          │                      │ 200 [{message_id:M,...}] │                          │
+      │                          │                      │─────────────────────────►│                          │
+      │                          │                      │                          │ write inbox file         │
+      │                          │                      │                          │ tmux send-keys           │
+      │                          │                      │                          │ POST /trackers/T2/       │
+      │                          │                      │                          │ deliveries/M/ack         │
+      │                          │                      │◄─────────────────────────│                          │
+      │                          │                      │ 200 {"ok": true}        │                          │
+      │                          │                      │─────────────────────────►│                          │
 ```
 
-**Target tracker offline path:**
-
-```
-  [at POST /messages — registry checks tracker T2 status]
-
-  T2 status = "stale" or "gone"
-  └─► registry returns 503:
-      {"error": "tracker_offline", "tracker_status": "stale", "message": "..."}
-
-  tracker-1 returns JSON-RPC error to Agent A:
-  {"code": -32603, "message": "Remote delivery failed: target tracker is stale (machine-2)"}
-```
+**Target tracker offline path:** `POST /messages` still returns `503 tracker_offline`
+for trackers whose heartbeat status is `stale` or `gone`.
 
 ---
 
@@ -685,7 +684,9 @@ The sidecar exposes exactly two endpoints.
 
 ### POST /deliver
 
-Called exclusively by the registry to deliver a forwarded message to a local agent.
+Retained for observer/debug compatibility and direct local testing. Normal cross-tracker
+message delivery now uses the registry's queued long-poll path instead of registry→tracker
+HTTP callbacks.
 
 Authentication: `Authorization: Bearer <token>` — the same pre-shared token this tracker
 used to register. The sidecar rejects any request whose token does not match.
@@ -813,8 +814,8 @@ from forging agent identities or flooding inboxes.
 A single 256-bit random token (base64url-encoded) is shared across all trackers and the
 registry. The same token is used in both directions:
 
-- Tracker → registry (`POST /trackers`, heartbeat, `POST /messages`).
-- Registry → tracker sidecar (`POST /deliver`, `GET /agents`).
+- Tracker → registry (`POST /trackers`, heartbeat, `POST /messages`, long-poll deliveries, ack).
+- Registry → tracker sidecar (`POST /deliver`, `GET /agents`) only for retained compatibility/debug access.
 
 The registry stores only the SHA-256 hash of the token; it never stores or returns the
 plaintext. The token is distributed to each machine via the Nix home-manager
@@ -862,7 +863,7 @@ All open questions have been resolved. Decisions are recorded here for posterity
 
 | # | Question | Decision |
 |---|----------|----------|
-| 1 | Offline message queue | **Fail fast.** Return `503` immediately. No queue at the registry. Sender is responsible for retry. |
+| 1 | Offline/cross-tracker delivery model | **Durable registry queue + tracker long-poll.** `POST /messages` persists a pending delivery and returns `202`; target trackers long-poll and ack after successful local delivery. This avoids inbound reachability requirements while preserving restart safety. |
 | 2 | Token rotation | **Simultaneous redeploy via Nix.** Update secret in `setup.nix`, run `home-manager switch` on all machines. Key versioning is unnecessary complexity. |
 | 3 | mTLS | **Deferred.** Not needed for a trusted home-lab. Revisit if machines ever join outside the trusted network. |
 | 4 | Registry HA | **rsync + manual failover.** Periodic `rsync` of the state file to a second machine. Local operation is unaffected when the registry is down. |
@@ -886,11 +887,12 @@ Implement flat-file persistence for restart recovery.
 ### Phase 2 — Tracker HTTP sidecar
 
 Add the sidecar to the existing tracker daemon as a new thread spawned from
-`agent-tracker.py`'s `main()`. Implement `POST /deliver` and `GET /agents`. Extend
-`state.py` to expose the sidecar-safe agent snapshot (no tmux/PID fields). Add
-`AGENT_TRACKER_HTTP_PORT` and `AGENT_REGISTRY_URL` env var handling.
+`agent-tracker.py`'s `main()`. Implement `POST /deliver` and `GET /agents` for
+observer/debug compatibility. Extend `state.py` to expose the sidecar-safe agent
+snapshot (no tmux/PID fields). Add `AGENT_TRACKER_HTTP_PORT` and
+`AGENT_REGISTRY_URL` env var handling.
 
-### Phase 3 — Tracker registration and heartbeat client
+### Phase 3 — Tracker registration, heartbeat, and delivery poll client
 
 Add a background thread in the tracker that calls `POST /trackers` on startup and
 `POST /trackers/{id}/heartbeat` every 30 s with the full agent list. Implement the

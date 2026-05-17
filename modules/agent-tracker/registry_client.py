@@ -7,10 +7,11 @@ HOSTNAME = os.environ.get("AGENT_TRACKER_HOSTNAME", socket.gethostname())
 TRACKER_ID = os.environ.get("AGENT_TRACKER_ID", str(uuid.uuid5(uuid.NAMESPACE_DNS, HOSTNAME)))
 HTTP_PORT = int(os.environ.get("AGENT_TRACKER_HTTP_PORT", "19876"))
 HEARTBEAT_INTERVAL = int(os.environ.get("AGENT_REGISTRY_HEARTBEAT_SECONDS", "30"))
+DELIVERY_WAIT_SECONDS = int(os.environ.get("AGENT_REGISTRY_DELIVERY_WAIT_SECONDS", "25"))
 STATUS_PATH = os.path.join(state.CACHE_DIR, "registry-status.json")
 
 
-def _request(method, path, payload=None):
+def _request(method, path, payload=None, timeout=3):
     if not REGISTRY_URL:
         return None, None
     req = urllib.request.Request(
@@ -20,7 +21,7 @@ def _request(method, path, payload=None):
         method=method,
     )
     try:
-        with urllib.request.urlopen(req, timeout=3) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             body = resp.read().decode()
             return resp.status, json.loads(body) if body else None
     except urllib.error.HTTPError as e:
@@ -34,12 +35,29 @@ def _request(method, path, payload=None):
 
 
 def register():
-    return _request("POST", "/trackers", {"tracker_id": TRACKER_ID, "hostname": HOSTNAME, "address": os.environ.get("AGENT_TRACKER_ADDRESS", HOSTNAME), "http_port": HTTP_PORT, "agents": state.get_agents_for_registry()})[0]
+    return _request(
+        "POST",
+        "/trackers",
+        {
+            "tracker_id": TRACKER_ID,
+            "hostname": HOSTNAME,
+            "address": os.environ.get("AGENT_TRACKER_ADDRESS", HOSTNAME),
+            "http_port": HTTP_PORT,
+            "agents": state.get_agents_for_registry(),
+        },
+    )[0]
 
-def heartbeat(): return _request("POST", f"/trackers/{TRACKER_ID}/heartbeat", {"agents": state.get_agents_for_registry()})[0]
+
+def heartbeat():
+    return _request("POST", f"/trackers/{TRACKER_ID}/heartbeat", {"agents": state.get_agents_for_registry()})[0]
+
 
 def push_agent_update(agent_id, status):
-    if REGISTRY_URL: threading.Thread(target=lambda: _request("POST", f"/trackers/{TRACKER_ID}/agent-update", {"agent_id": agent_id, "status": status}), daemon=True).start()
+    if REGISTRY_URL:
+        threading.Thread(
+            target=lambda: _request("POST", f"/trackers/{TRACKER_ID}/agent-update", {"agent_id": agent_id, "status": status}),
+            daemon=True,
+        ).start()
 
 
 def send_remote_message(sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, message=None, attachments=None):
@@ -58,6 +76,14 @@ def send_remote_message(sender_name, sender_agent_id, sender_tracker_id, target_
         payload["target_agent_name"] = target_name_or_id
         payload["target_hostname"] = target_hostname
     return _request("POST", "/messages", payload)
+
+
+def fetch_deliveries():
+    return _request("GET", f"/trackers/{TRACKER_ID}/deliveries?wait={DELIVERY_WAIT_SECONDS}", timeout=DELIVERY_WAIT_SECONDS + 5)
+
+
+def ack_delivery(message_id):
+    return _request("POST", f"/trackers/{TRACKER_ID}/deliveries/{message_id}/ack", {})[0]
 
 
 def _record_sync_result(status_code, operation):
@@ -92,9 +118,7 @@ def _record_sync_result(status_code, operation):
         logging.debug(f"failed to write registry status: {e}")
 
 
-def background_sync():
-    if not REGISTRY_URL:
-        return
+def _heartbeat_loop():
     _record_sync_result(register(), "register")
     while True:
         status = heartbeat()
@@ -103,3 +127,48 @@ def background_sync():
         else:
             _record_sync_result(status, "heartbeat")
         time.sleep(HEARTBEAT_INTERVAL)
+
+
+def _delivery_loop():
+    while True:
+        status, body = fetch_deliveries()
+        if status == 404:
+            register()
+            continue
+        if status != 200:
+            time.sleep(2)
+            continue
+        deliveries = (body or {}).get("deliveries") or []
+        if not deliveries:
+            continue
+        from rpc_handler import deliver_local_message, DeliveryTargetNotFound, DeliveryValidationError
+        for delivery in deliveries:
+            try:
+                deliver_local_message(
+                    delivery["target_agent_id"],
+                    {
+                        "sender": f'{delivery.get("sender_name", "unknown")} (via {delivery.get("sender_tracker", "unknown")})',
+                        "timestamp": delivery.get("sent_at"),
+                        "message": delivery.get("message"),
+                        "attachments": delivery.get("attachments"),
+                        "read": False,
+                        "message_id": delivery.get("message_id"),
+                    },
+                )
+                ack_delivery(delivery["message_id"])
+            except (DeliveryTargetNotFound, DeliveryValidationError) as e:
+                logging.warning(f"dropping undeliverable queued registry message {delivery.get('message_id')}: {e}")
+                ack_delivery(delivery["message_id"])
+            except RuntimeError as e:
+                logging.warning(f"transient local delivery failure for queued registry message {delivery.get('message_id')}: {e}")
+                time.sleep(2)
+            except Exception as e:
+                logging.warning(f"unexpected delivery failure for queued registry message {delivery.get('message_id')}: {e}")
+                time.sleep(2)
+
+
+def background_sync():
+    if not REGISTRY_URL:
+        return
+    threading.Thread(target=_heartbeat_loop, daemon=True).start()
+    _delivery_loop()
