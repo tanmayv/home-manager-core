@@ -7,6 +7,7 @@ HOSTNAME = os.environ.get("AGENT_TRACKER_HOSTNAME", socket.gethostname())
 TRACKER_ID = os.environ.get("AGENT_TRACKER_ID", str(uuid.uuid5(uuid.NAMESPACE_DNS, HOSTNAME)))
 HTTP_PORT = int(os.environ.get("AGENT_TRACKER_HTTP_PORT", "19876"))
 HEARTBEAT_INTERVAL = int(os.environ.get("AGENT_REGISTRY_HEARTBEAT_SECONDS", "30"))
+STATUS_PATH = os.path.join(state.CACHE_DIR, "registry-status.json")
 
 
 def _request(method, path, payload=None):
@@ -59,9 +60,46 @@ def send_remote_message(sender_name, sender_agent_id, sender_tracker_id, target_
     return _request("POST", "/messages", payload)
 
 
+def _record_sync_result(status_code, operation):
+    now = time.time()
+    connected = isinstance(status_code, int) and 200 <= status_code < 300
+    payload = {
+        "connected": connected,
+        "registry_url": REGISTRY_URL or None,
+        "tracker_id": TRACKER_ID,
+        "hostname": HOSTNAME,
+        "last_operation": operation,
+        "last_attempt": now,
+        "status_code": status_code,
+    }
+    try:
+        with open(STATUS_PATH, "r") as f:
+            existing = json.load(f)
+    except Exception:
+        existing = {}
+    if connected:
+        payload["last_success"] = now
+    elif "last_success" in existing:
+        payload["last_success"] = existing["last_success"]
+        payload["last_error"] = f"{operation}:{status_code if status_code is not None else 'unreachable'}"
+    else:
+        payload["last_error"] = f"{operation}:{status_code if status_code is not None else 'unreachable'}"
+    try:
+        os.makedirs(os.path.dirname(STATUS_PATH), exist_ok=True)
+        with open(STATUS_PATH, "w") as f:
+            json.dump(payload, f)
+    except Exception as e:
+        logging.debug(f"failed to write registry status: {e}")
+
+
 def background_sync():
-    if not REGISTRY_URL: return
-    register()
+    if not REGISTRY_URL:
+        return
+    _record_sync_result(register(), "register")
     while True:
-        if heartbeat() == 404: register()
+        status = heartbeat()
+        if status == 404:
+            _record_sync_result(register(), "register")
+        else:
+            _record_sync_result(status, "heartbeat")
         time.sleep(HEARTBEAT_INTERVAL)

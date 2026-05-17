@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import unittest
@@ -27,6 +28,51 @@ in builtins.toJSON cfg.config.services.agent-tracker.registryAuth
 '''
         out = subprocess.check_output(["nix", "eval", "--impure", "--raw", "--expr", expr], text=True).strip()
         self.assertEqual(out, "false")
+
+    def test_agent_tracker_user_settings_registry_defaults_evaluate(self):
+        repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        expr = f'''
+let
+  flake = builtins.getFlake "path:{repo}";
+  system = builtins.currentSystem;
+  pkgs = import flake.inputs.nixpkgs {{ inherit system; }};
+  hm = flake.inputs.home-manager;
+  cfg = hm.lib.homeManagerConfiguration {{
+    inherit pkgs;
+    modules = [
+      ({{ lib, ... }}: {{
+        options.programs.tmux.statusBar.extraLines = lib.mkOption {{ type = lib.types.listOf lib.types.anything; default = []; }};
+      }})
+      {repo}/modules/agent-tracker/default.nix
+      {{ home.username = "u"; home.homeDirectory = "/tmp/u"; home.stateVersion = "24.05"; }}
+    ];
+    extraSpecialArgs = {{
+      userSettings = {{
+        enable-agent-tracker = true;
+        agent-tracker = {{
+          registry-url = "https://agents.mundus.in";
+          registry-auth = false;
+          http-port = 29876;
+          registry-heartbeat-seconds = 45;
+        }};
+      }};
+    }};
+  }};
+in builtins.toJSON {{
+  enable = cfg.config.services.agent-tracker.enable;
+  registryUrl = cfg.config.services.agent-tracker.registryUrl;
+  registryAuth = cfg.config.services.agent-tracker.registryAuth;
+  httpPort = cfg.config.services.agent-tracker.httpPort;
+  registryHeartbeatSeconds = cfg.config.services.agent-tracker.registryHeartbeatSeconds;
+}}
+'''
+        out = subprocess.check_output(["nix", "eval", "--impure", "--raw", "--expr", expr], text=True).strip()
+        data = json.loads(out)
+        self.assertTrue(data["enable"])
+        self.assertEqual(data["registryUrl"], "https://agents.mundus.in")
+        self.assertFalse(data["registryAuth"])
+        self.assertEqual(data["httpPort"], 29876)
+        self.assertEqual(data["registryHeartbeatSeconds"], 45)
 
 
 if __name__ == "__main__":

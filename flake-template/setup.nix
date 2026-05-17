@@ -23,6 +23,13 @@
   sessionizerSearchPaths = [ "~" "~/projects/nix" ];
 
   enable-agent-tracker = true;
+  agent-tracker = {
+    registry-url = null; # e.g. "https://agents.mundus.in"
+    registry-auth = false;
+    registry-token-file = null; # required when registry-auth = true
+    http-port = 19876;
+    registry-heartbeat-seconds = 30;
+  };
   enable-skill-publishing = false;
   skill-publishing = {
     # Target path in piper. $USER will be replaced with your LDAP.

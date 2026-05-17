@@ -7,10 +7,12 @@ import socket
 import subprocess
 import sys
 import time
+import uuid
 
 CACHE_DIR = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "agent-tracker")
 SOCKET_PATH = os.environ.get("AGENT_TRACKER_SOCKET", os.path.join(CACHE_DIR, "agent-tracker.sock"))
 LOCK_PATH = os.path.join(CACHE_DIR, "agent-tracker.lock")
+REGISTRY_STATUS_PATH = os.path.join(CACHE_DIR, "registry-status.json")
 DEFAULT_STARTUP_TIMEOUT = 5.0
 
 
@@ -102,7 +104,34 @@ def get_current_tmux_pane(fallback: str | None = None) -> str:
         return ""
 
 
-def format_status_bar(agents: dict, current_pane: str) -> str:
+def is_uuid(value: str | None) -> bool:
+    try:
+        uuid.UUID(value or "")
+        return True
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
+def is_registry_connected(now: float | None = None) -> bool:
+    if not os.environ.get("AGENT_REGISTRY_URL", "").strip():
+        return False
+    try:
+        with open(REGISTRY_STATUS_PATH, "r") as f:
+            status = json.load(f)
+    except Exception:
+        return False
+    if not status.get("connected"):
+        return False
+    last_success = status.get("last_success")
+    if not isinstance(last_success, (int, float)):
+        return False
+    now = time.time() if now is None else now
+    heartbeat_interval = int(os.environ.get("AGENT_REGISTRY_HEARTBEAT_SECONDS", "30"))
+    max_age = max(heartbeat_interval * 2 + 5, 15)
+    return now - last_success <= max_age
+
+
+def format_status_bar(agents: dict, current_pane: str, registry_connected: bool = False) -> str:
     if not agents:
         return ""
 
@@ -135,11 +164,25 @@ def format_status_bar(agents: dict, current_pane: str) -> str:
     if not formatted:
         return ""
 
-    prefix = f"#[fg={color4},bold] Active Agents: #[fg={color8},nobold]"
-    return f"{prefix}{' · '.join(formatted)}#[default]"
+    indicator_color = color2 if registry_connected else color1
+    prefix = f"#[fg={color4},bold]Active Agents: #[fg={color8},nobold]"
+    suffix = f" #[fg={indicator_color},bold]●"
+    return f"{prefix}{' · '.join(formatted)}{suffix}#[default]"
 
 def main():
-    parser = argparse.ArgumentParser(description="Agent Tracker Control")
+    parser = argparse.ArgumentParser(
+        description="Agent Tracker Control",
+        epilog=(
+            "Remote messaging via agent-registry:\n"
+            "  send-message alice \"hello\"                 # local-only by bare name\n"
+            "  send-message 123e4567-e89b-12d3-a456-426614174000 \"hello\"  # local-only by bare UUID\n"
+            "  send-message host-a/alice \"hello\"          # remote by hostname/name\n"
+            "  send-message host-a/123e4567-e89b-12d3-a456-426614174000 \"hello\"  # remote by hostname/UUID\n"
+            "\n"
+            "Bare names/UUIDs stay local-only. Host-qualified targets require registry integration."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     subparsers = parser.add_subparsers(dest="subcommand", help="Subcommands")
 
     subparsers.add_parser("list", help="List agents in JSON format")
@@ -148,10 +191,23 @@ def main():
     subparsers.add_parser("ensure-running", help="Ensure the tracker daemon is running")
     subparsers.add_parser("daemon", help="Run the tracker daemon in the foreground")
 
-    send_parser = subparsers.add_parser("send-message", help="Send message to agent")
-    send_parser.add_argument("agent_name", nargs="?", help="Target agent name")
+    send_parser = subparsers.add_parser(
+        "send-message",
+        help="Send message to a local agent or a remote host-qualified target",
+        description=(
+            "Send a message to a local or remote agent.\n"
+            "Examples:\n"
+            "  agent-tracker-ctl send-message alice \"hello\"\n"
+            "  agent-tracker-ctl send-message host-a/alice \"hello\"\n"
+            "  agent-tracker-ctl send-message host-a/123e4567-e89b-12d3-a456-426614174000 \"hello\"\n"
+            "\n"
+            "Bare names/UUIDs are always local-only. Use HOST/TARGET for remote delivery via agent-registry."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    send_parser.add_argument("target", nargs="?", metavar="TARGET", help="Local agent name/UUID or remote HOST/NAME_OR_UUID")
     send_parser.add_argument("message", help="Message text")
-    send_parser.add_argument("--id", dest="agent_id", help="Target agent ID")
+    send_parser.add_argument("--id", dest="agent_id", help="Target local agent ID (legacy local-only form)")
 
     focus_parser = subparsers.add_parser("focus", help="Focus agent pane")
     focus_group = focus_parser.add_mutually_exclusive_group(required=True)
@@ -213,13 +269,13 @@ def main():
     elif args.subcommand == "status-bar":
         agents = call_rpc("list")
         current_pane = get_current_tmux_pane(args.current_pane)
-        status_bar = format_status_bar(agents, current_pane)
+        status_bar = format_status_bar(agents, current_pane, registry_connected=is_registry_connected())
         if status_bar:
             print(status_bar, end="")
 
     elif args.subcommand == "send-message":
-        if not args.agent_name and not args.agent_id:
-            print("Error: send-message requires <agent_name> or --id <agent_id>", file=sys.stderr)
+        if not args.target and not args.agent_id:
+            print("Error: send-message requires <target> or --id <agent_id>", file=sys.stderr)
             sys.exit(1)
         params = {"message": args.message}
         if "AGENT_ID" in os.environ:
@@ -228,8 +284,12 @@ def main():
             params["sender_name"] = os.environ["AGENT_NAME"]
         if args.agent_id:
             params["agent_id"] = args.agent_id
+        elif "/" in args.target:
+            params["target_address"] = args.target
+        elif is_uuid(args.target):
+            params["agent_id"] = args.target
         else:
-            params["agent_name"] = args.agent_name
+            params["agent_name"] = args.target
         res = call_rpc("send_message", params)
         if isinstance(res, dict) and res.get("warning"):
             print(res["warning"], file=sys.stderr)

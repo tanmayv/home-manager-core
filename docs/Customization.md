@@ -89,6 +89,16 @@ To update, simply run `nix flake update` in your personal repository.
 | `enable-agent-tracker` | Enables the background agent-tracker daemon. | The daemon is not started. |
 | `enable-skill-publishing` | Enables the `skill-ctl` tool and Piper-native skill integration. | Disables skill publishing and Piper inheritance logic. |
 
+### Agent Tracker (`agent-tracker` block)
+
+| Option | Description | Default |
+| :--- | :--- | :--- |
+| `registry-url` | Optional agent registry base URL. When `null`, the tracker stays local-only. | `null` |
+| `registry-auth` | Sends Bearer auth to the registry and requires `registry-token-file`. | `false` |
+| `registry-token-file` | User-readable file containing the shared Bearer token for registry auth. | `null` |
+| `http-port` | Local HTTP sidecar port used for observer and registry delivery. | `19876` |
+| `registry-heartbeat-seconds` | How often the tracker heartbeats to the registry. | `30` |
+
 ### Skill Publishing (`skill-publishing` block)
 
 | Option | Description | Default |

@@ -15,6 +15,10 @@ let
   tmuxUserSettings = userSettings // lib.optionalAttrs (userSettings ? tmuxTheme) {
     theme = userSettings.tmuxTheme;
   };
+  agentTrackerSettings = userSettings.agent-tracker or {};
+  registryTokenFileFromSettings = let
+    value = agentTrackerSettings.registry-token-file or null;
+  in if value == "" then null else value;
   palette = import ../palette.nix { userSettings = tmuxUserSettings; };
   cacheHome = config.xdg.cacheHome or "${config.home.homeDirectory}/.cache";
   socketPath = "${cacheHome}/agent-tracker/agent-tracker.sock";
@@ -50,6 +54,15 @@ in
   ];
 
   config = mkMerge [
+    {
+      services.agent-tracker.enable = mkDefault (userSettings.enable-agent-tracker or false);
+      services.agent-tracker.registryUrl = mkDefault (agentTrackerSettings.registry-url or null);
+      services.agent-tracker.registryAuth = mkDefault (agentTrackerSettings.registry-auth or false);
+      services.agent-tracker.registryTokenFile = mkDefault registryTokenFileFromSettings;
+      services.agent-tracker.httpPort = mkDefault (agentTrackerSettings.http-port or 19876);
+      services.agent-tracker.registryHeartbeatSeconds = mkDefault (agentTrackerSettings.registry-heartbeat-seconds or 30);
+    }
+
     (mkIf cfg.enable {
       assertions = [
         {
