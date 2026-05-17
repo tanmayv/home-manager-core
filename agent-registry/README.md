@@ -10,6 +10,11 @@ Managed-agent end-to-end check:
 
 - `nix build .#checks.x86_64-linux.managed-agent --no-link -L`
 
+Stateful dev VM workflow:
+
+- `nix run .#devvm`
+- see `VM_WORKFLOWS.md`
+
 Current registry delivery model: durable on-disk queue + tracker long-poll / ack for cross-tracker messages. This avoids registry→tracker callback reachability requirements while preserving messages across registry restarts.
 
 Deferred to follow-up: DELETE /trackers and broader Home Manager integration.

@@ -165,9 +165,8 @@ def format_status_bar(agents: dict, current_pane: str, registry_connected: bool 
         return ""
 
     indicator_color = color2 if registry_connected else color1
-    prefix = f"#[fg={color4},bold]Active Agents: #[fg={color8},nobold]"
-    suffix = f" #[fg={indicator_color},bold]●"
-    return f"{prefix}{' · '.join(formatted)}{suffix}#[default]"
+    prefix = f"#[fg={indicator_color},bold]● #[fg={color4},bold]Active Agents: #[fg={color8},nobold]"
+    return f"{prefix}{' · '.join(formatted)}#[default]"
 
 def main():
     parser = argparse.ArgumentParser(

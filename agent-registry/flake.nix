@@ -3,8 +3,9 @@
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   outputs = { self, nixpkgs }:
     let
+      lib = nixpkgs.lib;
       systems = [ "x86_64-linux" "aarch64-linux" ];
-      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f (import nixpkgs { inherit system; }));
+      forAllSystems = f: lib.genAttrs systems (system: f (import nixpkgs { inherit system; }));
       mkBundle = pkgs:
         let
           registryServer = pkgs.writeShellApplication {
@@ -21,17 +22,34 @@
           name = "agent-registry-bundle";
           paths = [ registryServer managedAgent ];
         };
+      mkDevVmApp = pkgs:
+        pkgs.writeShellApplication {
+          name = "agent-registry-devvm";
+          text = ''
+            exec ${self.nixosConfigurations.devvm.config.system.build.vm}/bin/run-agent-registry-devvm-vm "$@"
+          '';
+        };
     in {
       packages = forAllSystems (pkgs: {
         default = mkBundle pkgs;
       });
       apps = forAllSystems (pkgs: {
         default = { type = "app"; program = "${self.packages.${pkgs.system}.default}/bin/agent-registry"; };
+      } // lib.optionalAttrs pkgs.stdenv.isLinux {
+        devvm = {
+          type = "app";
+          program = "${mkDevVmApp pkgs}/bin/agent-registry-devvm";
+        };
       });
       checks = forAllSystems (pkgs:
         pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
           managed-agent = import ./managed-agent-test.nix { inherit pkgs self; };
         });
       nixosModules.default = import ./module.nix self;
+      nixosConfigurations.devvm = lib.nixosSystem {
+        system = "x86_64-linux";
+        specialArgs = { inherit self; };
+        modules = [ ./devvm.nix ];
+      };
     };
 }

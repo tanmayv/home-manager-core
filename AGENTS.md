@@ -86,3 +86,13 @@ When extending capabilities, always prefer creating a **Skill** first. Only crea
 - High autonomy and long-running, complex state management.
 - Specialized, agent-specific configuration (`agent.json`, `config.yaml`).
 - Orchestration of multiple other skills or peer agents.
+
+## 5. VM-Based Testing
+If the reusable local test VM project exists at `~/projects/nix/test-vm`, agents may use it for NixOS testing when appropriate instead of applying risky system changes directly on the host machine.
+
+- **Condition**: Only use this workflow if `~/projects/nix/test-vm` exists.
+- **Preferred Use**: Use it for NixOS module/service validation, remote `nixos-rebuild test`, closure pushing, and SSH/journal inspection.
+- **Safety Preference**: Prefer `nixos-rebuild test` before `switch` when targeting the VM.
+- **Scope**: Keep host changes minimal; use the VM especially for changes that could disrupt local services, SSH, or agent workflows.
+- **Shared Resource**: Treat the VM as a reusable shared environment; avoid casually breaking SSH access, the `dev` user, or the base VM behavior.
+- **Instructions**: Follow `~/projects/nix/test-vm/AGENTS.md` for the exact workflow and safety guidance.

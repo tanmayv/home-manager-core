@@ -19,7 +19,7 @@ class TestAgentTrackerCtl(unittest.TestCase):
             registry_connected=True,
         )
         self.assertIn("Active Agents:", bar)
-        self.assertTrue(bar.endswith(" #[fg=#9ece6a,bold]●#[default]"))
+        self.assertTrue(bar.startswith("#[fg=#9ece6a,bold]● #[fg=#2ac3de,bold]Active Agents:"))
 
     def test_format_status_bar_shows_red_registry_indicator_when_disconnected(self):
         bar = ctl.format_status_bar(
@@ -27,7 +27,7 @@ class TestAgentTrackerCtl(unittest.TestCase):
             "%2",
             registry_connected=False,
         )
-        self.assertTrue(bar.endswith(" #[fg=#db4b4b,bold]●#[default]"))
+        self.assertTrue(bar.startswith("#[fg=#db4b4b,bold]● #[fg=#2ac3de,bold]Active Agents:"))
 
     def test_is_registry_connected_requires_fresh_success(self):
         with tempfile.TemporaryDirectory() as tmp:
