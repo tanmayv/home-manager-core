@@ -3,6 +3,7 @@ import logging
 import socket
 import state
 import tmux_util
+import registry_client
 import datetime
 import time
 import os
@@ -140,6 +141,8 @@ def handle_update_agent(params: dict, caller_pid: int = None) -> bool:
     kwargs = {k: v for k, v in params.items() if k not in ["agent_id", "agent_name", "tmux_pane"]}
     if state.update_agent(agent_name, **kwargs):
         _flush_notifications(agent_name)
+        if "status" in kwargs:
+            registry_client.push_agent_update(state.get_agent(agent_name)["agent_id"], kwargs["status"])
         return True
     raise ValueError(f"Agent '{agent_name}' not found")
 

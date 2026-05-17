@@ -21,13 +21,22 @@ let
   logDir = "${cacheHome}/agent-tracker";
   launchdStdoutPath = "${logDir}/launchd.stdout.log";
   launchdStderrPath = "${logDir}/launchd.stderr.log";
-  daemonCmd = "${pkgs.python3}/bin/python3 ${agentTrackerFiles}/agent-tracker.py";
+  daemonCmd = toString (pkgs.writeShellScript "agent-tracker-daemon" ''
+    export AGENT_REGISTRY_AUTH=${if cfg.registryAuth then "true" else "false"}
+    ${lib.optionalString (cfg.registryAuth && cfg.registryTokenFile != null) ''export AGENT_REGISTRY_TOKEN="$(cat ${lib.escapeShellArg (toString cfg.registryTokenFile)})"''}
+    exec ${pkgs.python3}/bin/python3 ${agentTrackerFiles}/agent-tracker.py
+  '');
   agentWrapperPackage = import ../scripts/agent-wrapper-package.nix { inherit pkgs config; };
   monitorEnvVars = {
     AGENT_TRACKER_SOCKET = socketPath;
     POLL_INTERVAL = toString cfg.pollInterval;
     HEARTBEAT_STALE_SECONDS = toString cfg.heartbeatStaleSeconds;
     HEARTBEAT_GRACE_SECONDS = toString cfg.heartbeatGraceSeconds;
+    AGENT_TRACKER_HTTP_PORT = toString cfg.httpPort;
+    AGENT_REGISTRY_HEARTBEAT_SECONDS = toString cfg.registryHeartbeatSeconds;
+    AGENT_REGISTRY_AUTH = if cfg.registryAuth then "true" else "false";
+  } // lib.optionalAttrs (cfg.registryUrl != null) {
+    AGENT_REGISTRY_URL = cfg.registryUrl;
   } // lib.optionalAttrs pkgs.stdenv.isDarwin {
     # launchd starts services with a minimal PATH, so bare `tmux` lookups from
     # the daemon fail on macOS unless we provide the Nix profile tool paths.
@@ -47,6 +56,10 @@ in
           assertion = cfg.heartbeatGraceSeconds >= cfg.heartbeatStaleSeconds;
           message = "services.agent-tracker.heartbeatGraceSeconds must be greater than or equal to services.agent-tracker.heartbeatStaleSeconds.";
         }
+        {
+          assertion = !cfg.registryAuth || cfg.registryTokenFile != null;
+          message = "services.agent-tracker.registryTokenFile is required when registryAuth is enabled.";
+        }
       ];
 
       home.activation.ensureAgentTrackerCacheDir = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
@@ -63,11 +76,16 @@ in
           os.environ.setdefault("POLL_INTERVAL", "${toString cfg.pollInterval}")
           os.environ.setdefault("HEARTBEAT_STALE_SECONDS", "${toString cfg.heartbeatStaleSeconds}")
           os.environ.setdefault("HEARTBEAT_GRACE_SECONDS", "${toString cfg.heartbeatGraceSeconds}")
+          os.environ.setdefault("AGENT_TRACKER_HTTP_PORT", "${toString cfg.httpPort}")
+          os.environ.setdefault("AGENT_REGISTRY_HEARTBEAT_SECONDS", "${toString cfg.registryHeartbeatSeconds}")
+          os.environ.setdefault("AGENT_REGISTRY_AUTH", "${if cfg.registryAuth then "true" else "false"}")
+          ${lib.optionalString (cfg.registryUrl != null) ''os.environ.setdefault("AGENT_REGISTRY_URL", "${cfg.registryUrl}")''}
           os.environ.setdefault("PALETTE_COLOR8", "${palette.color8}")
           os.environ.setdefault("PALETTE_COLOR1", "${palette.color1}")
           os.environ.setdefault("PALETTE_COLOR3", "${palette.color3}")
           os.environ.setdefault("PALETTE_COLOR6", "${palette.color6}")
           os.environ.setdefault("PALETTE_COLOR2", "${palette.color2}")
+          os.environ.setdefault("PALETTE_COLOR4", "${palette.color4}")
           ${builtins.readFile ./agent-tracker-ctl.py}
         '')
       ] ++ (lib.mapAttrsToList (alias: path:
@@ -83,8 +101,7 @@ in
       programs.tmux.statusBar.extraLines = mkIf cfg.enableTmuxIntegration [
         {
           name = "agents";
-          command = "#[fg=${palette.color4},bold] Active Agents: #[fg=${palette.color8},nobold]#(agent-tracker-ctl status-bar)";
-          condition = "[ $(agent-tracker-ctl list | python3 -c 'import sys, json; print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0) -gt 0 ]";
+          command = "#(agent-tracker-ctl status-bar '#{pane_id}')";
         }
       ];
 
@@ -116,7 +133,7 @@ in
       launchd.agents.agent-tracker = {
         enable = true;
         config = {
-          ProgramArguments = [ "${pkgs.python3}/bin/python3" "${agentTrackerFiles}/agent-tracker.py" ];
+          ProgramArguments = [ "${daemonCmd}" ];
           EnvironmentVariables = monitorEnvVars;
           KeepAlive = {
             Crashed = true;

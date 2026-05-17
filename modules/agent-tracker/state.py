@@ -13,7 +13,8 @@ LOCK_PATH = os.path.join(CACHE_DIR, "agent-tracker.lock")
 INBOX_DIR = os.path.join(CACHE_DIR, "inboxes")
 
 state = {}  # keyed by stable agent_id
-name_index = {}  # agent_name -> agent_id
+name_index = {}  # agent_name/alias -> agent_id
+pane_index = {}  # tmux pane id -> agent_id
 state_lock = threading.Lock()
 
 TRANSIENT_COMMS = {
@@ -126,6 +127,31 @@ def _resolve_agent_id(name_or_id: str) -> str | None:
     return name_index.get(name_or_id)
 
 
+def _remove_indexes(agent_id: str, info: dict | None) -> None:
+    if not info:
+        return
+    current_name = info.get("name")
+    if current_name and name_index.get(current_name) == agent_id:
+        name_index.pop(current_name, None)
+    for alias in info.get("aliases", []):
+        if name_index.get(alias) == agent_id:
+            name_index.pop(alias, None)
+    pane_id = info.get("tmux_pane")
+    if pane_id and pane_index.get(pane_id) == agent_id:
+        pane_index.pop(pane_id, None)
+
+
+def _add_indexes(agent_id: str, info: dict) -> None:
+    current_name = info.get("name")
+    if current_name:
+        name_index[current_name] = agent_id
+    for alias in info.get("aliases", []):
+        name_index[alias] = agent_id
+    pane_id = info.get("tmux_pane")
+    if pane_id:
+        pane_index[pane_id] = agent_id
+
+
 def get_all_agents() -> dict:
     """Returns a copy of all agents indexed by display name for compatibility."""
     with state_lock:
@@ -163,10 +189,9 @@ def get_agent_id_by_name(name: str) -> str | None:
 def get_agent_name_by_pane(tmux_pane: str) -> str | None:
     """Returns the agent name for a given tmux pane."""
     with state_lock:
-        for info in state.values():
-            if info.get("tmux_pane") == tmux_pane:
-                return info.get("name")
-    return None
+        agent_id = pane_index.get(tmux_pane)
+        info = state.get(agent_id) if agent_id else None
+        return info.get("name") if info else None
 
 
 def set_agent(name: str, info: dict) -> None:
@@ -189,13 +214,12 @@ def set_agent(name: str, info: dict) -> None:
 
         existing_id_for_name = name_index.get(name)
         if existing_id_for_name and existing_id_for_name != agent_id:
-            state.pop(existing_id_for_name, None)
-            name_index.pop(name, None)
+            evicted = state.pop(existing_id_for_name, None)
+            _remove_indexes(existing_id_for_name, evicted)
 
+        _remove_indexes(agent_id, existing)
         state[agent_id] = normalized
-        name_index[name] = agent_id
-        for alias in normalized["aliases"]:
-            name_index[alias] = agent_id
+        _add_indexes(agent_id, normalized)
 
 
 def delete_agent(name_or_id: str) -> None:
@@ -205,11 +229,7 @@ def delete_agent(name_or_id: str) -> None:
         if not agent_id:
             return
         info = state.pop(agent_id, None)
-        if info:
-            if info.get("name"):
-                name_index.pop(info["name"], None)
-            for alias in info.get("aliases", []):
-                name_index.pop(alias, None)
+        _remove_indexes(agent_id, info)
 
 
 def update_agent(name_or_id: str, **kwargs) -> bool:
@@ -218,8 +238,17 @@ def update_agent(name_or_id: str, **kwargs) -> bool:
         agent_id = _resolve_agent_id(name_or_id)
         if not agent_id or agent_id not in state:
             return False
+
+        info = state[agent_id]
+        old_pane = info.get("tmux_pane")
         for k, v in kwargs.items():
-            state[agent_id][k] = v
+            info[k] = v
+        new_pane = info.get("tmux_pane")
+        if old_pane != new_pane:
+            if old_pane and pane_index.get(old_pane) == agent_id:
+                pane_index.pop(old_pane, None)
+            if new_pane:
+                pane_index[new_pane] = agent_id
         return True
 
 
@@ -238,3 +267,16 @@ def rename_agent(old_name: str, new_name: str) -> bool:
         if old_name not in state[agent_id]["aliases"]:
             state[agent_id]["aliases"].append(old_name)
         return True
+
+
+def get_agents_for_registry() -> list[dict]:
+    """Returns a sidecar/registry-safe snapshot of agents."""
+    with state_lock:
+        return [{
+            "agent_id": info.get("agent_id") or agent_id,
+            "name": info.get("name"),
+            "aliases": info.get("aliases", []),
+            "status": info.get("status", "unknown"),
+            "agent_type": info.get("agent_type", "unknown"),
+            "agent_cmd": info.get("agent_cmd", "unknown"),
+        } for agent_id, info in state.items()]

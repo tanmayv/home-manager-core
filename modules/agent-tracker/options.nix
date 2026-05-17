@@ -39,5 +39,35 @@ with lib;
       default = 30;
       description = "Heartbeat age in seconds after which the monitor may evict an agent if no live pane process is found. Must be greater than or equal to heartbeatStaleSeconds.";
     };
+
+    httpPort = mkOption {
+      type = types.port;
+      default = 19876;
+      description = "HTTP sidecar port for observer/registry access.";
+    };
+
+    registryUrl = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = "Optional agent-registry base URL.";
+    };
+
+    registryAuth = mkOption {
+      type = types.bool;
+      default = false;
+      description = "Require Bearer auth for registry/sidecar integration.";
+    };
+
+    registryTokenFile = mkOption {
+      type = types.nullOr types.path;
+      default = null;
+      description = "File containing the shared Bearer token for registry/sidecar auth.";
+    };
+
+    registryHeartbeatSeconds = mkOption {
+      type = types.ints.positive;
+      default = 30;
+      description = "Registry heartbeat interval in seconds.";
+    };
   };
 }

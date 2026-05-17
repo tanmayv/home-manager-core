@@ -9,6 +9,8 @@ import time
 import state
 import monitor
 import rpc_handler
+import http_sidecar
+import registry_client
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', stream=sys.stderr)
 
@@ -51,9 +53,11 @@ def main():
 
     state.init_state()
     
-    # Start background monitor thread
+    # Start background threads
     threading.Thread(target=monitor.background_monitor, daemon=True).start()
-    
+    threading.Thread(target=http_sidecar.serve_forever, daemon=True).start()
+    threading.Thread(target=registry_client.background_sync, daemon=True).start()
+
     logging.info(f"Agent Tracker listening on {SOCKET_PATH}")
 
     while True:
