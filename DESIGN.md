@@ -438,7 +438,7 @@ At least one of `target_agent_id` or `target_agent_name` must be provided.
 `target_hostname` to avoid ambiguity — bare name resolution is not supported at the
 registry level.
 
-Request body (updated to include `target_hostname`):
+Request body (updated to include `target_hostname` and optional attachments):
 ```json
 {
   "sender_agent_id":   "string",
@@ -447,9 +447,22 @@ Request body (updated to include `target_hostname`):
   "target_agent_id":   "string (preferred)",
   "target_agent_name": "string (requires target_hostname when used)",
   "target_hostname":   "string (required when target_agent_name is used)",
-  "message":           "string"
+  "message":           "string | null",
+  "attachments": [
+    {
+      "name":         "string",
+      "content_type": "string",
+      "content_b64":  "string (base64 payload)"
+    }
+  ]
 }
 ```
+
+At least one of `message` or `attachments` must be present.
+For this slice, attachments are carried inline as base64 in JSON. This avoids introducing
+multipart parsing complexity while still supporting cross-tracker file transfer.
+Large payloads are accepted up to an implementation-defined request-body limit; larger
+requests return `413 payload_too_large`.
 
 Resolution logic (registry-side):
 1. If `target_agent_id` is provided, look it up in the agent cache. If found, proceed.
@@ -684,10 +697,19 @@ Request body:
   "sender_name":      "string",
   "sender_agent_id":  "string",
   "sender_tracker":   "string (hostname of the originating tracker)",
-  "message":          "string",
+  "message":          "string | null",
+  "attachments": [
+    {
+      "name":         "string",
+      "content_type": "string",
+      "content_b64":  "string (base64 payload)"
+    }
+  ],
   "sent_at":          "string (ISO-8601 UTC)"
 }
 ```
+
+At least one of `message` or `attachments` must be present.
 
 Processing:
 1. Look up `target_agent_id` in local tracker state via `state.get_agent_name_by_id()`.
@@ -702,6 +724,8 @@ Processing:
    }
    ```
 4. Append to the agent's inbox file (same path as `handle_send_message` uses today).
+   If attachments are present, write them to per-message files under the local inbox
+   storage area and store attachment metadata/path references in the inbox entry.
 5. If the agent is busy (`working`, `waiting`, `spawning`), queue the notification via
    the existing `pending_notifications` mechanism.
 6. Otherwise, call `tmux_util.send_keys()` with the notification string.
@@ -712,7 +736,8 @@ Response `200 OK`:
 ```
 
 Error responses:
-- `400` — `{"error": "invalid_request", "message": "target_agent_id and message are required"}`.
+- `400` — `{"error": "invalid_request", "message": "target_agent_id and message or attachments are required"}`.
+- `413` — `{"error": "payload_too_large", "message": "request body exceeds limit"}`.
 - `401` — `{"error": "unauthorized", "message": "invalid or missing token"}`.
 - `404` — agent not found (see above).
 - `500` — `{"error": "inbox_error", "message": "failed to write to inbox: <os error>"}`.

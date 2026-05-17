@@ -1,9 +1,10 @@
-import json, os, time
+import base64, binascii, json, os, time, urllib.error, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 TOKEN = os.environ.get("AGENT_REGISTRY_TOKEN", "")
 AUTH_REQUIRED = os.environ.get("AGENT_REGISTRY_AUTH", "true").lower() not in ("0", "false", "no")
+MAX_BODY_BYTES = int(os.environ.get("AGENT_MAX_DELIVERY_BYTES", "5242880"))
 STALE = int(os.environ.get("TRACKER_STALE_SECONDS", "60"))
 GONE = int(os.environ.get("TRACKER_GONE_SECONDS", "180"))
 
@@ -41,7 +42,9 @@ def make_handler(store=None, token=None, auth_required=None):
             self.send_response(code); self.send_header("Content-Type", "application/json"); self.end_headers(); self.wfile.write(json.dumps(payload).encode())
         def _parts(self): return [p for p in urlparse(self.path).path.split("/") if p]
         def _body(self):
-            try: return json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0") or 0)) or b"{}")
+            length = int(self.headers.get("Content-Length", "0") or 0)
+            if length > MAX_BODY_BYTES: return "__too_large__"
+            try: return json.loads(self.rfile.read(length) or b"{}")
             except json.JSONDecodeError: return None
         def _check(self):
             store.sweep()
@@ -64,6 +67,7 @@ def make_handler(store=None, token=None, auth_required=None):
         def do_POST(self):
             if not self._check(): return
             parts, body = self._parts(), self._body()
+            if body == "__too_large__": return self._json(413, {"error": "payload_too_large", "message": "request body exceeds limit"})
             if body is None: return self._json(400, {"error": "invalid_request", "message": "malformed JSON body"})
             if parts == ["trackers"]:
                 if not {"tracker_id", "hostname", "address", "http_port"}.issubset(body): return self._json(400, {"error": "invalid_request", "message": "tracker_id, hostname, address, http_port are required"})
@@ -76,6 +80,51 @@ def make_handler(store=None, token=None, auth_required=None):
                 if code == 200: return self._json(200, {"ok": True})
                 if code == 403: return self._json(403, {"error": "wrong_tracker", "message": "agent does not belong to this tracker"})
                 return self._json(404, {"error": "agent_not_found", "message": "agent not in registry cache; wait for next heartbeat"})
+            if parts == ["messages"]:
+                if not body.get("message") and not body.get("attachments"): return self._json(400, {"error": "invalid_request", "message": "message text or attachments are required"})
+                if body.get("attachments"):
+                    seen_names = set()
+                    for att in body["attachments"]:
+                        safe_name = os.path.basename(att.get("name") or "")
+                        if not safe_name or "content_b64" not in att:
+                            return self._json(400, {"error": "invalid_request", "message": "invalid attachments"})
+                        if safe_name in seen_names:
+                            return self._json(400, {"error": "invalid_request", "message": "duplicate attachment name"})
+                        seen_names.add(safe_name)
+                        try:
+                            base64.b64decode(att["content_b64"], validate=True)
+                        except (binascii.Error, ValueError):
+                            return self._json(400, {"error": "invalid_request", "message": "invalid attachment payload"})
+                target = store.agents.get(body.get("target_agent_id")) if body.get("target_agent_id") else None
+                if not target and body.get("target_agent_name"):
+                    if not body.get("target_hostname"): return self._json(400, {"error": "hostname_required", "message": "target_hostname is required when using target_agent_name; bare-name global resolution is not supported"})
+                    target = next((a for a in store.agents.values() if a["hostname"] == body["target_hostname"] and (a["name"] == body["target_agent_name"] or body["target_agent_name"] in a.get("aliases", []))), None)
+                if not target:
+                    if body.get("target_agent_name") or body.get("target_agent_id"): return self._json(404, {"error": "agent_not_found", "message": "no agent with that ID or name is registered on the specified tracker"})
+                    return self._json(400, {"error": "missing_target", "message": "provide target_agent_id or target_agent_name"})
+                if body.get("sender_tracker_id") == target["tracker_id"]: return self._json(400, {"error": "same_tracker", "message": "target agent is on the same tracker; use local send"})
+                tracker = store.trackers.get(target["tracker_id"], {})
+                if tracker.get("status") != "active": return self._json(503, {"error": "tracker_offline", "message": "target tracker is stale or gone", "tracker_status": tracker.get("status", "gone")})
+                req = urllib.request.Request(
+                    f"http://{tracker['address']}:{tracker['http_port']}/deliver",
+                    data=json.dumps({"target_agent_id": target["agent_id"], "sender_name": body.get("sender_agent_name", "unknown"), "sender_agent_id": body.get("sender_agent_id"), "sender_tracker": store.trackers.get(body.get("sender_tracker_id"), {}).get("hostname", body.get("sender_tracker_id")), "message": body.get("message"), "attachments": body.get("attachments"), "sent_at": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime())}).encode(),
+                    headers={"Content-Type": "application/json", **({"Authorization": f"Bearer {token}"} if token else {})},
+                    method="POST",
+                )
+                try:
+                    with urllib.request.urlopen(req, timeout=3):
+                        return self._json(202, {"ok": True, "target_agent_id": target["agent_id"], "target_name": target["name"], "target_tracker": target["hostname"]})
+                except urllib.error.HTTPError as e:
+                    try:
+                        err = json.loads(e.read().decode())
+                        detail = err.get("message", str(e))
+                        if e.code == 400:
+                            return self._json(400, {"error": err.get("error", "invalid_request"), "message": detail})
+                    except Exception:
+                        detail = str(e)
+                    return self._json(503, {"error": "delivery_failed", "message": f"target tracker returned an error: {detail}"})
+                except Exception as e:
+                    return self._json(503, {"error": "tracker_unreachable", "message": f"could not connect to target tracker: {e}"})
             self._json(404, {"error": "not_found", "message": "no such endpoint"})
     return Handler
 

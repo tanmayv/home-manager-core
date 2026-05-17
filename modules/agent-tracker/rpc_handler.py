@@ -1,3 +1,5 @@
+import base64
+import binascii
 import json
 import logging
 import socket
@@ -13,10 +15,27 @@ import struct
 import re
 
 BUFFER_SIZE = 4096
+LOCAL_HOSTNAME = os.environ.get("AGENT_TRACKER_HOSTNAME", socket.gethostname())
+
+
+class DeliveryTargetNotFound(ValueError):
+    pass
+
+
+class DeliveryValidationError(ValueError):
+    pass
 
 
 def _utc_now_isoformat() -> str:
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+
+def _is_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(value)
+        return True
+    except (ValueError, TypeError, AttributeError):
+        return False
 
 
 def _generate_unique_agent_name(name: str, session: str = None) -> str:
@@ -268,61 +287,120 @@ def handle_spin_agent(params: dict) -> str:
         state.delete_agent(agent_name)
         raise RuntimeError(f"Failed to spin agent: {e}")
 
-def handle_send_message(params: dict, caller_pid: int = None) -> bool:
-    """Sends a message to an agent by adding it directly to its inbox file, queuing notification if busy."""
-    sender_name = params.get("sender_name")
-    if not sender_name:
-        sender_name = _identify_agent({}, caller_pid)
-    
-    if not sender_name:
-        sender_name = "cli-user"
-        
-    agent_name = _resolve_target_agent_name(params)
-    msg = params.get("message")
-    
-    if not (agent_name and msg):
-        raise ValueError("Invalid params")
-        
-    info = state.get_agent(agent_name)
+def deliver_local_message(target_name_or_id: str, msg_obj: dict, notify_sender: str | None = None) -> str:
+    """Writes a message to a local agent inbox and triggers/queues notification."""
+    info = state.get_agent(target_name_or_id)
     if not info:
-        raise ValueError("Target agent not found")
+        raise DeliveryTargetNotFound("Target agent not found")
 
-    current_name = state.get_agent_name_by_id(info["agent_id"])
+    current_name = state.get_agent_name_by_id(info["agent_id"]) or target_name_or_id
+    uuid_str = info.get("uuid") or current_name
+    inbox_file = os.path.join(state.INBOX_DIR, f"{uuid_str}.inbox")
+    notify_sender = notify_sender or msg_obj.get("sender", "unknown")
+    attach_dir = None
+
+    try:
+        attachments = []
+        if msg_obj.get("attachments"):
+            msg_id = msg_obj.get("message_id") or str(uuid.uuid4())
+            attach_dir = os.path.join(state.INBOX_DIR, "attachments", uuid_str, msg_id)
+            os.makedirs(attach_dir, exist_ok=True)
+            seen_names = set()
+            for att in msg_obj["attachments"]:
+                raw_name = att.get("name")
+                safe_name = os.path.basename(raw_name or "")
+                if not safe_name or "content_b64" not in att:
+                    raise DeliveryValidationError("invalid attachments")
+                if safe_name in seen_names:
+                    raise DeliveryValidationError("duplicate attachment name")
+                seen_names.add(safe_name)
+                try:
+                    content = base64.b64decode(att["content_b64"], validate=True)
+                except (binascii.Error, ValueError) as e:
+                    raise DeliveryValidationError(f"invalid attachment payload: {e}")
+                path = os.path.join(attach_dir, safe_name)
+                with open(path, "wb") as af:
+                    af.write(content)
+                attachments.append({
+                    "name": safe_name,
+                    "path": path,
+                    "content_type": att.get("content_type", "application/octet-stream"),
+                    "size": os.path.getsize(path),
+                })
+            msg_obj = {**msg_obj, "message_id": msg_id, "attachments": attachments}
+
+        os.makedirs(os.path.dirname(inbox_file), exist_ok=True)
+        with open(inbox_file, "a") as f:
+            f.write(json.dumps(msg_obj) + "\n")
+
+        if _is_agent_waiting(info):
+            logging.info(f"Queuing notification for {current_name} from {notify_sender} (agent is busy)")
+            pending = info.get("pending_notifications", [])
+            pending.append(notify_sender)
+            state.update_agent(current_name, pending_notifications=pending)
+        else:
+            tmux_util.send_keys(info["tmux_pane"], f"New message in inbox from {notify_sender}", info["tmux_socket"])
+        return current_name
+    except DeliveryValidationError:
+        if attach_dir and os.path.isdir(attach_dir):
+            for root, _, files in os.walk(attach_dir, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                os.rmdir(root)
+        raise
+    except OSError as e:
+        if attach_dir and os.path.isdir(attach_dir):
+            for root, _, files in os.walk(attach_dir, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                os.rmdir(root)
+        logging.error(f"Failed to write to inbox file for {target_name_or_id}: {e}")
+        raise RuntimeError(f"Failed to send message: {e}")
+
+
+def handle_send_message(params: dict, caller_pid: int = None) -> bool:
+    """Sends a message locally or routes it remotely via the registry when target_address is hostname-qualified."""
+    sender_name = params.get("sender_name") or _identify_agent(params, caller_pid) or "cli-user"
+    msg = params.get("message")
+    attachments = params.get("attachments")
+    target_address = params.get("target_address")
+
+    if target_address and "/" in target_address:
+        hostname, target = target_address.split("/", 1)
+        if hostname not in {"local", LOCAL_HOSTNAME}:
+            sender_info = state.get_agent(params.get("sender_id") or sender_name) or {}
+            status, body = registry_client.send_remote_message(
+                sender_name,
+                sender_info.get("agent_id") or params.get("sender_id"),
+                registry_client.TRACKER_ID,
+                hostname,
+                target,
+                msg,
+                attachments,
+            )
+            if status == 202:
+                return True
+            raise RuntimeError(f"Remote delivery failed: {(body or {}).get('message', 'unknown error')}")
+        params = {**params, **({"agent_id": target} if _is_uuid(target) else {"agent_name": target})}
+
+    agent_name = _resolve_target_agent_name(params)
+    if not agent_name or (not msg and not attachments):
+        raise ValueError("Invalid params")
+
+    current_name = state.get_agent_name_by_id(state.get_agent(agent_name)["agent_id"])
     warning_msg = None
     if agent_name != current_name:
         warning_msg = f"Note: Agent '{agent_name}' was renamed to '{current_name}'."
         logging.info(warning_msg)
 
-    msg_obj = {
+    deliver_local_message(agent_name, {
         "sender": sender_name,
         "timestamp": _utc_now_isoformat(),
         "message": msg,
-        "read": False
-    }
-    
-    uuid_str = info.get("uuid") or current_name
-    inbox_file = os.path.join(state.INBOX_DIR, f"{uuid_str}.inbox")
-    
-    try:
-        os.makedirs(os.path.dirname(inbox_file), exist_ok=True)
-        with open(inbox_file, "a") as f:
-            f.write(json.dumps(msg_obj) + "\n")
-            
-        if _is_agent_waiting(info):
-            logging.info(f"Queuing notification for {current_name} from {sender_name} (agent is busy)")
-            pending = info.get("pending_notifications", [])
-            pending.append(sender_name)
-            state.update_agent(current_name, pending_notifications=pending)
-        else:
-            notify_msg = f"New message in inbox from {sender_name}"
-            tmux_util.send_keys(info["tmux_pane"], notify_msg, info["tmux_socket"])
-        
-        if warning_msg:
-            return {"success": True, "warning": warning_msg}
-        return True
-    except IOError as e:
-        logging.error(f"Failed to write to inbox file for {agent_name}: {e}")
-        raise RuntimeError(f"Failed to send message: {e}")
+        "attachments": attachments,
+        "read": False,
+    }, sender_name)
+    return {"success": True, "warning": warning_msg} if warning_msg else True
 
 def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None) -> dict:
     """Reads the inbox file, handles unread/history/last_n messages, marks them as read, and rewrites the file."""

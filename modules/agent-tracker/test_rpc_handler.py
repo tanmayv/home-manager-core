@@ -318,6 +318,34 @@ class TestRpcHandler(unittest.TestCase):
         self.assertEqual(info["agent_id"], "real-uuid-123")
         self.assertEqual(info["status"], "idle")
 
+    @mock.patch("registry_client.send_remote_message", return_value=(202, {"ok": True}))
+    def test_send_message_routes_remote_target_address_via_registry(self, send_remote):
+        state.set_agent("sender", {"agent_id": "id-s", "status": "idle"})
+        self.assertTrue(rpc_handler.handle_send_message({"agent_name": "sender", "target_address": "remote-host/agent2", "message": "hello"}))
+        send_remote.assert_called_once_with("sender", "id-s", mock.ANY, "remote-host", "agent2", "hello", None)
+
+    @mock.patch("registry_client.send_remote_message", return_value=(202, {"ok": True}))
+    def test_send_message_routes_remote_uuid_target_address_via_registry(self, send_remote):
+        state.set_agent("sender", {"agent_id": "id-s", "status": "idle"})
+        target_id = "961477f2-6523-4dae-87ea-bc6223fa04df"
+        self.assertTrue(rpc_handler.handle_send_message({"agent_name": "sender", "target_address": f"remote-host/{target_id}", "message": "hello"}))
+        send_remote.assert_called_once_with("sender", "id-s", mock.ANY, "remote-host", target_id, "hello", None)
+
+    @mock.patch("registry_client.send_remote_message")
+    @mock.patch("tmux_util.send_keys")
+    def test_send_message_treats_local_target_address_as_local_only(self, send_keys, send_remote):
+        inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent("agent1", {"agent_id": "id-1", "status": "idle", "tmux_pane": "%1", "tmux_socket": "sock"})
+            self.assertTrue(rpc_handler.handle_send_message({"target_address": "local/agent1", "message": "hello", "sender_name": "tester"}))
+            send_remote.assert_not_called()
+            send_keys.assert_called_once()
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
     @mock.patch("tmux_util.send_keys")
     def test_busy_agent_pending_notification_flush(self, send_keys):
         inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
