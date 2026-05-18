@@ -154,10 +154,7 @@ in
         config = {
           ProgramArguments = [ "${daemonCmd}" ];
           EnvironmentVariables = monitorEnvVars;
-          KeepAlive = {
-            Crashed = true;
-            SuccessfulExit = false;
-          };
+          KeepAlive = false;
           ProcessType = "Background";
           RunAtLoad = true;
           StandardOutPath = launchdStdoutPath;

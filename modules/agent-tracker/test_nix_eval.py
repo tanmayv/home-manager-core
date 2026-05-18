@@ -74,6 +74,44 @@ in builtins.toJSON {{
         self.assertEqual(data["httpPort"], 29876)
         self.assertEqual(data["registryHeartbeatSeconds"], 45)
 
+    def test_darwin_launchd_agent_is_run_at_load_without_keepalive_loop(self):
+        repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        expr = f'''
+let
+  flake = builtins.getFlake "path:{repo}";
+  pkgs = import flake.inputs.nixpkgs {{ system = "aarch64-darwin"; }};
+  hm = flake.inputs.home-manager;
+  cfg = hm.lib.homeManagerConfiguration {{
+    inherit pkgs;
+    modules = [
+      ({{ lib, ... }}: {{
+        options.programs.tmux.statusBar.extraLines = lib.mkOption {{ type = lib.types.listOf lib.types.anything; default = []; }};
+      }})
+      {repo}/modules/agent-tracker/default.nix
+      {{ services.agent-tracker.enable = true; home.username = "u"; home.homeDirectory = "/Users/u"; home.stateVersion = "24.05"; }}
+    ];
+    extraSpecialArgs = {{ userSettings = {{ }}; }};
+  }};
+  agent = cfg.config.launchd.agents.agent-tracker.config;
+in builtins.toJSON {{
+  keepAlive = agent.KeepAlive;
+  runAtLoad = agent.RunAtLoad;
+  programArguments = agent.ProgramArguments;
+  environment = agent.EnvironmentVariables;
+  stdout = agent.StandardOutPath;
+  stderr = agent.StandardErrorPath;
+}}
+'''
+        out = subprocess.check_output(["nix", "eval", "--impure", "--raw", "--expr", expr], text=True).strip()
+        data = json.loads(out)
+        self.assertFalse(data["keepAlive"])
+        self.assertTrue(data["runAtLoad"])
+        self.assertEqual(len(data["programArguments"]), 1)
+        self.assertIn("AGENT_TRACKER_SOCKET", data["environment"])
+        self.assertIn("PATH", data["environment"])
+        self.assertTrue(data["stdout"].endswith("/agent-tracker/launchd.stdout.log"))
+        self.assertTrue(data["stderr"].endswith("/agent-tracker/launchd.stderr.log"))
+
 
 if __name__ == "__main__":
     unittest.main()
