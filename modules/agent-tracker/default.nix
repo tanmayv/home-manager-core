@@ -25,6 +25,11 @@ let
   logDir = "${cacheHome}/agent-tracker";
   launchdStdoutPath = "${logDir}/launchd.stdout.log";
   launchdStderrPath = "${logDir}/launchd.stderr.log";
+  agentTrackerToolPath = lib.makeBinPath [ pkgs.tmux pkgs.coreutils pkgs.gnugrep ];
+  platformFallbackPath =
+    if pkgs.stdenv.isDarwin
+    then "/usr/bin:/bin:/usr/sbin:/sbin"
+    else "/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin";
   daemonCmd = toString (pkgs.writeShellScript "agent-tracker-daemon" ''
     export AGENT_REGISTRY_AUTH=${if cfg.registryAuth then "true" else "false"}
     ${lib.optionalString (cfg.registryAuth && cfg.registryTokenFile != null) ''export AGENT_REGISTRY_TOKEN="$(cat ${lib.escapeShellArg (toString cfg.registryTokenFile)})"''}
@@ -39,12 +44,13 @@ let
     AGENT_TRACKER_HTTP_PORT = toString cfg.httpPort;
     AGENT_REGISTRY_HEARTBEAT_SECONDS = toString cfg.registryHeartbeatSeconds;
     AGENT_REGISTRY_AUTH = if cfg.registryAuth then "true" else "false";
+    # systemd user services and launchd agents both start with a minimal PATH.
+    # agent-tracker intentionally invokes `tmux` and `sleep` by name from
+    # Python, so provide an explicit cross-platform tool PATH instead of
+    # relying on the interactive shell environment.
+    PATH = "${agentTrackerToolPath}:${platformFallbackPath}";
   } // lib.optionalAttrs (cfg.registryUrl != null) {
     AGENT_REGISTRY_URL = cfg.registryUrl;
-  } // lib.optionalAttrs pkgs.stdenv.isDarwin {
-    # launchd starts services with a minimal PATH, so bare `tmux` lookups from
-    # the daemon fail on macOS unless we provide the Nix profile tool paths.
-    PATH = "${lib.makeBinPath [ pkgs.tmux pkgs.coreutils pkgs.gnugrep ]}:/usr/bin:/bin:/usr/sbin:/sbin";
   };
   monitorEnv = lib.mapAttrsToList (name: value: "${name}=${value}") monitorEnvVars;
 in
