@@ -1,12 +1,16 @@
 import base64
 import binascii
 import json
+import logging
 import os
 import threading
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+LOG = logging.getLogger("agent-registry")
 
 TOKEN = os.environ.get("AGENT_REGISTRY_TOKEN", "")
 AUTH_REQUIRED = os.environ.get("AGENT_REGISTRY_AUTH", "true").lower() not in ("0", "false", "no")
@@ -36,8 +40,10 @@ class Store:
                 with open(self.state_path, "r") as f:
                     data = json.load(f)
             except FileNotFoundError:
+                LOG.info("registry state file not found yet at %s; starting empty", self.state_path)
                 return
-            except Exception:
+            except Exception as e:
+                LOG.warning("failed to load registry state from %s: %s", self.state_path, e)
                 return
             self.trackers = data.get("trackers") or {}
             self.agents = data.get("agents") or {}
@@ -46,6 +52,13 @@ class Store:
                 for tracker_id, queue in (data.get("deliveries") or {}).items()
                 if isinstance(queue, list)
             }
+            LOG.info(
+                "loaded registry state from %s trackers=%s agents=%s queued_trackers=%s",
+                self.state_path,
+                len(self.trackers),
+                len(self.agents),
+                len(self.deliveries),
+            )
 
     def _persist_locked(self):
         if not self.state_path:
@@ -76,6 +89,14 @@ class Store:
                 age = now - tracker["last_heartbeat"]
                 status = "active" if age <= STALE else "stale" if age <= GONE else "gone"
                 if tracker.get("status") != status:
+                    LOG.info(
+                        "tracker_id=%s hostname=%s status transition %s -> %s age=%.1fs",
+                        tracker.get("tracker_id"),
+                        tracker.get("hostname"),
+                        tracker.get("status"),
+                        status,
+                        age,
+                    )
                     tracker["status"] = status
                     changed = True
             agents = {
@@ -95,6 +116,7 @@ class Store:
                 self.deliveries = deliveries
                 changed = True
             if changed:
+                LOG.info("registry sweep updated state trackers=%s agents=%s queued_trackers=%s", len(self.trackers), len(self.agents), len(self.deliveries))
                 self._persist_locked()
 
     def list_agents(self):
@@ -119,6 +141,7 @@ class Store:
         with self.cv:
             existing = next((tid for tid, t in self.trackers.items() if t["hostname"] == body["hostname"] and tid != body["tracker_id"]), None)
             if existing:
+                LOG.warning("replacing existing tracker_id=%s for hostname=%s with tracker_id=%s", existing, body["hostname"], body["tracker_id"])
                 self.trackers.pop(existing, None)
                 self.agents = {k: v for k, v in self.agents.items() if v["tracker_id"] != existing}
                 self.deliveries.pop(existing, None)
@@ -135,6 +158,14 @@ class Store:
             self.deliveries.setdefault(body["tracker_id"], {})
             self._persist_locked()
             self.cv.notify_all()
+            LOG.info(
+                "tracker %s tracker_id=%s hostname=%s http_port=%s agents=%s",
+                "registered" if created else "updated",
+                body["tracker_id"],
+                body["hostname"],
+                body["http_port"],
+                len(body.get("agents", [])),
+            )
             return created
 
     def _replace_agents_locked(self, tracker_id, agents):
@@ -153,6 +184,7 @@ class Store:
     def heartbeat(self, tracker_id, agents):
         with self.cv:
             if tracker_id not in self.trackers:
+                LOG.warning("heartbeat for unknown tracker_id=%s agents=%s", tracker_id, len(agents))
                 return False
             self.trackers[tracker_id]["last_heartbeat"] = time.time()
             self.trackers[tracker_id]["status"] = "active"
@@ -165,8 +197,10 @@ class Store:
         with self.cv:
             agent = self.agents.get(agent_id)
             if not agent:
+                LOG.warning("agent-update for missing agent_id=%s tracker_id=%s status=%s", agent_id, tracker_id, status)
                 return 404
             if agent["tracker_id"] != tracker_id:
+                LOG.warning("agent-update wrong tracker agent_id=%s expected_tracker_id=%s got_tracker_id=%s", agent_id, agent["tracker_id"], tracker_id)
                 return 403
             agent["status"], agent["last_seen"] = status, time.time()
             self._persist_locked()
@@ -178,6 +212,13 @@ class Store:
             self.deliveries.setdefault(tracker_id, {})[entry["message_id"]] = entry
             self._persist_locked()
             self.cv.notify_all()
+            LOG.info(
+                "queued delivery message_id=%s tracker_id=%s target_agent_id=%s sender_tracker=%s",
+                entry["message_id"],
+                tracker_id,
+                entry.get("target_agent_id"),
+                entry.get("sender_tracker"),
+            )
         return entry
 
     def wait_for_deliveries(self, tracker_id, timeout):
@@ -186,6 +227,7 @@ class Store:
             while True:
                 queue = sorted(self.deliveries.get(tracker_id, {}).values(), key=lambda item: item.get("queued_at", 0))
                 if queue:
+                    LOG.info("returning %s queued deliveries to tracker_id=%s", len(queue), tracker_id)
                     return [dict(item) for item in queue]
                 remaining = deadline - time.time()
                 if remaining <= 0:
@@ -196,11 +238,13 @@ class Store:
         with self.cv:
             queue = self.deliveries.get(tracker_id)
             if not queue or message_id not in queue:
+                LOG.warning("ack for unknown delivery tracker_id=%s message_id=%s", tracker_id, message_id)
                 return False
             queue.pop(message_id, None)
             if not queue:
                 self.deliveries.pop(tracker_id, None)
             self._persist_locked()
+            LOG.info("acked delivery tracker_id=%s message_id=%s remaining=%s", tracker_id, message_id, len(self.deliveries.get(tracker_id, {})))
             return True
 
 
@@ -275,6 +319,7 @@ def make_handler(store=None, token=None, auth_required=None):
             if len(parts) == 3 and parts[0] == "trackers" and parts[2] == "deliveries":
                 tracker_id = parts[1]
                 if not store.has_tracker(tracker_id):
+                    LOG.warning("delivery poll for unknown tracker_id=%s", tracker_id)
                     return self._json(404, {"error": "tracker_not_found", "message": "tracker not registered; call POST /trackers first"})
                 wait = min(max(int((query.get("wait") or [DELIVERY_WAIT_SECONDS])[0]), 0), DELIVERY_WAIT_SECONDS)
                 return self._json(200, {"deliveries": store.wait_for_deliveries(tracker_id, wait)})
@@ -295,6 +340,7 @@ def make_handler(store=None, token=None, auth_required=None):
             if len(parts) == 3 and parts[0] == "trackers" and parts[2] in {"heartbeat", "agent-update"}:
                 tracker_id = parts[1]
                 if not store.has_tracker(tracker_id):
+                    LOG.warning("tracker write %s for unknown tracker_id=%s", parts[2], tracker_id)
                     return self._json(404, {"error": "tracker_not_found", "message": "tracker not registered; call POST /trackers first"})
                 if parts[2] == "heartbeat":
                     store.heartbeat(tracker_id, body.get("agents", []))
@@ -310,6 +356,7 @@ def make_handler(store=None, token=None, auth_required=None):
             if len(parts) == 5 and parts[0] == "trackers" and parts[2] == "deliveries" and parts[4] == "ack":
                 tracker_id, message_id = parts[1], parts[3]
                 if not store.has_tracker(tracker_id):
+                    LOG.warning("ack for unknown tracker_id=%s message_id=%s", tracker_id, message_id)
                     return self._json(404, {"error": "tracker_not_found", "message": "tracker not registered; call POST /trackers first"})
                 if store.ack_delivery(tracker_id, message_id):
                     return self._json(200, {"ok": True})
@@ -327,12 +374,14 @@ def make_handler(store=None, token=None, auth_required=None):
                     target = next((agent for agent in store.list_agents() if agent["hostname"] == body["target_hostname"] and (agent["name"] == body["target_agent_name"] or body["target_agent_name"] in agent.get("aliases", []))), None)
                 if not target:
                     if body.get("target_agent_name") or body.get("target_agent_id"):
+                        LOG.warning("message target not found target_agent_id=%s target_agent_name=%s target_hostname=%s sender_tracker_id=%s", body.get("target_agent_id"), body.get("target_agent_name"), body.get("target_hostname"), body.get("sender_tracker_id"))
                         return self._json(404, {"error": "agent_not_found", "message": "no agent with that ID or name is registered on the specified tracker"})
                     return self._json(400, {"error": "missing_target", "message": "provide target_agent_id or target_agent_name"})
                 if body.get("sender_tracker_id") == target["tracker_id"]:
                     return self._json(400, {"error": "same_tracker", "message": "target agent is on the same tracker; use local send"})
                 tracker = store.get_tracker(target["tracker_id"]) or {}
                 if tracker.get("status") != "active":
+                    LOG.warning("message target tracker not active target_tracker_id=%s status=%s target_agent_id=%s", target["tracker_id"], tracker.get("status", "gone"), target["agent_id"])
                     return self._json(503, {"error": "tracker_offline", "message": "target tracker is stale or gone", "tracker_status": tracker.get("status", "gone")})
                 entry = store.enqueue_delivery(target["tracker_id"], {
                     "target_agent_id": target["agent_id"],
@@ -350,7 +399,9 @@ def make_handler(store=None, token=None, auth_required=None):
 
 
 def serve_forever():
-    ThreadingHTTPServer(("0.0.0.0", int(os.environ.get("AGENT_REGISTRY_PORT", "8080"))), make_handler()).serve_forever()
+    port = int(os.environ.get("AGENT_REGISTRY_PORT", "8080"))
+    LOG.info("starting agent-registry bind=0.0.0.0 port=%s state_path=%s auth_required=%s", port, STATE_PATH, AUTH_REQUIRED)
+    ThreadingHTTPServer(("0.0.0.0", port), make_handler()).serve_forever()
 
 
 if __name__ == "__main__":

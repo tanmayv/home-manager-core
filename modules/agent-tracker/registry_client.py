@@ -1,6 +1,8 @@
 import json, logging, os, socket, threading, time, urllib.error, urllib.request, uuid
 import state
 
+LOG = logging.getLogger("agent-tracker.registry")
+
 REGISTRY_URL = os.environ.get("AGENT_REGISTRY_URL", "").rstrip("/")
 TOKEN = os.environ.get("AGENT_REGISTRY_TOKEN", "")
 HOSTNAME = os.environ.get("AGENT_TRACKER_HOSTNAME", socket.gethostname())
@@ -26,16 +28,18 @@ def _request(method, path, payload=None, timeout=3):
             return resp.status, json.loads(body) if body else None
     except urllib.error.HTTPError as e:
         try:
-            return e.code, json.loads(e.read().decode())
+            body = json.loads(e.read().decode())
         except Exception:
-            return e.code, None
+            body = None
+        LOG.warning("registry request %s %s returned HTTP %s body=%s", method, path, e.code, body)
+        return e.code, body
     except Exception as e:
-        logging.debug(f"registry request failed for {path}: {e}")
+        LOG.warning("registry request %s %s failed: %s", method, path, e)
         return None, None
 
 
 def register():
-    return _request(
+    status = _request(
         "POST",
         "/trackers",
         {
@@ -46,6 +50,11 @@ def register():
             "agents": state.get_agents_for_registry(),
         },
     )[0]
+    if status in (200, 201):
+        LOG.info("registered tracker_id=%s hostname=%s http_port=%s status=%s", TRACKER_ID, HOSTNAME, HTTP_PORT, status)
+    else:
+        LOG.warning("failed to register tracker_id=%s hostname=%s status=%s", TRACKER_ID, HOSTNAME, status)
+    return status
 
 
 def heartbeat():
@@ -83,7 +92,10 @@ def fetch_deliveries():
 
 
 def ack_delivery(message_id):
-    return _request("POST", f"/trackers/{TRACKER_ID}/deliveries/{message_id}/ack", {})[0]
+    status = _request("POST", f"/trackers/{TRACKER_ID}/deliveries/{message_id}/ack", {})[0]
+    if status != 200:
+        LOG.warning("failed to ack registry delivery message_id=%s tracker_id=%s status=%s", message_id, TRACKER_ID, status)
+    return status
 
 
 def _record_sync_result(status_code, operation):
@@ -123,8 +135,11 @@ def _heartbeat_loop():
     while True:
         status = heartbeat()
         if status == 404:
+            LOG.warning("registry heartbeat got 404 for tracker_id=%s; re-registering", TRACKER_ID)
             _record_sync_result(register(), "register")
         else:
+            if status != 200:
+                LOG.warning("registry heartbeat failed for tracker_id=%s status=%s", TRACKER_ID, status)
             _record_sync_result(status, "heartbeat")
         time.sleep(HEARTBEAT_INTERVAL)
 
@@ -133,14 +148,17 @@ def _delivery_loop():
     while True:
         status, body = fetch_deliveries()
         if status == 404:
+            LOG.warning("registry delivery poll got 404 for tracker_id=%s; re-registering", TRACKER_ID)
             register()
             continue
         if status != 200:
+            LOG.warning("registry delivery poll failed for tracker_id=%s status=%s body=%s", TRACKER_ID, status, body)
             time.sleep(2)
             continue
         deliveries = (body or {}).get("deliveries") or []
         if not deliveries:
             continue
+        LOG.info("received %s queued registry deliveries for tracker_id=%s", len(deliveries), TRACKER_ID)
         from rpc_handler import deliver_local_message, DeliveryTargetNotFound, DeliveryValidationError
         for delivery in deliveries:
             try:
@@ -155,10 +173,14 @@ def _delivery_loop():
                         "message_id": delivery.get("message_id"),
                     },
                 )
-                ack_delivery(delivery["message_id"])
+                ack_status = ack_delivery(delivery["message_id"])
+                if ack_status == 200:
+                    LOG.info("delivered and acked queued registry message_id=%s target_agent_id=%s", delivery["message_id"], delivery["target_agent_id"])
             except (DeliveryTargetNotFound, DeliveryValidationError) as e:
                 logging.warning(f"dropping undeliverable queued registry message {delivery.get('message_id')}: {e}")
-                ack_delivery(delivery["message_id"])
+                ack_status = ack_delivery(delivery["message_id"])
+                if ack_status == 200:
+                    LOG.info("acked undeliverable queued registry message_id=%s after local validation failure", delivery["message_id"])
             except RuntimeError as e:
                 logging.warning(f"transient local delivery failure for queued registry message {delivery.get('message_id')}: {e}")
                 time.sleep(2)
@@ -169,6 +191,15 @@ def _delivery_loop():
 
 def background_sync():
     if not REGISTRY_URL:
+        LOG.info("registry sync disabled: no AGENT_REGISTRY_URL configured")
         return
+    LOG.info(
+        "starting registry sync tracker_id=%s hostname=%s registry_url=%s heartbeat_interval=%ss delivery_wait=%ss",
+        TRACKER_ID,
+        HOSTNAME,
+        REGISTRY_URL,
+        HEARTBEAT_INTERVAL,
+        DELIVERY_WAIT_SECONDS,
+    )
     threading.Thread(target=_heartbeat_loop, daemon=True).start()
     _delivery_loop()
