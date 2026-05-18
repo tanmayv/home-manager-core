@@ -46,6 +46,7 @@
           managed-agent = import ./managed-agent-test.nix { inherit pkgs self; };
         });
       nixosModules.default = import ./module.nix self;
+      homeManagerModules.default = import ./home-manager-module.nix self;
       nixosConfigurations.devvm = lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = { inherit self; };

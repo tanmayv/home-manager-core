@@ -9,14 +9,16 @@ The registry flake exports:
 - `packages.<system>.default`
 - `apps.<system>.default`
 - `nixosModules.default`
+- `homeManagerModules.default`
 
 Files:
 
 - `agent-registry/server.py` — registry server
 - `agent-registry/flake.nix` — standalone flake entrypoint
 - `agent-registry/module.nix` — minimal NixOS module
+- `agent-registry/home-manager-module.nix` — Linux/Home Manager module for non-NixOS or user-scoped deployments
 
-## 1. Standalone registry deployment on NixOS
+## 1. Standalone registry deployment on NixOS / homelab hosts
 
 ### Flake input wiring
 
@@ -59,7 +61,51 @@ Then rebuild normally:
 sudo nixos-rebuild switch --flake .#my-host
 ```
 
-## 2. Running the app directly
+This is the preferred path for arbitrary homelab NixOS machines: import the standalone flake's `nixosModules.default` into whichever host should run the registry.
+
+## 2. Linux with Nix package manager + Home Manager (non-NixOS supported)
+
+For Linux machines that are not running NixOS but do use Nix + Home Manager, import the standalone Home Manager module:
+
+```nix
+{
+  inputs.agent-registry.url = "path:/path/to/home-manager-core/agent-registry";
+
+  outputs = { self, nixpkgs, home-manager, agent-registry, ... }: {
+    homeConfigurations.user = home-manager.lib.homeManagerConfiguration {
+      pkgs = import nixpkgs { system = "x86_64-linux"; };
+      modules = [
+        agent-registry.homeManagerModules.default
+        ({ ... }: {
+          home.username = "your-user";
+          home.homeDirectory = "/home/your-user";
+          home.stateVersion = "24.05";
+
+          services.agent-registry = {
+            enable = true;
+            auth = false;
+            port = 8080;
+          };
+        })
+      ];
+    };
+  };
+}
+```
+
+Apply it with your usual Home Manager workflow:
+
+```bash
+home-manager switch --flake .#user
+```
+
+On this path, `agent-registry` runs as a `systemd --user` service and stores state under `~/.local/state/agent-registry/state.json` by default.
+
+Important: this is a user-service deployment model. If you expect the registry and managed agents to keep running across logout/reboot without an active login session, enable persistent user services with `loginctl enable-linger <user>` (or an equivalent persistent user-manager setup) on that machine.
+
+Managed agents are also supported in the Home Manager module; they run as the Home Manager user and support the same `session`, `cwd`, `tmuxSocketPath`, `trackerSocketPath`, and scheduled restart options as the NixOS module.
+
+## 3. Running the app directly
 
 For quick manual runs:
 
@@ -79,7 +125,7 @@ export AGENT_REGISTRY_STATE_PATH="$HOME/.local/state/agent-registry/state.json"
 nix run path:/path/to/home-manager-core/agent-registry
 ```
 
-## 3. Secret setup when auth is enabled
+## 4. Secret setup when auth is enabled
 
 When `services.agent-registry.auth = true`, you must provide `services.agent-registry.tokenFile`.
 
@@ -98,7 +144,7 @@ Recommended properties:
 
 The module reads the token at runtime and exports it to the service process as `AGENT_REGISTRY_TOKEN`.
 
-## 4. Disable auth / secrets intentionally
+## 5. Disable auth / secrets intentionally
 
 For local development or trusted test environments, you can disable auth entirely:
 
@@ -116,7 +162,7 @@ When `auth = false`:
 - the registry accepts unauthenticated requests on non-`/healthz` endpoints
 - this should only be used for local/dev or otherwise trusted networks
 
-## 5. Tracker-side configuration
+## 6. Tracker-side configuration
 
 Trackers do **not** talk to the registry unless `registryUrl` is set.
 
@@ -191,7 +237,7 @@ services.agent-tracker = {
 
 This leaves local-only agent-tracker usage unaffected and avoids secret setup.
 
-## 6. Minimal end-to-end dev setup
+## 7. Minimal end-to-end dev setup
 
 Registry host:
 
@@ -213,7 +259,7 @@ services.agent-tracker = {
 };
 ```
 
-## 7. Managed agents on the registry host
+## 8. Managed agents on the registry host
 
 The NixOS module can keep selected agents running locally on the registry host inside tmux.
 
