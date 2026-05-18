@@ -62,6 +62,42 @@ class TestRpcHandler(unittest.TestCase):
         self.assertIn("last_heartbeat", info)
         self.assertEqual(len(state.state), 1)
 
+    @mock.patch("tmux_util.set_pane_title")
+    @mock.patch("tmux_util.set_agent_cmd")
+    @mock.patch("tmux_util.set_agent_type")
+    @mock.patch("tmux_util.set_agent_name")
+    @mock.patch("tmux_util.set_agent_uuid")
+    @mock.patch("tmux_util.set_agent_id")
+    def test_register_persists_restart_recovery_tmux_metadata(
+        self,
+        set_agent_id,
+        set_agent_uuid,
+        set_agent_name,
+        set_agent_type,
+        set_agent_cmd,
+        set_pane_title,
+    ):
+        name = rpc_handler.handle_register(
+            {
+                "session": "sess",
+                "tmux_pane": "%9",
+                "wrapper_pid": 999,
+                "tmux_socket": "sock",
+                "name": "agent9",
+                "agent_type": "pi",
+                "agent_cmd": "pi",
+                "agent_id": "id-9",
+            }
+        )
+
+        self.assertEqual(name, "agent9")
+        set_agent_id.assert_called_once_with("%9", "id-9", "sock")
+        set_agent_uuid.assert_called_once_with("%9", "id-9", "sock")
+        set_agent_name.assert_called_once_with("%9", "agent9", "sock")
+        set_agent_type.assert_called_once_with("%9", "pi", "sock")
+        set_agent_cmd.assert_called_once_with("%9", "pi", "sock")
+        set_pane_title.assert_called_once_with("%9", "agent9", "sock")
+
     @mock.patch("rpc_handler.time.time", return_value=123.0)
     @mock.patch("tmux_util.set_agent_uuid")
     @mock.patch("tmux_util.set_agent_id")

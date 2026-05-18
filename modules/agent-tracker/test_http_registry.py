@@ -1,6 +1,9 @@
+import contextlib
 import importlib.util
+import io
 import json
 import os
+import socket
 import tempfile
 import threading
 import time
@@ -12,6 +15,7 @@ from http.server import ThreadingHTTPServer
 
 import http_sidecar
 import registry_client
+import rpc_handler
 import state
 
 _REGISTRY_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "agent-registry", "server.py")
@@ -104,6 +108,25 @@ class TestHttpAndRegistry(unittest.TestCase):
             store.trackers["t1"]["last_heartbeat"] = time.time() - 5
             self.assertEqual(get(f"{base}/agents", token="secret")[1]["agents"], [])
 
+    def test_registry_long_poll_client_disconnect_has_no_traceback(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = registry_server.Store(state_path=os.path.join(tmp, "registry-state.json"))
+            target = {"tracker_id": "t2", "hostname": "host2", "address": "host2", "http_port": 19876, "agents": []}
+            store.put_tracker(target)
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                server, base = start(registry_server.make_handler(store=store, auth_required=False))
+                self.addCleanup(server.shutdown)
+                self.addCleanup(server.server_close)
+                host, port = "127.0.0.1", server.server_port
+                client = socket.create_connection((host, port), timeout=1)
+                client.sendall(b"GET /trackers/t2/deliveries?wait=1 HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+                client.close()
+                store.enqueue_delivery("t2", {"target_agent_id": "a2", "message": "hello"})
+                time.sleep(0.2)
+            self.assertNotIn("BrokenPipeError", stderr.getvalue())
+            self.assertNotIn("Exception occurred during processing", stderr.getvalue())
+
     def test_registry_messages_queue_ack_and_persist(self):
         with tempfile.TemporaryDirectory() as tmp:
             state_path = os.path.join(tmp, "registry-state.json")
@@ -168,6 +191,65 @@ class TestHttpAndRegistry(unittest.TestCase):
                 registry_client._delivery_loop()
         deliver.assert_called_once()
         ack.assert_called_once_with("m1")
+
+    def test_registry_client_delivery_loop_retries_missing_target_until_available(self):
+        delivery = {
+            "message_id": "m1",
+            "target_agent_id": "a2",
+            "sender_name": "agent1",
+            "sender_tracker": "host1",
+            "message": "hello",
+            "sent_at": "2026-05-17T00:00:00+00:00",
+        }
+        with mock.patch.object(registry_client, "fetch_deliveries", side_effect=[(200, {"deliveries": [delivery]}), (200, {"deliveries": [delivery]}), SystemExit]), \
+             mock.patch.object(registry_client, "ack_delivery") as ack, \
+             mock.patch.object(registry_client, "DELIVERY_TARGET_GRACE_SECONDS", 60), \
+             mock.patch.object(registry_client.time, "sleep") as sleep, \
+             mock.patch.object(registry_client.time, "time", return_value=100.0), \
+             mock.patch("rpc_handler.deliver_local_message", side_effect=[rpc_handler.DeliveryTargetNotFound("not recovered yet"), "agent2"]) as deliver:
+            with self.assertRaises(SystemExit):
+                registry_client._delivery_loop()
+        self.assertEqual(deliver.call_count, 2)
+        ack.assert_called_once_with("m1")
+        sleep.assert_called_once_with(2)
+
+    def test_registry_client_delivery_loop_acks_missing_target_after_grace(self):
+        delivery = {
+            "message_id": "m1",
+            "target_agent_id": "a2",
+            "sender_name": "agent1",
+            "sender_tracker": "host1",
+            "message": "hello",
+            "sent_at": "2026-05-17T00:00:00+00:00",
+        }
+        with mock.patch.object(registry_client, "fetch_deliveries", side_effect=[(200, {"deliveries": [delivery]}), (200, {"deliveries": [delivery]}), SystemExit]), \
+             mock.patch.object(registry_client, "ack_delivery") as ack, \
+             mock.patch.object(registry_client, "DELIVERY_TARGET_GRACE_SECONDS", 60), \
+             mock.patch.object(registry_client.time, "sleep") as sleep, \
+             mock.patch.object(registry_client.time, "time", side_effect=[100.0, 200.0]), \
+             mock.patch("rpc_handler.deliver_local_message", side_effect=rpc_handler.DeliveryTargetNotFound("gone")):
+            with self.assertRaises(SystemExit):
+                registry_client._delivery_loop()
+        ack.assert_called_once_with("m1")
+        sleep.assert_called_once_with(2)
+
+    def test_registry_client_delivery_loop_acks_invalid_delivery_immediately(self):
+        delivery = {
+            "message_id": "m1",
+            "target_agent_id": "a2",
+            "sender_name": "agent1",
+            "sender_tracker": "host1",
+            "message": "hello",
+            "sent_at": "2026-05-17T00:00:00+00:00",
+        }
+        with mock.patch.object(registry_client, "fetch_deliveries", side_effect=[(200, {"deliveries": [delivery]}), SystemExit]), \
+             mock.patch.object(registry_client, "ack_delivery") as ack, \
+             mock.patch.object(registry_client.time, "sleep") as sleep, \
+             mock.patch("rpc_handler.deliver_local_message", side_effect=rpc_handler.DeliveryValidationError("bad attachment")):
+            with self.assertRaises(SystemExit):
+                registry_client._delivery_loop()
+        ack.assert_called_once_with("m1")
+        sleep.assert_not_called()
 
     def test_registry_client_delivery_loop_does_not_ack_transient_failures(self):
         delivery = {

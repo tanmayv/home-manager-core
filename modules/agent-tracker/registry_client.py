@@ -10,6 +10,7 @@ TRACKER_ID = os.environ.get("AGENT_TRACKER_ID", str(uuid.uuid5(uuid.NAMESPACE_DN
 HTTP_PORT = int(os.environ.get("AGENT_TRACKER_HTTP_PORT", "19876"))
 HEARTBEAT_INTERVAL = int(os.environ.get("AGENT_REGISTRY_HEARTBEAT_SECONDS", "30"))
 DELIVERY_WAIT_SECONDS = int(os.environ.get("AGENT_REGISTRY_DELIVERY_WAIT_SECONDS", "25"))
+DELIVERY_TARGET_GRACE_SECONDS = int(os.environ.get("AGENT_REGISTRY_DELIVERY_TARGET_GRACE_SECONDS", "60"))
 STATUS_PATH = os.path.join(state.CACHE_DIR, "registry-status.json")
 
 
@@ -145,6 +146,7 @@ def _heartbeat_loop():
 
 
 def _delivery_loop():
+    missing_target_first_seen = {}
     while True:
         status, body = fetch_deliveries()
         if status == 404:
@@ -175,12 +177,40 @@ def _delivery_loop():
                 )
                 ack_status = ack_delivery(delivery["message_id"])
                 if ack_status == 200:
+                    missing_target_first_seen.pop(delivery.get("message_id"), None)
                     LOG.info("delivered and acked queued registry message_id=%s target_agent_id=%s", delivery["message_id"], delivery["target_agent_id"])
-            except (DeliveryTargetNotFound, DeliveryValidationError) as e:
-                logging.warning(f"dropping undeliverable queued registry message {delivery.get('message_id')}: {e}")
+            except DeliveryValidationError as e:
+                logging.warning(f"dropping invalid queued registry message {delivery.get('message_id')}: {e}")
                 ack_status = ack_delivery(delivery["message_id"])
                 if ack_status == 200:
-                    LOG.info("acked undeliverable queued registry message_id=%s after local validation failure", delivery["message_id"])
+                    missing_target_first_seen.pop(delivery.get("message_id"), None)
+                    LOG.info("acked invalid queued registry message_id=%s after local validation failure", delivery["message_id"])
+            except DeliveryTargetNotFound as e:
+                message_id = delivery.get("message_id")
+                now = time.time()
+                first_seen = missing_target_first_seen.setdefault(message_id, now)
+                age = now - first_seen
+                if age >= DELIVERY_TARGET_GRACE_SECONDS:
+                    logging.warning(
+                        "dropping queued registry message %s after %.1fs target-not-found grace: %s",
+                        message_id,
+                        age,
+                        e,
+                    )
+                    ack_status = ack_delivery(delivery["message_id"])
+                    if ack_status == 200:
+                        missing_target_first_seen.pop(message_id, None)
+                        LOG.info("acked undeliverable queued registry message_id=%s after target-not-found grace", message_id)
+                else:
+                    logging.warning(
+                        "deferring queued registry message %s for missing target %s (age %.1fs < grace %ss): %s",
+                        message_id,
+                        delivery.get("target_agent_id"),
+                        age,
+                        DELIVERY_TARGET_GRACE_SECONDS,
+                        e,
+                    )
+                    time.sleep(2)
             except RuntimeError as e:
                 logging.warning(f"transient local delivery failure for queued registry message {delivery.get('message_id')}: {e}")
                 time.sleep(2)

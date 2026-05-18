@@ -1,5 +1,6 @@
 import base64
 import binascii
+import errno
 import json
 import logging
 import os
@@ -276,7 +277,15 @@ def make_handler(store=None, token=None, auth_required=None):
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps(payload).encode())
+            try:
+                self.wfile.write(json.dumps(payload).encode())
+            except (BrokenPipeError, ConnectionResetError) as e:
+                LOG.debug("client disconnected while writing response path=%s error=%s", self.path, e)
+            except OSError as e:
+                if getattr(e, "errno", None) in (errno.EPIPE, errno.ECONNRESET):
+                    LOG.debug("client disconnected while writing response path=%s error=%s", self.path, e)
+                    return
+                raise
 
         def _parts(self):
             return [p for p in urlparse(self.path).path.split("/") if p]

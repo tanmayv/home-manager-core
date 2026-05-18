@@ -57,6 +57,22 @@ def set_agent_uuid(pane_id, uuid, socket_path=None):
     enqueue_tmux_cmd(cmd)
 
 
+def set_agent_type(pane_id, agent_type, socket_path=None):
+    cmd = ["tmux"]
+    if socket_path:
+        cmd.extend(["-S", socket_path])
+    cmd.extend(["set-option", "-p", "-t", pane_id, "@agent_type", agent_type])
+    enqueue_tmux_cmd(cmd)
+
+
+def set_agent_cmd(pane_id, agent_cmd, socket_path=None):
+    cmd = ["tmux"]
+    if socket_path:
+        cmd.extend(["-S", socket_path])
+    cmd.extend(["set-option", "-p", "-t", pane_id, "@agent_cmd", agent_cmd])
+    enqueue_tmux_cmd(cmd)
+
+
 def list_panes():
     """Lists panes with ID, agent identity, type, cmd, and active state.
 

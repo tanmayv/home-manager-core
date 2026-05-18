@@ -64,6 +64,19 @@ def _generate_unique_agent_name(name: str, session: str = None) -> str:
         return f"{session}-agent-{num}"
 
 
+def _best_effort_update_tmux_metadata(tmux_pane, agent_name, agent_id, agent_type, agent_cmd, tmux_socket):
+    """Persist restart-recovery metadata in tmux without making registration depend on tmux."""
+    try:
+        tmux_util.set_agent_id(tmux_pane, agent_id, tmux_socket)
+        tmux_util.set_agent_uuid(tmux_pane, agent_id, tmux_socket)
+        tmux_util.set_agent_name(tmux_pane, agent_name, tmux_socket)
+        tmux_util.set_agent_type(tmux_pane, agent_type or "unknown", tmux_socket)
+        tmux_util.set_agent_cmd(tmux_pane, agent_cmd or "unknown", tmux_socket)
+        tmux_util.set_pane_title(tmux_pane, agent_name, tmux_socket)
+    except Exception as e:
+        logging.warning("failed to update tmux metadata for agent %s pane %s: %s", agent_name, tmux_pane, e)
+
+
 def handle_register(params: dict) -> str:
     """Handles agent registration, accepting a stable agent_id when provided."""
     session = params.get("session")
@@ -112,9 +125,7 @@ def handle_register(params: dict) -> str:
         "pending_notifications": (existing_info or {}).get("pending_notifications", [])
     })
     
-    # Persist both new and legacy identity keys in tmux during migration.
-    tmux_util.set_agent_id(tmux_pane, agent_id, tmux_socket)
-    tmux_util.set_agent_uuid(tmux_pane, agent_id, tmux_socket)
+    _best_effort_update_tmux_metadata(tmux_pane, agent_name, agent_id, agent_type, agent_cmd, tmux_socket)
     
     return agent_name
 
