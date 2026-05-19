@@ -5,6 +5,7 @@ import socket
 import sys
 import threading
 import time
+import signal
 
 import state
 import monitor
@@ -30,7 +31,22 @@ def _can_connect() -> bool:
         return False
 
 
+def setup_signals():
+    def handle_exit(signum, frame):
+        logging.info(f"Received signal {signum}, cleaning up socket and exiting...")
+        if os.path.exists(SOCKET_PATH):
+            try:
+                os.remove(SOCKET_PATH)
+            except OSError as e:
+                logging.warning(f"Failed to clean up socket on exit: {e}")
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, handle_exit)
+    signal.signal(signal.SIGINT, handle_exit)
+
+
 def main():
+    setup_signals()
     os.makedirs(os.path.dirname(SOCKET_PATH), exist_ok=True)
 
     with open(LOCK_PATH, "a+") as lock_file:

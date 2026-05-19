@@ -94,7 +94,7 @@ in
           #!${pkgs.python3}/bin/python3
           import os
           os.environ.setdefault("AGENT_TRACKER_SOCKET", "${socketPath}")
-          os.environ.setdefault("AGENT_TRACKER_DAEMON", "${daemonCmd}")
+          ${lib.optionalString (!cfg.enable) ''os.environ.setdefault("AGENT_TRACKER_DAEMON", "${daemonCmd}")''}
           os.environ.setdefault("POLL_INTERVAL", "${toString cfg.pollInterval}")
           os.environ.setdefault("HEARTBEAT_STALE_SECONDS", "${toString cfg.heartbeatStaleSeconds}")
           os.environ.setdefault("HEARTBEAT_GRACE_SECONDS", "${toString cfg.heartbeatGraceSeconds}")
