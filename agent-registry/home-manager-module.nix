@@ -19,19 +19,19 @@ let
   trackerSocketFor = spec:
     if spec.trackerSocketPath != null then spec.trackerSocketPath else "${cacheHome}/agent-tracker/agent-tracker.sock";
 
-  tmuxSocketFor = spec:
-    if spec.tmuxSocketPath != null then spec.tmuxSocketPath else "${cacheHome}/agent-registry/tmux.sock";
+  tmuxSocketFor = spec: spec.tmuxSocketPath;
 
   baseEnvironmentFor = spec: {
     HOME = homeDir;
     USER = config.home.username;
     PATH = lib.mkForce userPath;
     AGENT_TRACKER_SOCKET = trackerSocketFor spec;
+  } // lib.optionalAttrs (tmuxSocketFor spec != null) {
     AGENT_REGISTRY_TMUX_SOCKET = tmuxSocketFor spec;
   };
 
   launcherArgsFor = agentName: spec:
-    ''--agent-name ${lib.escapeShellArg agentName} --session ${lib.escapeShellArg spec.session} --cwd ${lib.escapeShellArg spec.cwd} --command ${lib.escapeShellArg spec.command} --home ${lib.escapeShellArg homeDir} --tracker-socket ${lib.escapeShellArg (trackerSocketFor spec)} --tmux-socket ${lib.escapeShellArg (tmuxSocketFor spec)} --wrapper-path ${lib.escapeShellArg spec.wrapperPath}'';
+    ''--agent-name ${lib.escapeShellArg agentName} --session ${lib.escapeShellArg spec.session} --cwd ${lib.escapeShellArg spec.cwd} --command ${lib.escapeShellArg spec.command} --home ${lib.escapeShellArg homeDir} --tracker-socket ${lib.escapeShellArg (trackerSocketFor spec)}${lib.optionalString (tmuxSocketFor spec != null) " --tmux-socket ${lib.escapeShellArg (tmuxSocketFor spec)}"} --wrapper-path ${lib.escapeShellArg spec.wrapperPath}'';
 
   mkManagedService = agentName: spec:
     let unitName = managedUnitName "managed" agentName; in
@@ -155,7 +155,7 @@ in {
           tmuxSocketPath = mkOption {
             type = types.nullOr types.str;
             default = null;
-            description = "Optional explicit tmux socket path. Defaults to ~/.cache/agent-registry/tmux.sock for the Home Manager user.";
+            description = "Optional explicit tmux socket path. By default managed agents use the user's normal tmux socket under XDG_RUNTIME_DIR (for example /run/user/<uid>/tmux-<uid>/default). Set this explicitly if you want a dedicated tmux server instead.";
           };
           reconcileIntervalSeconds = mkOption {
             type = types.ints.positive;

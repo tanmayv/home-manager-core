@@ -10,6 +10,11 @@ _spec.loader.exec_module(managed_agent)
 
 
 class TestManagedAgent(unittest.TestCase):
+    def test_default_tmux_socket_uses_runtime_dir(self):
+        with mock.patch.dict(managed_agent.os.environ, {"XDG_RUNTIME_DIR": "/run/user/1234"}, clear=False), \
+             mock.patch.object(managed_agent.os, "getuid", return_value=1234):
+            self.assertEqual(managed_agent.default_tmux_socket(), "/run/user/1234/tmux-1234/default")
+
     def test_build_launch_command_includes_wrapper_and_env(self):
         cmd = managed_agent.build_launch_command("nixos-expert", "pi --help", "agent-wrapper", "/tmp/tracker.sock")
         self.assertIn("SUGGESTED_AGENT_NAME=nixos-expert", cmd)

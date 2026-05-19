@@ -25,6 +25,7 @@ in pkgs.testers.runNixOSTest {
         cwd = "~";
         command = "${fakePi}/bin/pi";
         wrapperPath = "${pkgs.coreutils}/bin/env";
+        tmuxSocketPath = "/home/tanmay/.cache/agent-registry/tmux.sock";
         reconcileIntervalSeconds = 60;
         restart = {
           enable = true;

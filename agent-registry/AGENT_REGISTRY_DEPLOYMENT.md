@@ -298,9 +298,9 @@ services.agent-registry = {
     # Defaults shown explicitly:
     wrapperPath = "agent-wrapper";
     reconcileIntervalSeconds = 30;
-    tmuxSocketPath = "/home/tanmay/.cache/agent-registry/tmux.sock";
-    # Or point at your normal tmux socket if you intentionally want to share it.
-    # tmuxSocketPath = "/run/user/1000/tmux-1000/default";
+    # By default this now uses the user's normal tmux socket.
+    # Set tmuxSocketPath explicitly if you want a dedicated tmux server instead.
+    # tmuxSocketPath = "/home/tanmay/.cache/agent-registry/tmux.sock";
 
     restart = {
       enable = true;
@@ -337,7 +337,7 @@ sudo nixos-rebuild switch --flake .#your-host
 | `command` | Agent command to run, for example `pi`, `claude`, or an absolute path. |
 | `wrapperPath` | Wrapper executable used to launch the agent. Default: `agent-wrapper`. |
 | `trackerSocketPath` | Optional override for the target user's tracker socket. |
-| `tmuxSocketPath` | Optional override for the tmux socket. Default is a dedicated socket under `~/.cache/agent-registry/tmux.sock`. |
+| `tmuxSocketPath` | Optional override for the tmux socket. By default managed agents use the user's normal tmux socket under `XDG_RUNTIME_DIR` (for example `/run/user/<uid>/tmux-<uid>/default`). |
 | `reconcileIntervalSeconds` | How often the registry host re-checks that the agent exists. |
 | `restart.enable` | Enables scheduled restarts. |
 | `restart.onCalendar` | systemd `OnCalendar` restart schedule. |
@@ -349,7 +349,7 @@ sudo nixos-rebuild switch --flake .#your-host
 
 - Reconcile and restart units run as the target user, not root.
 - The module sets explicit `HOME`, `PATH`, `XDG_RUNTIME_DIR`, tracker socket, and tmux socket context.
-- **Important:** by default managed agents use a dedicated tmux socket at `~/.cache/agent-registry/tmux.sock` so they keep working without relying on an interactive login session. If you want them to appear on your usual tmux server, override `tmuxSocketPath` explicitly.
+- **Important:** by default managed agents now use the user's normal tmux socket so they appear in the same tmux server the user interacts with over SSH. If you want isolated/persistent managed-agent tmux state instead, override `tmuxSocketPath` explicitly to a dedicated socket such as `~/.cache/agent-registry/tmux.sock`.
 - Managed agents use tmux pane metadata (`@agent_name`) as the idempotency source of truth.
   Manual pane or agent renames can therefore break reconciliation and may cause a duplicate pane to be spawned.
 - If tmux is not already running for that socket, the reconcile unit starts it automatically.
@@ -365,7 +365,14 @@ systemctl status agent-registry-managed-nixos-expert.timer
 systemctl status agent-registry-restart-nixos-expert.timer
 ```
 
-If using the default dedicated tmux socket:
+If using the default normal tmux socket:
+
+```bash
+sudo -u tanmay tmux ls
+sudo -u tanmay tmux list-panes -a -F '#S #{pane_id} #{@agent_name}'
+```
+
+If you override to a dedicated tmux socket instead:
 
 ```bash
 sudo -u tanmay tmux -S /home/tanmay/.cache/agent-registry/tmux.sock ls

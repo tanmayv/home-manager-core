@@ -143,11 +143,14 @@ in
       systemd.user.services.agent-tracker = {
         Unit = {
           Description = "Agent Tracker Daemon";
+          StartLimitIntervalSec = 60;
+          StartLimitBurst = 10;
         };
         Service = {
           Environment = monitorEnv;
           ExecStart = daemonCmd;
           Restart = "always";
+          RestartSec = 2;
         };
         Install = {
           WantedBy = [ "default.target" ];

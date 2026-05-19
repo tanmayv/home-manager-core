@@ -7,6 +7,11 @@ import sys
 import time
 
 
+def default_tmux_socket() -> str:
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
+    return os.path.join(runtime_dir, f"tmux-{os.getuid()}", "default")
+
+
 def ensure_env(home: str, tracker_socket: str | None = None, tmux_socket: str | None = None) -> None:
     os.environ.setdefault("HOME", home)
     os.environ.setdefault("USER", os.path.basename(home))
@@ -21,9 +26,9 @@ def ensure_env(home: str, tracker_socket: str | None = None, tmux_socket: str | 
     os.environ["PATH"] = ":".join(part for part in path_parts if part)
     if tracker_socket:
         os.environ.setdefault("AGENT_TRACKER_SOCKET", tracker_socket)
-    if tmux_socket:
-        os.makedirs(os.path.dirname(tmux_socket), exist_ok=True)
-        os.environ.setdefault("AGENT_REGISTRY_TMUX_SOCKET", tmux_socket)
+    tmux_socket = tmux_socket or default_tmux_socket()
+    os.makedirs(os.path.dirname(tmux_socket), exist_ok=True)
+    os.environ.setdefault("AGENT_REGISTRY_TMUX_SOCKET", tmux_socket)
 
 
 def tmux_cmd(args: list[str], check: bool = True) -> subprocess.CompletedProcess:

@@ -27,8 +27,7 @@ let
   trackerSocketFor = spec:
     if spec.trackerSocketPath != null then spec.trackerSocketPath else "${userHomeFor spec}/.cache/agent-tracker/agent-tracker.sock";
 
-  tmuxSocketFor = spec:
-    if spec.tmuxSocketPath != null then spec.tmuxSocketPath else "${userHomeFor spec}/.cache/agent-registry/tmux.sock";
+  tmuxSocketFor = spec: spec.tmuxSocketPath;
 
   baseEnvironmentFor = spec:
     let uid = userUidFor spec; in {
@@ -36,13 +35,14 @@ let
       USER = spec.user;
       PATH = lib.mkForce (userPathFor spec);
       AGENT_TRACKER_SOCKET = trackerSocketFor spec;
+    } // lib.optionalAttrs (tmuxSocketFor spec != null) {
       AGENT_REGISTRY_TMUX_SOCKET = tmuxSocketFor spec;
     } // lib.optionalAttrs (uid != null) {
       XDG_RUNTIME_DIR = "/run/user/${uid}";
     };
 
   launcherArgsFor = agentName: spec:
-    ''--agent-name ${lib.escapeShellArg agentName} --session ${lib.escapeShellArg spec.session} --cwd ${lib.escapeShellArg spec.cwd} --command ${lib.escapeShellArg spec.command} --home ${lib.escapeShellArg (userHomeFor spec)} --tracker-socket ${lib.escapeShellArg (trackerSocketFor spec)} --tmux-socket ${lib.escapeShellArg (tmuxSocketFor spec)} --wrapper-path ${lib.escapeShellArg spec.wrapperPath}'';
+    ''--agent-name ${lib.escapeShellArg agentName} --session ${lib.escapeShellArg spec.session} --cwd ${lib.escapeShellArg spec.cwd} --command ${lib.escapeShellArg spec.command} --home ${lib.escapeShellArg (userHomeFor spec)} --tracker-socket ${lib.escapeShellArg (trackerSocketFor spec)}${lib.optionalString (tmuxSocketFor spec != null) " --tmux-socket ${lib.escapeShellArg (tmuxSocketFor spec)}"} --wrapper-path ${lib.escapeShellArg spec.wrapperPath}'';
 
   mkManagedService = agentName: spec:
     let
@@ -161,7 +161,7 @@ in {
           tmuxSocketPath = mkOption {
             type = types.nullOr types.str;
             default = null;
-            description = "Optional explicit tmux socket path. Defaults to ~/.cache/agent-registry/tmux.sock for the target user so managed agents work even without a login session.";
+            description = "Optional explicit tmux socket path. By default managed agents use the user's normal tmux socket under XDG_RUNTIME_DIR (for example /run/user/<uid>/tmux-<uid>/default). Set this explicitly if you want a dedicated tmux server instead.";
           };
           reconcileIntervalSeconds = mkOption {
             type = types.ints.positive;
