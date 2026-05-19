@@ -10,7 +10,7 @@ import (
 func (m *model) toggleMode() {
 	m.mode = (m.mode + 1) % 2
 	m.messageOffset = 0
-	m.messageSelected = clampSelectedMessage(m.messageSelected, len(m.displayMessages()))
+	m.messageSelected = clampSelectedMessage(m.messageSelected, len(m.displayOrderedMessages()))
 }
 
 func (m model) reloadMessages() tea.Cmd {
@@ -25,6 +25,14 @@ func (m model) displayMessages() []tracker.Message {
 		return m.allMessages
 	}
 	return m.messages
+}
+
+func (m model) displayOrderedMessages() []tracker.Message {
+	messages := append([]tracker.Message{}, m.displayMessages()...)
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
+	}
+	return messages
 }
 
 func (m *model) refreshMergedMessages() {

@@ -89,6 +89,8 @@ def init_state() -> None:
         agent_uuid = pane["agent_uuid"]
         agent_type = pane.get("agent_type", "unknown")
         agent_cmd = pane.get("agent_cmd")
+        no_notify_with_send_keys = bool(pane.get("no_notify_with_send_keys", False))
+        no_registry = bool(pane.get("no_registry", False))
         if agent_name:
             logging.info(f"Found recovered agent: {agent_name} of type {agent_type} in pane {pane_id}")
             try:
@@ -112,6 +114,8 @@ def init_state() -> None:
                         "recovered_at": time.time(),
                         "agent_type": agent_type,
                         "agent_cmd": agent_cmd or discovered_cmd or "unknown",
+                        "no_notify_with_send_keys": no_notify_with_send_keys,
+                        "no_registry": no_registry,
                         "pending_notifications": []
                     })
 
@@ -283,7 +287,7 @@ def get_agents_for_registry() -> list[dict]:
             "status": info.get("status", "unknown"),
             "agent_type": info.get("agent_type", "unknown"),
             "agent_cmd": info.get("agent_cmd", "unknown"),
-        } for agent_id, info in state.items()]
+        } for agent_id, info in state.items() if not info.get("no_registry", False)]
 
 
 def publish_event(event_type: str, payload: dict) -> dict:

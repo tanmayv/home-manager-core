@@ -64,7 +64,7 @@ def _generate_unique_agent_name(name: str, session: str = None) -> str:
         return f"{session}-agent-{num}"
 
 
-def _best_effort_update_tmux_metadata(tmux_pane, agent_name, agent_id, agent_type, agent_cmd, tmux_socket):
+def _best_effort_update_tmux_metadata(tmux_pane, agent_name, agent_id, agent_type, agent_cmd, tmux_socket, no_notify_with_send_keys=False, no_registry=False):
     """Persist restart-recovery metadata in tmux without making registration depend on tmux."""
     try:
         tmux_util.set_agent_id(tmux_pane, agent_id, tmux_socket)
@@ -72,6 +72,8 @@ def _best_effort_update_tmux_metadata(tmux_pane, agent_name, agent_id, agent_typ
         tmux_util.set_agent_name(tmux_pane, agent_name, tmux_socket)
         tmux_util.set_agent_type(tmux_pane, agent_type or "unknown", tmux_socket)
         tmux_util.set_agent_cmd(tmux_pane, agent_cmd or "unknown", tmux_socket)
+        tmux_util.set_agent_no_notify_with_send_keys(tmux_pane, no_notify_with_send_keys, tmux_socket)
+        tmux_util.set_agent_no_registry(tmux_pane, no_registry, tmux_socket)
         tmux_util.set_pane_title(tmux_pane, agent_name, tmux_socket)
     except Exception as e:
         logging.warning("failed to update tmux metadata for agent %s pane %s: %s", agent_name, tmux_pane, e)
@@ -88,6 +90,7 @@ def handle_register(params: dict) -> str:
     agent_cmd = params.get("agent_cmd", "unknown")
     agent_id = params.get("agent_id") or str(uuid.uuid4())
     no_notify_with_send_keys = bool(params.get("no_notify_with_send_keys", False))
+    no_registry = bool(params.get("no_registry", False))
     
     if not (session and tmux_pane and wrapper_pid and tmux_socket):
         raise ValueError("Invalid params")
@@ -122,12 +125,13 @@ def handle_register(params: dict) -> str:
         "agent_type": agent_type or (existing_info or {}).get("agent_type", "unknown"),
         "agent_cmd": agent_cmd or (existing_info or {}).get("agent_cmd", "unknown"),
         "no_notify_with_send_keys": no_notify_with_send_keys,
+        "no_registry": no_registry,
         "last_heartbeat": time.time(),
         "recovered_at": None,
         "pending_notifications": (existing_info or {}).get("pending_notifications", [])
     })
     
-    _best_effort_update_tmux_metadata(tmux_pane, agent_name, agent_id, agent_type, agent_cmd, tmux_socket)
+    _best_effort_update_tmux_metadata(tmux_pane, agent_name, agent_id, agent_type, agent_cmd, tmux_socket, no_notify_with_send_keys, no_registry)
     
     return agent_name
 
@@ -146,21 +150,34 @@ def _is_agent_waiting(info: dict) -> bool:
     busy_statuses = {"working", "waiting", "spawning"}
     return info.get("status") in busy_statuses or info.get("waiting_approval", False)
 
+def _publish_message_notified(info: dict, agent_name: str, pending_item):
+    sender_name = pending_item.get("sender") if isinstance(pending_item, dict) else pending_item
+    message_id = pending_item.get("message_id") if isinstance(pending_item, dict) else None
+    state.publish_event("message_notified", {
+        "target_agent_id": info.get("agent_id"),
+        "target_agent_name": agent_name,
+        "sender": sender_name or "unknown",
+        "message_id": message_id,
+    })
+
+
 def _flush_notifications(agent_name: str):
     """Sends all pending notifications for an agent if it is no longer waiting."""
     info = state.get_agent(agent_name)
     if not info or _is_agent_waiting(info):
         return
-        
+
     pending = info.get("pending_notifications", [])
     if not pending:
         return
-        
+
     logging.info(f"Flushing {len(pending)} notifications for {agent_name}")
     if not info.get("no_notify_with_send_keys", False):
-        for sender_name in pending:
+        for pending_item in pending:
+            sender_name = pending_item.get("sender") if isinstance(pending_item, dict) else pending_item
             notify_msg = f"New message in inbox from {sender_name}"
             tmux_util.send_keys(info["tmux_pane"], notify_msg, info["tmux_socket"])
+            _publish_message_notified(info, agent_name, pending_item)
 
     state.update_agent(agent_name, pending_notifications=[])
 
@@ -368,15 +385,17 @@ def deliver_local_message(target_name_or_id: str, msg_obj: dict, notify_sender: 
         }
         state.publish_event("message_delivered", notification)
 
+        pending_item = {"sender": notify_sender, "message_id": msg_obj.get("message_id")}
         if info.get("no_notify_with_send_keys", False):
             logging.info(f"Skipping tmux send-keys notification for {current_name} from {notify_sender}")
         elif _is_agent_waiting(info):
             logging.info(f"Queuing notification for {current_name} from {notify_sender} (agent is busy)")
             pending = info.get("pending_notifications", [])
-            pending.append(notify_sender)
+            pending.append(pending_item)
             state.update_agent(current_name, pending_notifications=pending)
         else:
             tmux_util.send_keys(info["tmux_pane"], f"New message in inbox from {notify_sender}", info["tmux_socket"])
+            _publish_message_notified(info, current_name, pending_item)
         return current_name
     except DeliveryValidationError:
         if attach_dir and os.path.isdir(attach_dir):
@@ -407,6 +426,8 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
     if target_address and "/" in target_address:
         registry_name = None
         hostname, target = target_address.split("/", 1)
+         
+        logging.info("handle_send_message sender=%s sender_id=%s target_address=%s message_id=%s attachments=%s", sender_name, sender_id, target_address, params.get("message_id"), bool(attachments))
         if ":" in hostname:
             registry_name, hostname = hostname.split(":", 1)
         if hostname not in {"local", LOCAL_HOSTNAME}:
@@ -440,7 +461,7 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
         warning_msg = f"Note: Agent '{agent_name}' was renamed to '{current_name}'."
         logging.info(warning_msg)
 
-    deliver_local_message(agent_name, {
+    payload = {
         "sender": sender_name,
         "timestamp": _utc_now_isoformat(),
         "message": msg,
@@ -449,7 +470,9 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
         "message_id": params.get("message_id"),
         "sender_agent_id": sender_id,
         "sender_tracker_id": registry_client.TRACKER_ID,
-    }, sender_name)
+    }
+    logging.info("local delivery payload target=%s sender=%s message_id=%s sender_agent_id=%s sender_tracker_id=%s", agent_name, sender_name, payload.get("message_id"), payload.get("sender_agent_id"), payload.get("sender_tracker_id"))
+    deliver_local_message(agent_name, payload, sender_name)
     return {"success": True, "warning": warning_msg} if warning_msg else True
 
 def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None, agent_name: str | None = None, agent_info: dict | None = None) -> dict:
@@ -499,6 +522,7 @@ def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None
                     f.write(json.dumps(m) + "\n")
         if agent_name and agent_info:
             for msg in newly_read:
+                logging.info("publishing message_read target=%s sender=%s message_id=%s sender_agent_id=%s sender_tracker_id=%s", agent_name, msg.get("sender", "unknown"), msg.get("message_id"), msg.get("sender_agent_id"), msg.get("sender_tracker_id"))
                 state.publish_event("message_read", {
                     "target_agent_id": agent_info.get("agent_id"),
                     "target_agent_name": agent_name,
@@ -506,6 +530,7 @@ def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None
                     "message_id": msg.get("message_id"),
                 })
                 if msg.get("sender_tracker_id"):
+                    logging.info("relaying remote message_read back to sender_tracker_id=%s message_id=%s reader=%s", msg.get("sender_tracker_id"), msg.get("message_id"), agent_name)
                     registry_client.publish_tracker_event(msg.get("sender_tracker_id"), "message_read", {
                         "message_id": msg.get("message_id"),
                         "sender_agent_id": msg.get("sender_agent_id"),

@@ -51,16 +51,15 @@ func TestMessageViewportScrollsIndependently(t *testing.T) {
 	}
 }
 
-func TestTypingScrollsMessagesToBottomAndAppendsComposer(t *testing.T) {
-	m := model{height: 8, messageOffset: 0, messages: []tracker.Message{{Sender: "a", Body: "one\ntwo\nthree\nfour\nfive"}}}
+func TestTypingKeepsMessagesPinnedToTopAndAppendsComposer(t *testing.T) {
+	m := model{height: 8, messageOffset: 2, messages: []tracker.Message{{Sender: "a", Body: "one\ntwo\nthree\nfour\nfive"}}}
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("x")})
 	m = updated.(model)
 	if string(m.composer) != "x" {
 		t.Fatalf("composer = %q, want x", string(m.composer))
 	}
-	wantBottom := messageBottomOffset(len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
-	if m.messageOffset != wantBottom {
-		t.Fatalf("messageOffset = %d, want bottom %d", m.messageOffset, wantBottom)
+	if m.messageOffset != 0 {
+		t.Fatalf("messageOffset = %d, want top 0", m.messageOffset)
 	}
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeySpace})
 	m = updated.(model)
@@ -73,19 +72,20 @@ func TestCtrlUCtrlDClampMessageScroll(t *testing.T) {
 	m := model{height: 8, messages: []tracker.Message{{Sender: "a", Body: "one\ntwo\nthree\nfour\nfive"}}}
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
 	m = updated.(model)
-	wantBottom := messageBottomOffset(len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
-	if m.messageOffset != wantBottom {
-		t.Fatalf("ctrl+d offset = %d, want clamped %d", m.messageOffset, wantBottom)
+	wantOlder := clampMessageOffset(messagePageSize(m.height), len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
+	if m.messageOffset != wantOlder {
+		t.Fatalf("ctrl+d offset = %d, want clamped %d", m.messageOffset, wantOlder)
 	}
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
 	m = updated.(model)
-	if m.messageOffset != wantBottom {
-		t.Fatalf("second ctrl+d offset = %d, want still %d", m.messageOffset, wantBottom)
+	wantMax := messageBottomOffset(len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
+	if m.messageOffset != wantMax {
+		t.Fatalf("second ctrl+d offset = %d, want %d", m.messageOffset, wantMax)
 	}
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlU})
 	m = updated.(model)
-	if m.messageOffset != 0 {
-		t.Fatalf("ctrl+u offset = %d, want 0", m.messageOffset)
+	if m.messageOffset != max(0, wantMax-messagePageSize(m.height)) {
+		t.Fatalf("ctrl+u offset = %d", m.messageOffset)
 	}
 }
 

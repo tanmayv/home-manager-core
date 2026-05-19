@@ -11,6 +11,8 @@ import (
 var titleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("14"))
 var selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true)
 var mutedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+var readStatusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
+var composerBoxStyle = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Padding(0, 1)
 
 const composerMaxLines = 5
 
@@ -20,17 +22,16 @@ func (m model) View() string {
 	if m.width == 0 {
 		return "loading..."
 	}
-	bottom := m.bottomBar(m.width)
-	bodyH := max(3, m.height-lineCount(bottom))
+	footer := m.footer(m.width)
+	bodyH := max(3, m.height-lineCount(footer))
 	if m.mode == advancedView {
-		body := titleStyle.Render("Simple View                                    Advanced View") + "\n" + m.messageView(m.width)
-		return box(body, m.width, bodyH) + "\n" + bottom
+		return m.advancedBody(m.width, bodyH) + "\n" + footer
 	}
 	leftW, midW, rightW := m.layoutWidths()
 	_ = rightW
 	left := box(titleStyle.Render("Agents")+"\n"+m.agentList(leftW), leftW, bodyH)
-	mid := box(titleStyle.Render("Conversation")+"\n"+m.messageView(midW), midW, bodyH)
-	return lipgloss.JoinHorizontal(lipgloss.Top, left, mid) + "\n" + bottom
+	mid := m.conversationPanel(midW, bodyH)
+	return lipgloss.JoinHorizontal(lipgloss.Top, left, mid) + "\n" + footer
 }
 
 func (m model) layoutWidths() (int, int, int) {
@@ -42,10 +43,19 @@ func (m model) layoutWidths() (int, int, int) {
 	return left, mid, 0
 }
 
-func (m model) bottomBar(width int) string {
-	composer := m.composerView(width)
-	hint := m.footer(width)
-	return composer + "\n" + hint
+func (m model) conversationPanel(width, height int) string {
+	body := titleStyle.Render("Conversation") + "\n" + m.composerBox(width) + "\n" + m.messageView(width)
+	return box(body, width, height)
+}
+
+func (m model) advancedBody(width, height int) string {
+	body := titleStyle.Render("Simple View                                    Advanced View") + "\n" + m.composerBox(width) + "\n" + m.messageView(width)
+	return box(body, width, height)
+}
+
+func (m model) composerBox(width int) string {
+	inner := max(1, width-4)
+	return composerBoxStyle.Width(inner).Render(m.composerView(inner))
 }
 
 func (m model) footer(width int) string {
@@ -93,7 +103,7 @@ func (m model) messageView(width int) string {
 
 func (m model) messageLinesForWidth(width int) []string {
 	wrapWidth := max(10, width-1)
-	messages := m.displayMessages()
+	messages := m.displayOrderedMessages()
 	if len(messages) == 0 {
 		if len(m.rows) > 0 && m.rows[m.selected].Scope == "remote" {
 			return wrapLine(mutedStyle.Render("No messages. Remote history is in-memory for sent messages only."), wrapWidth)
@@ -131,11 +141,17 @@ func (m model) messageLinesForWidth(width int) []string {
 }
 
 func sentReadMarker(msg tracker.Message) string {
-	if msg.Sender == "You" || strings.Contains(msg.Sender, "→") {
-		if msg.Read {
-			return mutedStyle.Render("✓✓ ")
-		}
-		return mutedStyle.Render("✓ ")
+	if msg.Sender != "You" && !strings.Contains(msg.Sender, "→") {
+		return ""
+	}
+	if msg.Read {
+		return readStatusStyle.Render("⇒⇒ ")
+	}
+	if msg.Notified {
+		return "⇒⇒ "
+	}
+	if msg.Delivered {
+		return "→ "
 	}
 	return ""
 }
@@ -149,7 +165,7 @@ func messageBodyLines(body string, wrapWidth int) []string {
 }
 
 func (m model) visibleBodyLines(lines []string, index int) []string {
-	if m.mode != advancedView || index == m.messageSelected || index == len(m.displayMessages())-1 || len(lines) <= 3 {
+	if m.mode != advancedView || index == m.messageSelected || index == 0 || len(lines) <= 3 {
 		return lines
 	}
 	return append(append([]string{}, lines[:3]...), mutedStyle.Render("    …"))
@@ -157,13 +173,22 @@ func (m model) visibleBodyLines(lines []string, index int) []string {
 
 func (m model) messageContentWidth() int {
 	if m.mode == advancedView {
-		return max(1, m.width-1)
+		return max(1, m.width-3)
 	}
 	_, mid, _ := m.layoutWidths()
-	return max(1, mid-1)
+	return max(1, mid-3)
 }
+
+func (m model) messageChromeHeight() int {
+	if m.mode == advancedView {
+		return lineCount(titleStyle.Render("Simple View                                    Advanced View") + "\n" + m.composerBox(max(1, m.width)))
+	}
+	_, mid, _ := m.layoutWidths()
+	return lineCount(titleStyle.Render("Conversation") + "\n" + m.composerBox(mid))
+}
+
 func (m model) messageVisibleLines() int {
-	return max(1, m.height-lineCount(m.bottomBar(m.messageContentWidth()))-2)
+	return max(1, m.height-lineCount(m.footer(max(1, m.width)))-m.messageChromeHeight())
 }
 func messagePageSize(height int) int             { return max(1, height/2) }
 func messageBottomOffset(total, visible int) int { return max(0, total-visible) }

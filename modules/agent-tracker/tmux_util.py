@@ -73,6 +73,22 @@ def set_agent_cmd(pane_id, agent_cmd, socket_path=None):
     enqueue_tmux_cmd(cmd)
 
 
+def set_agent_no_notify_with_send_keys(pane_id, value, socket_path=None):
+    cmd = ["tmux"]
+    if socket_path:
+        cmd.extend(["-S", socket_path])
+    cmd.extend(["set-option", "-p", "-t", pane_id, "@agent_no_notify_with_send_keys", "on" if value else "off"])
+    enqueue_tmux_cmd(cmd)
+
+
+def set_agent_no_registry(pane_id, value, socket_path=None):
+    cmd = ["tmux"]
+    if socket_path:
+        cmd.extend(["-S", socket_path])
+    cmd.extend(["set-option", "-p", "-t", pane_id, "@agent_no_registry", "on" if value else "off"])
+    enqueue_tmux_cmd(cmd)
+
+
 def list_panes():
     """Lists panes with ID, agent identity, type, cmd, and active state.
 
@@ -81,12 +97,12 @@ def list_panes():
     tracked agent during transient PATH/launchd issues on macOS.
     """
     try:
-        out = run_tmux_cmd(["list-panes", "-a", "-F", "#{pane_id}|#{@agent_name}|#{@agent_id}|#{@agent_uuid}|#{@agent_type}|#{@agent_cmd}|#{pane_active}"])
+        out = run_tmux_cmd(["list-panes", "-a", "-F", "#{pane_id}|#{@agent_name}|#{@agent_id}|#{@agent_uuid}|#{@agent_type}|#{@agent_cmd}|#{@agent_no_notify_with_send_keys}|#{@agent_no_registry}|#{pane_active}"])
         panes = []
         if out:
             for line in out.split("\n"):
                 parts = line.split('|')
-                if len(parts) < 7:
+                if len(parts) < 9:
                     continue
                 pane_info = {
                     "pane_id": parts[0],
@@ -95,7 +111,9 @@ def list_panes():
                     "agent_uuid": parts[3] if parts[3] else None,
                     "agent_type": parts[4] if parts[4] else "unknown",
                     "agent_cmd": parts[5] if parts[5] else None,
-                    "pane_active": (parts[6] == "1")
+                    "no_notify_with_send_keys": (parts[6] == "on"),
+                    "no_registry": (parts[7] == "on"),
+                    "pane_active": (parts[8] == "1")
                 }
                 panes.append(pane_info)
         return panes

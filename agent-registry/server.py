@@ -269,6 +269,7 @@ class Store:
             return True
 
     def enqueue_tracker_event(self, target_tracker_id, event_type, source_tracker_id, payload):
+        LOG.info("queueing tracker event type=%s source=%s target=%s payload=%s", event_type, source_tracker_id, target_tracker_id, payload)
         entry = {
             "event_id": str(uuid.uuid4()),
             "event_type": event_type,
@@ -289,6 +290,7 @@ class Store:
             while True:
                 queue = sorted(self.tracker_events.get(tracker_id, {}).values(), key=lambda item: item.get("created_at", 0))
                 if queue:
+                    LOG.info("returning %s queued tracker events to tracker_id=%s", len(queue), tracker_id)
                     return [dict(item) for item in queue]
                 remaining = deadline - time.time()
                 if remaining <= 0:
@@ -302,6 +304,7 @@ class Store:
                 LOG.warning("ack for unknown tracker event tracker_id=%s event_id=%s", tracker_id, event_id)
                 return False
             queue.pop(event_id, None)
+            LOG.info("acked tracker event tracker_id=%s event_id=%s remaining=%s", tracker_id, event_id, len(queue))
             if not queue:
                 self.tracker_events.pop(tracker_id, None)
             self._persist_locked()
@@ -449,6 +452,7 @@ def make_handler(store=None, token=None, auth_required=None):
                 if not store.has_tracker(body["source_tracker_id"]) or not store.has_tracker(body["target_tracker_id"]):
                     return self._json(404, {"error": "tracker_not_found", "message": "source or target tracker not registered"})
                 event = store.enqueue_tracker_event(body["target_tracker_id"], body["event_type"], body["source_tracker_id"], body["payload"])
+                LOG.info("accepted tracker event event_id=%s type=%s source=%s target=%s", event["event_id"], body["event_type"], body["source_tracker_id"], body["target_tracker_id"])
                 return self._json(202, {"ok": True, "event_id": event["event_id"]})
             if parts == ["messages"]:
                 if not body.get("message") and not body.get("attachments"):

@@ -92,5 +92,12 @@ class TestState(unittest.TestCase):
             "agent_id": "id-1", "name": "agent1", "aliases": [], "status": "idle", "agent_type": "unknown", "agent_cmd": "unknown"
         }])
 
+    def test_get_agents_for_registry_skips_no_registry_agents(self):
+        state.set_agent("agent1", {"agent_id": "id-1", "status": "idle", "no_registry": True})
+        state.set_agent("agent2", {"agent_id": "id-2", "status": "working"})
+        self.assertEqual(state.get_agents_for_registry(), [{
+            "agent_id": "id-2", "name": "agent2", "aliases": [], "status": "working", "agent_type": "unknown", "agent_cmd": "unknown"
+        }])
+
 if __name__ == '__main__':
     unittest.main()

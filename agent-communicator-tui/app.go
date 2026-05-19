@@ -57,14 +57,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyCtrlF:
 			return m, switchToAgentPane(m.currentRow())
 		case tea.KeyCtrlP:
-			if m.selected > 0 {
-				m.selected--
+			if len(m.rows) > 0 {
+				m.selected = (m.selected - 1 + len(m.rows)) % len(m.rows)
 				m.selectLatestMessage()
 				return m, m.reloadMessages()
 			}
 		case tea.KeyCtrlN:
-			if m.selected < len(m.rows)-1 {
-				m.selected++
+			if len(m.rows) > 0 {
+				m.selected = (m.selected + 1) % len(m.rows)
 				m.selectLatestMessage()
 				return m, m.reloadMessages()
 			}
@@ -100,18 +100,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.selectLatestMessage()
 			return m, tea.Batch(loadAgents(m.local, m.remote), loadOutboxCmd())
 		case tea.KeyCtrlE:
-			messages := m.displayMessages()
+			messages := m.displayOrderedMessages()
 			if len(messages) > 0 {
 				return m, openMessageInEditor(messages[m.messageSelected])
 			}
 		case tea.KeyRunes:
 			m.messageFocused = false
 			m.composer = append(m.composer, msg.Runes...)
-			m.messageOffset = messageBottomOffset(len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
+			m.messageOffset = 0
 		case tea.KeySpace:
 			m.messageFocused = false
 			m.composer = append(m.composer, ' ')
-			m.messageOffset = messageBottomOffset(len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
+			m.messageOffset = 0
 		}
 	case refreshTick:
 		return m, tea.Batch(loadAgents(m.local, m.remote), loadOutboxCmd(), tickRefresh())
@@ -152,8 +152,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.outbox = appendOrReplaceOutbox(m.outbox, msg.Record)
 			m.appendSentMessage(msg.Row, msg.Record)
 			m.refreshMergedMessages()
-			m.messageSelected = len(m.displayMessages()) - 1
-			m.messageOffset = messageBottomOffset(len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
+			m.selectLatestMessage()
 			if len(m.rows) > 0 {
 				return m, m.reloadMessages()
 			}
@@ -161,7 +160,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case eventsLoaded:
 		if msg.Err == nil {
 			m.eventSeq = msg.Result.LastSeq
-			m.applyReadEvents(msg.Result)
+			m.applyStatusEvents(msg.Result)
 			cmds := []tea.Cmd{waitEvents(m.local, m.eventSeq)}
 			if len(m.rows) > 0 && shouldReloadForEvents(m.ownName, m.rows[m.selected], msg.Result) {
 				cmds = append(cmds, m.reloadMessages())
@@ -193,8 +192,8 @@ func (m model) currentRow() agentRow {
 func conversationKey(row agentRow) string { return rowTarget(row) }
 
 func (m *model) selectLatestMessage() {
-	m.messageSelected = max(0, len(m.displayMessages())-1)
-	m.messageOffset = messageBottomOffset(len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
+	m.messageSelected = 0
+	m.messageOffset = 0
 }
 
 func clampSelectedMessage(selected, count int) int {

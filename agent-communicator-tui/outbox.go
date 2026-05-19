@@ -19,6 +19,8 @@ type outboxRecord struct {
 	TargetAddress string `json:"target_address"`
 	TargetScope   string `json:"target_scope"`
 	Body          string `json:"body"`
+	Delivered     bool   `json:"delivered,omitempty"`
+	Notified      bool   `json:"notified,omitempty"`
 	Read          bool   `json:"read,omitempty"`
 }
 
@@ -118,7 +120,7 @@ func outboxMessage(rec outboxRecord, advanced bool) tracker.Message {
 	if advanced {
 		sender = fallback(rec.Sender, "agent-communicator") + " → " + fallback(rec.TargetDisplay, rec.TargetAddress)
 	}
-	return tracker.Message{Sender: sender, Timestamp: rec.Timestamp, Body: rec.Body, Read: rec.Read, MessageID: rec.ID}
+	return tracker.Message{Sender: sender, Timestamp: rec.Timestamp, Body: rec.Body, Delivered: rec.Delivered, Notified: rec.Notified, Read: rec.Read, MessageID: rec.ID}
 }
 
 func loadOutboxCmd() tea.Cmd {

@@ -20,9 +20,15 @@ class TestRpcHandler(unittest.TestCase):
         state.event_seq = 0
         state.INBOX_DIR = "/tmp/test-agent-inboxes"
 
+    @mock.patch("tmux_util.set_agent_no_registry")
+    @mock.patch("tmux_util.set_agent_no_notify_with_send_keys")
+    @mock.patch("tmux_util.set_agent_cmd")
+    @mock.patch("tmux_util.set_agent_type")
+    @mock.patch("tmux_util.set_agent_name")
+    @mock.patch("tmux_util.set_pane_title")
     @mock.patch("tmux_util.set_agent_uuid")
     @mock.patch("tmux_util.set_agent_id")
-    def test_register_same_agent_id_preserves_runtime_state(self, _set_agent_id, _set_agent_uuid):
+    def test_register_same_agent_id_preserves_runtime_state(self, _set_agent_id, _set_agent_uuid, _set_pane_title, _set_agent_name, _set_agent_type, _set_agent_cmd, _set_agent_no_notify, _set_agent_no_registry):
         state.set_agent(
             "agent1",
             {
@@ -64,10 +70,14 @@ class TestRpcHandler(unittest.TestCase):
         self.assertEqual(info["tmux_pane"], "%2")
         self.assertEqual(info["tmux_socket"], "new-sock")
         self.assertEqual(info["wrapper_pid"], 222)
+        self.assertFalse(info.get("no_notify_with_send_keys", False))
+        self.assertFalse(info.get("no_registry", False))
         self.assertIn("last_heartbeat", info)
         self.assertEqual(len(state.state), 1)
 
     @mock.patch("tmux_util.set_pane_title")
+    @mock.patch("tmux_util.set_agent_no_registry")
+    @mock.patch("tmux_util.set_agent_no_notify_with_send_keys")
     @mock.patch("tmux_util.set_agent_cmd")
     @mock.patch("tmux_util.set_agent_type")
     @mock.patch("tmux_util.set_agent_name")
@@ -80,6 +90,8 @@ class TestRpcHandler(unittest.TestCase):
         set_agent_name,
         set_agent_type,
         set_agent_cmd,
+        set_agent_no_notify,
+        set_agent_no_registry,
         set_pane_title,
     ):
         name = rpc_handler.handle_register(
@@ -101,9 +113,55 @@ class TestRpcHandler(unittest.TestCase):
         set_agent_name.assert_called_once_with("%9", "agent9", "sock")
         set_agent_type.assert_called_once_with("%9", "pi", "sock")
         set_agent_cmd.assert_called_once_with("%9", "pi", "sock")
+        set_agent_no_notify.assert_called_once_with("%9", False, "sock")
+        set_agent_no_registry.assert_called_once_with("%9", False, "sock")
         set_pane_title.assert_called_once_with("%9", "agent9", "sock")
 
+    @mock.patch("tmux_util.set_pane_title")
+    @mock.patch("tmux_util.set_agent_no_registry")
+    @mock.patch("tmux_util.set_agent_no_notify_with_send_keys")
+    @mock.patch("tmux_util.set_agent_cmd")
+    @mock.patch("tmux_util.set_agent_type")
+    @mock.patch("tmux_util.set_agent_name")
+    @mock.patch("tmux_util.set_agent_uuid")
+    @mock.patch("tmux_util.set_agent_id")
+    def test_register_stores_no_registry_and_no_notify_flags(
+        self,
+        _set_agent_id,
+        _set_agent_uuid,
+        _set_agent_name,
+        _set_agent_type,
+        _set_agent_cmd,
+        set_agent_no_notify,
+        set_agent_no_registry,
+        _set_pane_title,
+    ):
+        name = rpc_handler.handle_register({
+            "session": "sess",
+            "tmux_pane": "%9",
+            "wrapper_pid": 999,
+            "tmux_socket": "sock",
+            "name": "agent9",
+            "agent_type": "pi",
+            "agent_cmd": "pi",
+            "agent_id": "id-9",
+            "no_notify_with_send_keys": True,
+            "no_registry": True,
+        })
+        self.assertEqual(name, "agent9")
+        info = state.get_agent("agent9")
+        self.assertTrue(info["no_notify_with_send_keys"])
+        self.assertTrue(info["no_registry"])
+        set_agent_no_notify.assert_called_once_with("%9", True, "sock")
+        set_agent_no_registry.assert_called_once_with("%9", True, "sock")
+
     @mock.patch("rpc_handler.time.time", return_value=123.0)
+    @mock.patch("tmux_util.set_agent_no_registry")
+    @mock.patch("tmux_util.set_agent_no_notify_with_send_keys")
+    @mock.patch("tmux_util.set_agent_cmd")
+    @mock.patch("tmux_util.set_agent_type")
+    @mock.patch("tmux_util.set_agent_name")
+    @mock.patch("tmux_util.set_pane_title")
     @mock.patch("tmux_util.set_agent_uuid")
     @mock.patch("tmux_util.set_agent_id")
     @mock.patch("state.discover_agent_process", return_value=None)
@@ -115,6 +173,8 @@ class TestRpcHandler(unittest.TestCase):
         "agent_uuid": "id-1",
         "agent_type": "pi",
         "agent_cmd": "pi",
+        "no_notify_with_send_keys": True,
+        "no_registry": True,
         "pane_active": False,
     }])
     def test_register_clears_recovered_at_after_recovery(
@@ -124,11 +184,19 @@ class TestRpcHandler(unittest.TestCase):
         _discover_agent_process,
         _set_agent_id,
         _set_agent_uuid,
+        _set_pane_title,
+        _set_agent_name,
+        _set_agent_type,
+        _set_agent_cmd,
+        _set_agent_no_notify,
+        _set_agent_no_registry,
         _time,
     ):
         state.init_state()
         recovered = state.get_agent("agent1")
         self.assertEqual(recovered["status"], "unknown")
+        self.assertTrue(recovered["no_notify_with_send_keys"])
+        self.assertTrue(recovered["no_registry"])
         self.assertIsNotNone(recovered["recovered_at"])
 
         rpc_handler.handle_register(
@@ -148,6 +216,8 @@ class TestRpcHandler(unittest.TestCase):
         self.assertEqual(info["tmux_pane"], "%2")
         self.assertEqual(info["wrapper_pid"], 222)
         self.assertEqual(info["last_heartbeat"], 123.0)
+        self.assertFalse(info["no_notify_with_send_keys"])
+        self.assertFalse(info["no_registry"])
         self.assertIsNone(info["recovered_at"])
 
     @mock.patch("rpc_handler.time.time", return_value=456.0)
@@ -250,7 +320,7 @@ class TestRpcHandler(unittest.TestCase):
                 rpc_handler.handle_send_message({"agent_id": "id-1", "message": "hello", "sender_name": "tester"})
             )
             info = state.get_agent("agent1")
-            self.assertEqual(info["pending_notifications"], ["tester"])
+            self.assertEqual(info["pending_notifications"], [{"sender": "tester", "message_id": None}])
             with open(inbox_path, "r") as f:
                 message = json.loads(f.readline())
             timestamp = datetime.datetime.fromisoformat(message["timestamp"])
@@ -309,13 +379,43 @@ class TestRpcHandler(unittest.TestCase):
             })
 
             result = rpc_handler.handle_wait_events({"since": 0, "timeout": 0})
-            self.assertEqual(len(result["events"]), 1)
+            self.assertEqual(len(result["events"]), 2)
             event = result["events"][0]
             self.assertEqual(event["type"], "message_delivered")
             self.assertEqual(event["target_agent_id"], "receiver-id")
             self.assertEqual(event["target_agent_name"], "receiver")
             self.assertEqual(event["sender"], "sender-agent")
             self.assertEqual(event["message_id"], "msg-1")
+            self.assertEqual(result["events"][1]["type"], "message_notified")
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
+    @mock.patch("tmux_util.send_keys")
+    def test_deliver_local_message_publishes_notified_event_when_idle(self, _send_keys):
+        inbox_path = os.path.join(state.INBOX_DIR, "receiver-id.inbox")
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent("receiver", {
+                "agent_id": "receiver-id",
+                "uuid": "receiver-id",
+                "tmux_pane": "%1",
+                "tmux_socket": "sock",
+                "status": "idle",
+            })
+
+            rpc_handler.deliver_local_message("receiver", {
+                "sender": "sender-agent",
+                "timestamp": "now",
+                "message": "hello",
+                "read": False,
+                "message_id": "msg-1",
+            })
+
+            result = rpc_handler.handle_wait_events({"since": 0, "timeout": 0})
+            self.assertEqual([event["type"] for event in result["events"]], ["message_delivered", "message_notified"])
+            self.assertEqual(result["events"][1]["message_id"], "msg-1")
         finally:
             if os.path.exists(inbox_path):
                 os.remove(inbox_path)
@@ -605,7 +705,7 @@ class TestRpcHandler(unittest.TestCase):
             )
 
             info = state.get_agent("agent1")
-            self.assertEqual(info["pending_notifications"], ["alice", "bob"])
+            self.assertEqual(info["pending_notifications"], [{"sender": "alice", "message_id": None}, {"sender": "bob", "message_id": None}])
             send_keys.assert_not_called()
 
             rpc_handler.handle_update_agent({"agent_name": "agent1", "status": "idle"})

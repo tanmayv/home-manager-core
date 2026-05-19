@@ -34,16 +34,35 @@ func messageIDExists(messages []tracker.Message, id string) bool {
 	return false
 }
 
-func (m *model) applyReadEvents(result tracker.WaitEventsResult) {
+func (m *model) applyStatusEvents(result tracker.WaitEventsResult) {
 	changed := false
 	for _, event := range result.Events {
-		if event.Type != "message_read" || event.Sender != m.ownName || event.MessageID == "" {
+		if event.Sender != m.ownName || event.MessageID == "" {
 			continue
 		}
 		for i := range m.outbox {
-			if m.outbox[i].ID == event.MessageID && !m.outbox[i].Read {
-				m.outbox[i].Read = true
-				changed = true
+			if m.outbox[i].ID != event.MessageID {
+				continue
+			}
+			switch event.Type {
+			case "message_delivered":
+				if !m.outbox[i].Delivered {
+					m.outbox[i].Delivered = true
+					changed = true
+				}
+			case "message_notified":
+				if !m.outbox[i].Notified {
+					m.outbox[i].Delivered = true
+					m.outbox[i].Notified = true
+					changed = true
+				}
+			case "message_read":
+				if !m.outbox[i].Read {
+					m.outbox[i].Delivered = true
+					m.outbox[i].Notified = true
+					m.outbox[i].Read = true
+					changed = true
+				}
 			}
 		}
 	}

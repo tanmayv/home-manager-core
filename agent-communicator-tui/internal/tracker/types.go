@@ -31,6 +31,8 @@ type Message struct {
 	Body        string       `json:"message"`
 	ContentType string       `json:"content_type,omitempty"`
 	Attachments []Attachment `json:"attachments,omitempty"`
+	Delivered   bool         `json:"delivered,omitempty"`
+	Notified    bool         `json:"notified,omitempty"`
 	Read        bool         `json:"read"`
 	MessageID   string       `json:"message_id,omitempty"`
 }

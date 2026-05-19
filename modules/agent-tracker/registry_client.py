@@ -320,9 +320,11 @@ def _ack(client, message_id):
 
 
 def publish_tracker_event(target_tracker_id, event_type, payload):
+    LOG.info("publish_tracker_event target_tracker_id=%s event_type=%s payload=%s", target_tracker_id, event_type, payload)
     if target_tracker_id == TRACKER_ID:
         if event_type == "message_read":
             sender_name = state.get_agent_name_by_id(payload.get("sender_agent_id")) or payload.get("sender_agent_id") or "unknown"
+            LOG.info("publish_tracker_event local fast-path sender=%s message_id=%s", sender_name, payload.get("message_id"))
             state.publish_event("message_read", {
                 "target_agent_id": payload.get("reader_agent_id"),
                 "target_agent_name": payload.get("reader_agent_name"),
@@ -346,12 +348,15 @@ def _event_loop(client=None):
     while True:
         status, body = (fetch_events() if client is None else client.fetch_events())
         if status != 200:
+            LOG.debug("tracker event poll status=%s body=%s client=%s", status, body, None if client is None else client.name)
             time.sleep(2)
             continue
         for event in (body or {}).get("events") or []:
+            LOG.info("tracker event received client=%s event=%s", None if client is None else client.name, event)
             if event.get("event_type") == "message_read":
                 payload = event.get("payload") or {}
                 sender_name = state.get_agent_name_by_id(payload.get("sender_agent_id")) or payload.get("sender_agent_id") or "unknown"
+                LOG.info("mapping remote message_read sender=%s message_id=%s reader=%s", sender_name, payload.get("message_id"), payload.get("reader_agent_name"))
                 state.publish_event("message_read", {
                     "target_agent_id": payload.get("reader_agent_id"),
                     "target_agent_name": payload.get("reader_agent_name"),
@@ -383,6 +388,7 @@ def _delivery_loop(client=None):
         from rpc_handler import deliver_local_message, DeliveryTargetNotFound, DeliveryValidationError
         for delivery in deliveries:
             try:
+                LOG.info("delivering queued registry message message_id=%s sender_agent_id=%s sender_tracker_id=%s target_agent_id=%s", delivery.get("message_id"), delivery.get("sender_agent_id"), delivery.get("sender_tracker_id"), delivery.get("target_agent_id"))
                 deliver_local_message(
                     delivery["target_agent_id"],
                     {
