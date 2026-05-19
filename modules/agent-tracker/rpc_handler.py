@@ -153,12 +153,21 @@ def _is_agent_waiting(info: dict) -> bool:
 def _publish_message_notified(info: dict, agent_name: str, pending_item):
     sender_name = pending_item.get("sender") if isinstance(pending_item, dict) else pending_item
     message_id = pending_item.get("message_id") if isinstance(pending_item, dict) else None
+    sender_agent_id = pending_item.get("sender_agent_id") if isinstance(pending_item, dict) else None
+    sender_tracker_id = pending_item.get("sender_tracker_id") if isinstance(pending_item, dict) else None
     state.publish_event("message_notified", {
         "target_agent_id": info.get("agent_id"),
         "target_agent_name": agent_name,
         "sender": sender_name or "unknown",
         "message_id": message_id,
     })
+    if sender_tracker_id and sender_tracker_id != registry_client.TRACKER_ID:
+        registry_client.publish_tracker_event(sender_tracker_id, "message_notified", {
+            "message_id": message_id,
+            "sender_agent_id": sender_agent_id,
+            "receiver_agent_id": info.get("agent_id"),
+            "receiver_agent_name": agent_name,
+        })
 
 
 def _flush_notifications(agent_name: str):
@@ -384,8 +393,20 @@ def deliver_local_message(target_name_or_id: str, msg_obj: dict, notify_sender: 
             "has_attachments": bool(msg_obj.get("attachments")),
         }
         state.publish_event("message_delivered", notification)
+        if msg_obj.get("sender_tracker_id") and msg_obj.get("sender_tracker_id") != registry_client.TRACKER_ID:
+            registry_client.publish_tracker_event(msg_obj.get("sender_tracker_id"), "message_delivered", {
+                "message_id": msg_obj.get("message_id"),
+                "sender_agent_id": msg_obj.get("sender_agent_id"),
+                "receiver_agent_id": info.get("agent_id"),
+                "receiver_agent_name": current_name,
+            })
 
-        pending_item = {"sender": notify_sender, "message_id": msg_obj.get("message_id")}
+        pending_item = {
+            "sender": notify_sender,
+            "message_id": msg_obj.get("message_id"),
+            "sender_agent_id": msg_obj.get("sender_agent_id"),
+            "sender_tracker_id": msg_obj.get("sender_tracker_id"),
+        }
         if info.get("no_notify_with_send_keys", False):
             logging.info(f"Skipping tmux send-keys notification for {current_name} from {notify_sender}")
         elif _is_agent_waiting(info):
@@ -529,7 +550,7 @@ def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None
                     "sender": msg.get("sender", "unknown"),
                     "message_id": msg.get("message_id"),
                 })
-                if msg.get("sender_tracker_id"):
+                if msg.get("sender_tracker_id") and msg.get("sender_tracker_id") != registry_client.TRACKER_ID:
                     logging.info("relaying remote message_read back to sender_tracker_id=%s message_id=%s reader=%s", msg.get("sender_tracker_id"), msg.get("message_id"), agent_name)
                     registry_client.publish_tracker_event(msg.get("sender_tracker_id"), "message_read", {
                         "message_id": msg.get("message_id"),

@@ -320,7 +320,7 @@ class TestRpcHandler(unittest.TestCase):
                 rpc_handler.handle_send_message({"agent_id": "id-1", "message": "hello", "sender_name": "tester"})
             )
             info = state.get_agent("agent1")
-            self.assertEqual(info["pending_notifications"], [{"sender": "tester", "message_id": None}])
+            self.assertEqual(info["pending_notifications"], [{"sender": "tester", "message_id": None, "sender_agent_id": None, "sender_tracker_id": registry_client.TRACKER_ID}])
             with open(inbox_path, "r") as f:
                 message = json.loads(f.readline())
             timestamp = datetime.datetime.fromisoformat(message["timestamp"])
@@ -416,6 +416,47 @@ class TestRpcHandler(unittest.TestCase):
             result = rpc_handler.handle_wait_events({"since": 0, "timeout": 0})
             self.assertEqual([event["type"] for event in result["events"]], ["message_delivered", "message_notified"])
             self.assertEqual(result["events"][1]["message_id"], "msg-1")
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
+    @mock.patch("registry_client.publish_tracker_event")
+    @mock.patch("tmux_util.send_keys")
+    def test_deliver_local_message_relays_remote_delivered_and_notified(self, _send_keys, publish_tracker_event):
+        inbox_path = os.path.join(state.INBOX_DIR, "receiver-id.inbox")
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent("receiver", {
+                "agent_id": "receiver-id",
+                "uuid": "receiver-id",
+                "tmux_pane": "%1",
+                "tmux_socket": "sock",
+                "status": "idle",
+            })
+
+            rpc_handler.deliver_local_message("receiver", {
+                "sender": "sender-agent (via host)",
+                "timestamp": "now",
+                "message": "hello",
+                "read": False,
+                "message_id": "msg-1",
+                "sender_agent_id": "sender-id",
+                "sender_tracker_id": "tracker-1",
+            })
+
+            publish_tracker_event.assert_any_call("tracker-1", "message_delivered", {
+                "message_id": "msg-1",
+                "sender_agent_id": "sender-id",
+                "receiver_agent_id": "receiver-id",
+                "receiver_agent_name": "receiver",
+            })
+            publish_tracker_event.assert_any_call("tracker-1", "message_notified", {
+                "message_id": "msg-1",
+                "sender_agent_id": "sender-id",
+                "receiver_agent_id": "receiver-id",
+                "receiver_agent_name": "receiver",
+            })
         finally:
             if os.path.exists(inbox_path):
                 os.remove(inbox_path)
@@ -705,7 +746,10 @@ class TestRpcHandler(unittest.TestCase):
             )
 
             info = state.get_agent("agent1")
-            self.assertEqual(info["pending_notifications"], [{"sender": "alice", "message_id": None}, {"sender": "bob", "message_id": None}])
+            self.assertEqual(info["pending_notifications"], [
+                {"sender": "alice", "message_id": None, "sender_agent_id": None, "sender_tracker_id": registry_client.TRACKER_ID},
+                {"sender": "bob", "message_id": None, "sender_agent_id": None, "sender_tracker_id": registry_client.TRACKER_ID},
+            ])
             send_keys.assert_not_called()
 
             rpc_handler.handle_update_agent({"agent_name": "agent1", "status": "idle"})

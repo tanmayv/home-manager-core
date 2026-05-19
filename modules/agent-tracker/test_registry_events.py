@@ -26,6 +26,21 @@ class TestRegistryEvents(unittest.TestCase):
         publish.assert_called_once_with("message_read", {"target_agent_id": "r1", "target_agent_name": "remote", "sender": "agent-communicator", "message_id": "m1"})
         ack.assert_called_once_with("e1")
 
+    def test_event_loop_publishes_remote_delivered_and_notified(self):
+        events = [
+            {"event_id": "e1", "event_type": "message_delivered", "payload": {"message_id": "m1", "sender_agent_id": "s1", "receiver_agent_id": "r1", "receiver_agent_name": "remote"}},
+            {"event_id": "e2", "event_type": "message_notified", "payload": {"message_id": "m1", "sender_agent_id": "s1", "receiver_agent_id": "r1", "receiver_agent_name": "remote"}},
+        ]
+        state.set_agent("agent-communicator", {"agent_id": "s1"})
+        with mock.patch.object(registry_client, "fetch_events", side_effect=[(200, {"events": events}), SystemExit]), \
+             mock.patch.object(registry_client, "ack_event", return_value=200) as ack, \
+             mock.patch.object(state, "publish_event") as publish:
+            with self.assertRaises(SystemExit):
+                registry_client._event_loop()
+        publish.assert_any_call("message_delivered", {"target_agent_id": "r1", "target_agent_name": "remote", "sender": "agent-communicator", "message_id": "m1"})
+        publish.assert_any_call("message_notified", {"target_agent_id": "r1", "target_agent_name": "remote", "sender": "agent-communicator", "message_id": "m1"})
+        self.assertEqual(ack.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

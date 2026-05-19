@@ -319,18 +319,25 @@ def _ack(client, message_id):
     return ack_delivery(message_id) if client is None else client.ack_delivery(message_id)
 
 
+def _local_tracker_event_payload(event_type, payload):
+    sender_name = state.get_agent_name_by_id(payload.get("sender_agent_id")) or payload.get("sender_agent_id") or "unknown"
+    target_agent_id = payload.get("reader_agent_id") or payload.get("receiver_agent_id")
+    target_agent_name = payload.get("reader_agent_name") or payload.get("receiver_agent_name")
+    return sender_name, {
+        "target_agent_id": target_agent_id,
+        "target_agent_name": target_agent_name,
+        "sender": sender_name,
+        "message_id": payload.get("message_id"),
+    }
+
+
 def publish_tracker_event(target_tracker_id, event_type, payload):
     LOG.info("publish_tracker_event target_tracker_id=%s event_type=%s payload=%s", target_tracker_id, event_type, payload)
     if target_tracker_id == TRACKER_ID:
-        if event_type == "message_read":
-            sender_name = state.get_agent_name_by_id(payload.get("sender_agent_id")) or payload.get("sender_agent_id") or "unknown"
-            LOG.info("publish_tracker_event local fast-path sender=%s message_id=%s", sender_name, payload.get("message_id"))
-            state.publish_event("message_read", {
-                "target_agent_id": payload.get("reader_agent_id"),
-                "target_agent_name": payload.get("reader_agent_name"),
-                "sender": sender_name,
-                "message_id": payload.get("message_id"),
-            })
+        if event_type in {"message_delivered", "message_notified", "message_read"}:
+            sender_name, local_payload = _local_tracker_event_payload(event_type, payload)
+            LOG.info("publish_tracker_event local fast-path type=%s sender=%s message_id=%s", event_type, sender_name, payload.get("message_id"))
+            state.publish_event(event_type, local_payload)
         else:
             state.publish_event(event_type, payload)
         return 200
@@ -353,16 +360,11 @@ def _event_loop(client=None):
             continue
         for event in (body or {}).get("events") or []:
             LOG.info("tracker event received client=%s event=%s", None if client is None else client.name, event)
-            if event.get("event_type") == "message_read":
+            if event.get("event_type") in {"message_delivered", "message_notified", "message_read"}:
                 payload = event.get("payload") or {}
-                sender_name = state.get_agent_name_by_id(payload.get("sender_agent_id")) or payload.get("sender_agent_id") or "unknown"
-                LOG.info("mapping remote message_read sender=%s message_id=%s reader=%s", sender_name, payload.get("message_id"), payload.get("reader_agent_name"))
-                state.publish_event("message_read", {
-                    "target_agent_id": payload.get("reader_agent_id"),
-                    "target_agent_name": payload.get("reader_agent_name"),
-                    "sender": sender_name,
-                    "message_id": payload.get("message_id"),
-                })
+                sender_name, local_payload = _local_tracker_event_payload(event.get("event_type"), payload)
+                LOG.info("mapping remote %s sender=%s message_id=%s target=%s", event.get("event_type"), sender_name, payload.get("message_id"), local_payload.get("target_agent_name"))
+                state.publish_event(event.get("event_type"), local_payload)
             ack = ack_event(event.get("event_id")) if client is None else client.ack_event(event.get("event_id"))
             if ack != 200:
                 LOG.warning("failed to ack tracker event event_id=%s status=%s", event.get("event_id"), ack)
