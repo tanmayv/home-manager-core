@@ -93,8 +93,9 @@ To update, simply run `nix flake update` in your personal repository.
 
 | Option | Description | Default |
 | :--- | :--- | :--- |
-| `registry-url` | Optional agent registry base URL. When `null`, the tracker stays local-only. | `null` |
-| `registry-auth` | Sends Bearer auth to the registry and requires `registry-token-file`. | `false` |
+| `registry-url` | Optional single agent registry base URL. When `null`, the tracker stays local-only unless `registries` is set. Ignored for sync/discovery when `registries` is non-empty. | `null` |
+| `registries` | Optional list of registry entries (`{ name, url, token-file ? null }`) for multi-registry discovery/sync. When non-empty, all listed registries are used. `token-file` is read at runtime and used as a Bearer token for that registry. | `[]` |
+| `registry-auth` | Sends Bearer auth to the single `registry-url` registry and requires `registry-token-file`. | `false` |
 | `registry-token-file` | User-readable file containing the shared Bearer token for registry auth. | `null` |
 | `http-port` | Local HTTP sidecar port used for observer and registry delivery. | `19876` |
 | `registry-heartbeat-seconds` | How often the tracker heartbeats to the registry. | `30` |
@@ -112,6 +113,7 @@ To update, simply run `nix flake update` in your personal repository.
 | `enable_agent_knowledge` | Enables the agent knowledge section in `GEMINI.md`, instructing agents to use the knowledge directory. | Agents do not receive explicit instructions about the knowledge directory. |
 | `enable_ai_ssa_creator_skill` | Links the `ai-ssa-creator` skill to `~/.gemini/skills/`. | The skill is unavailable to agents. |
 | `enable_tmux_based_agent_comms` | Installs communication scripts (`iamdone`, `waiting`, `send-message-to-agent`), shows `@agent_name` in pane titles, and wraps CLI tools with `agent-wrapper`. | Inter-agent communication tools are not installed, pane titles are standard, and raw CLI binaries are used. |
+| `enable_agent_communicator` | Installs `agent-communicator-tui` and an `agent-communicator` launcher that runs it through `agent-wrapper` with `--no-notify-with-send-keys`, giving the TUI its own inbox without tmux key injection. Requires `enable_tmux_based_agent_comms`. | The communicator TUI and launcher are not installed. |
 
 ---
 

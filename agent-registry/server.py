@@ -31,6 +31,7 @@ class Store:
         self.trackers = {}
         self.agents = {}
         self.deliveries = {}
+        self.tracker_events = {}
         self.lock = threading.RLock()
         self.cv = threading.Condition(self.lock)
         self._load_locked()
@@ -51,6 +52,11 @@ class Store:
             self.deliveries = {
                 tracker_id: {item["message_id"]: item for item in queue}
                 for tracker_id, queue in (data.get("deliveries") or {}).items()
+                if isinstance(queue, list)
+            }
+            self.tracker_events = {
+                tracker_id: {item["event_id"]: item for item in queue}
+                for tracker_id, queue in (data.get("tracker_events") or {}).items()
                 if isinstance(queue, list)
             }
             LOG.info(
@@ -76,6 +82,10 @@ class Store:
                     "deliveries": {
                         tracker_id: sorted(queue.values(), key=lambda item: item.get("queued_at", 0))
                         for tracker_id, queue in self.deliveries.items()
+                    },
+                    "tracker_events": {
+                        tracker_id: sorted(queue.values(), key=lambda item: item.get("created_at", 0))
+                        for tracker_id, queue in self.tracker_events.items()
                     },
                 },
                 f,
@@ -116,6 +126,14 @@ class Store:
             if deliveries != self.deliveries:
                 self.deliveries = deliveries
                 changed = True
+            tracker_events = {
+                tracker_id: queue
+                for tracker_id, queue in self.tracker_events.items()
+                if self.trackers.get(tracker_id, {}).get("status") != "gone"
+            }
+            if tracker_events != self.tracker_events:
+                self.tracker_events = tracker_events
+                changed = True
             if changed:
                 LOG.info("registry sweep updated state trackers=%s agents=%s queued_trackers=%s", len(self.trackers), len(self.agents), len(self.deliveries))
                 self._persist_locked()
@@ -146,6 +164,7 @@ class Store:
                 self.trackers.pop(existing, None)
                 self.agents = {k: v for k, v in self.agents.items() if v["tracker_id"] != existing}
                 self.deliveries.pop(existing, None)
+                self.tracker_events.pop(existing, None)
             created = body["tracker_id"] not in self.trackers
             self.trackers[body["tracker_id"]] = {
                 "tracker_id": body["tracker_id"],
@@ -157,6 +176,7 @@ class Store:
             }
             self._replace_agents_locked(body["tracker_id"], body.get("agents", []))
             self.deliveries.setdefault(body["tracker_id"], {})
+            self.tracker_events.setdefault(body["tracker_id"], {})
             self._persist_locked()
             self.cv.notify_all()
             LOG.info(
@@ -248,6 +268,45 @@ class Store:
             LOG.info("acked delivery tracker_id=%s message_id=%s remaining=%s", tracker_id, message_id, len(self.deliveries.get(tracker_id, {})))
             return True
 
+    def enqueue_tracker_event(self, target_tracker_id, event_type, source_tracker_id, payload):
+        entry = {
+            "event_id": str(uuid.uuid4()),
+            "event_type": event_type,
+            "source_tracker_id": source_tracker_id,
+            "target_tracker_id": target_tracker_id,
+            "payload": payload or {},
+            "created_at": time.time(),
+        }
+        with self.cv:
+            self.tracker_events.setdefault(target_tracker_id, {})[entry["event_id"]] = entry
+            self._persist_locked()
+            self.cv.notify_all()
+            return entry
+
+    def wait_for_tracker_events(self, tracker_id, timeout):
+        deadline = time.time() + max(timeout, 0)
+        with self.cv:
+            while True:
+                queue = sorted(self.tracker_events.get(tracker_id, {}).values(), key=lambda item: item.get("created_at", 0))
+                if queue:
+                    return [dict(item) for item in queue]
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    return []
+                self.cv.wait(timeout=remaining)
+
+    def ack_tracker_event(self, tracker_id, event_id):
+        with self.cv:
+            queue = self.tracker_events.get(tracker_id)
+            if not queue or event_id not in queue:
+                LOG.warning("ack for unknown tracker event tracker_id=%s event_id=%s", tracker_id, event_id)
+                return False
+            queue.pop(event_id, None)
+            if not queue:
+                self.tracker_events.pop(tracker_id, None)
+            self._persist_locked()
+            return True
+
 
 def _validate_attachments(body):
     seen_names = set()
@@ -332,6 +391,12 @@ def make_handler(store=None, token=None, auth_required=None):
                     return self._json(404, {"error": "tracker_not_found", "message": "tracker not registered; call POST /trackers first"})
                 wait = min(max(int((query.get("wait") or [DELIVERY_WAIT_SECONDS])[0]), 0), DELIVERY_WAIT_SECONDS)
                 return self._json(200, {"deliveries": store.wait_for_deliveries(tracker_id, wait)})
+            if len(parts) == 3 and parts[0] == "trackers" and parts[2] == "events":
+                tracker_id = parts[1]
+                if not store.has_tracker(tracker_id):
+                    return self._json(404, {"error": "tracker_not_found", "message": "tracker not registered; call POST /trackers first"})
+                wait = min(max(int((query.get("wait") or [DELIVERY_WAIT_SECONDS])[0]), 0), DELIVERY_WAIT_SECONDS)
+                return self._json(200, {"events": store.wait_for_tracker_events(tracker_id, wait)})
             self._json(404, {"error": "not_found", "message": "no such endpoint"})
 
         def do_POST(self):
@@ -370,6 +435,21 @@ def make_handler(store=None, token=None, auth_required=None):
                 if store.ack_delivery(tracker_id, message_id):
                     return self._json(200, {"ok": True})
                 return self._json(404, {"error": "delivery_not_found", "message": "no queued delivery with that message_id"})
+            if len(parts) == 5 and parts[0] == "trackers" and parts[2] == "events" and parts[4] == "ack":
+                tracker_id, event_id = parts[1], parts[3]
+                if not store.has_tracker(tracker_id):
+                    return self._json(404, {"error": "tracker_not_found", "message": "tracker not registered; call POST /trackers first"})
+                if store.ack_tracker_event(tracker_id, event_id):
+                    return self._json(200, {"ok": True})
+                return self._json(404, {"error": "event_not_found", "message": "no queued event with that event_id"})
+            if parts == ["tracker-events"]:
+                required = {"event_type", "source_tracker_id", "target_tracker_id", "payload"}
+                if not required.issubset(body) or not isinstance(body.get("payload"), dict):
+                    return self._json(400, {"error": "invalid_request", "message": "event_type, source_tracker_id, target_tracker_id, payload object are required"})
+                if not store.has_tracker(body["source_tracker_id"]) or not store.has_tracker(body["target_tracker_id"]):
+                    return self._json(404, {"error": "tracker_not_found", "message": "source or target tracker not registered"})
+                event = store.enqueue_tracker_event(body["target_tracker_id"], body["event_type"], body["source_tracker_id"], body["payload"])
+                return self._json(202, {"ok": True, "event_id": event["event_id"]})
             if parts == ["messages"]:
                 if not body.get("message") and not body.get("attachments"):
                     return self._json(400, {"error": "invalid_request", "message": "message text or attachments are required"})
@@ -399,6 +479,9 @@ def make_handler(store=None, token=None, auth_required=None):
                     "sender_tracker": (store.get_tracker(body.get("sender_tracker_id")) or {}).get("hostname", body.get("sender_tracker_id")),
                     "message": body.get("message"),
                     "attachments": body.get("attachments"),
+                    "sender_agent_id": body.get("sender_agent_id"),
+                    "sender_tracker_id": body.get("sender_tracker_id"),
+                    "message_id": body.get("message_id"),
                     "sent_at": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()),
                 })
                 return self._json(202, {"ok": True, "queued": True, "message_id": entry["message_id"], "target_agent_id": target["agent_id"], "target_name": target["name"], "target_tracker": target["hostname"]})

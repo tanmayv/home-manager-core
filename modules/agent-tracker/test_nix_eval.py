@@ -74,6 +74,49 @@ in builtins.toJSON {{
         self.assertEqual(data["httpPort"], 29876)
         self.assertEqual(data["registryHeartbeatSeconds"], 45)
 
+    def test_agent_tracker_user_settings_multiple_registries_evaluate(self):
+        repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        expr = f'''
+let
+  flake = builtins.getFlake "path:{repo}";
+  system = builtins.currentSystem;
+  pkgs = import flake.inputs.nixpkgs {{ inherit system; }};
+  hm = flake.inputs.home-manager;
+  cfg = hm.lib.homeManagerConfiguration {{
+    inherit pkgs;
+    modules = [
+      ({{ lib, ... }}: {{
+        options.programs.tmux.statusBar.extraLines = lib.mkOption {{ type = lib.types.listOf lib.types.anything; default = []; }};
+      }})
+      {repo}/modules/agent-tracker/default.nix
+      {{ home.username = "u"; home.homeDirectory = "/tmp/u"; home.stateVersion = "24.05"; }}
+    ];
+    extraSpecialArgs = {{
+      userSettings = {{
+        enable-agent-tracker = true;
+        agent-tracker = {{
+          registry-url = "https://legacy.example";
+          registries = [
+            {{ name = "corp"; url = "https://corp.example"; token-file = "/tmp/corp-token"; }}
+            {{ name = "lab"; url = "https://lab.example"; }}
+          ];
+        }};
+      }};
+    }};
+  }};
+in builtins.toJSON {{
+  registryUrl = cfg.config.services.agent-tracker.registryUrl;
+  registries = cfg.config.services.agent-tracker.registries;
+}}
+'''
+        out = subprocess.check_output(["nix", "eval", "--impure", "--raw", "--expr", expr], text=True).strip()
+        data = json.loads(out)
+        self.assertEqual(data["registryUrl"], "https://legacy.example")
+        self.assertEqual(data["registries"], [
+            {"name": "corp", "token-file": "/tmp/corp-token", "url": "https://corp.example"},
+            {"name": "lab", "token-file": None, "url": "https://lab.example"},
+        ])
+
     def test_darwin_launchd_agent_is_run_at_load_without_keepalive_loop(self):
         repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         expr = f'''

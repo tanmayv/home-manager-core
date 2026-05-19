@@ -16,6 +16,10 @@ state = {}  # keyed by stable agent_id
 name_index = {}  # agent_name/alias -> agent_id
 pane_index = {}  # tmux pane id -> agent_id
 state_lock = threading.Lock()
+event_lock = threading.Condition()
+events = []
+event_seq = 0
+MAX_EVENTS = 200
 
 TRANSIENT_COMMS = {
     "ps", "grep", "pgrep", "ls", "cat", "sleep", "which", "sh", "bash", "zsh",
@@ -280,3 +284,49 @@ def get_agents_for_registry() -> list[dict]:
             "agent_type": info.get("agent_type", "unknown"),
             "agent_cmd": info.get("agent_cmd", "unknown"),
         } for agent_id, info in state.items()]
+
+
+def publish_event(event_type: str, payload: dict) -> dict:
+    """Publishes a best-effort in-memory event for live observers such as a TUI."""
+    global event_seq
+    with event_lock:
+        event_seq += 1
+        event = {
+            **payload,
+            "seq": event_seq,
+            "type": event_type,
+            "timestamp": time.time(),
+        }
+        events.append(event)
+        del events[:-MAX_EVENTS]
+        event_lock.notify_all()
+        return event.copy()
+
+
+def wait_events(since: int = 0, timeout: float = 25.0, filters: dict | None = None) -> dict:
+    """Best-effort event long-poll for observers; callers must still read durable inboxes."""
+    deadline = time.time() + max(0.0, min(float(timeout), 30.0))
+    filters = filters or {}
+
+    def event_matches(event: dict) -> bool:
+        target_agent_id = filters.get("target_agent_id")
+        target_agent_name = filters.get("target_agent_name")
+        if target_agent_id and event.get("target_agent_id") != target_agent_id:
+            return False
+        if target_agent_name and event.get("target_agent_name") != target_agent_name:
+            return False
+        return True
+
+    with event_lock:
+        while True:
+            reset = since > event_seq
+            first_seq = events[0]["seq"] if events else event_seq + 1
+            gap = bool(events and since < first_seq - 1)
+            effective_since = 0 if reset else since
+            matching = [event.copy() for event in events if event["seq"] > effective_since and event_matches(event)]
+            if matching or reset or gap:
+                return {"events": matching, "last_seq": event_seq, "reset": reset, "gap": gap}
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                return {"events": [], "last_seq": event_seq, "reset": False, "gap": False}
+            event_lock.wait(timeout=remaining)

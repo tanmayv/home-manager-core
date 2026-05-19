@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>agent-communicator TUI mock</title>
+  <style>
+    :root {
+      --bg: #101014;
+      --panel: #171821;
+      --panel-2: #1f2130;
+      --border: #3b3e55;
+      --text: #d9e0ee;
+      --muted: #8c93aa;
+      --green: #9ece6a;
+      --blue: #7dcfff;
+      --yellow: #e0af68;
+      --red: #f7768e;
+      --purple: #bb9af7;
+      --cyan: #2ac3de;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #050507;
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 14px;
+    }
+    .mock-tabs {
+      width: min(1320px, 100vw);
+      margin: 10px auto 0;
+      display: flex;
+      gap: 8px;
+      padding: 0 8px;
+    }
+    .mock-tabs label {
+      cursor: pointer;
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-bottom: 0;
+      border-radius: 8px 8px 0 0;
+      color: var(--muted);
+      background: #0c0d12;
+    }
+    input[name="mock-state"] { display: none; }
+    #tab-plain:checked ~ .mock-tabs label[for="tab-plain"],
+    #tab-popup:checked ~ .mock-tabs label[for="tab-popup"] {
+      color: var(--green);
+      background: var(--panel-2);
+    }
+    .terminal {
+      width: min(1320px, 100vw);
+      height: min(790px, calc(100vh - 42px));
+      margin: 0 auto;
+      background: var(--bg);
+      border: 1px solid #282a3a;
+      display: grid;
+      grid-template-rows: 30px 1fr 26px;
+      overflow: hidden;
+    }
+    .topbar, .footer {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 12px;
+      background: #0c0d12;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .footer {
+      border-top: 1px solid var(--border);
+      border-bottom: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .brand { color: var(--cyan); font-weight: 700; }
+    .pill { padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
+    .ok { color: var(--green); }
+    .warn { color: var(--yellow); }
+    .main {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 232px minmax(0, 1fr) 238px;
+      gap: 1px;
+      background: var(--border);
+    }
+    .pane {
+      min-height: 0;
+      background: var(--panel);
+      display: grid;
+      grid-template-rows: 32px 1fr;
+    }
+    .pane-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      background: var(--panel-2);
+      border-bottom: 1px solid var(--border);
+      color: var(--blue);
+      font-weight: 700;
+    }
+    .pane-title small { color: var(--muted); font-weight: 400; }
+    .agent-list, .details, .messages { overflow: hidden; }
+    .search {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .agent-row {
+      display: grid;
+      grid-template-columns: 18px 1fr auto;
+      gap: 8px;
+      padding: 7px 8px;
+      border-bottom: 1px solid rgba(59,62,85,.55);
+      align-items: center;
+    }
+    .agent-row.selected { background: #26314a; outline: 1px solid var(--blue); outline-offset: -1px; }
+    .agent-name { color: var(--text); }
+    .agent-meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); }
+    .dot.remote { background: var(--purple); }
+    .dot.busy { background: var(--yellow); }
+    .dot.offline { background: var(--red); }
+    .badge { font-size: 11px; color: var(--muted); border: 1px solid var(--border); padding: 1px 5px; border-radius: 4px; }
+    .chat {
+      min-height: 0;
+      display: grid;
+      grid-template-rows: 1fr 96px;
+      background: var(--panel);
+    }
+    .messages {
+      padding: 16px 18px;
+      overflow-y: auto;
+    }
+    .msg {
+      margin-bottom: 16px;
+      display: grid;
+      grid-template-columns: 68px minmax(0, 860px);
+      gap: 10px;
+    }
+    .msg .from { color: var(--muted); font-size: 12px; text-align: right; padding-top: 3px; }
+    .bubble {
+      border: 1px solid var(--border);
+      background: #141621;
+      border-radius: 8px;
+      padding: 12px 14px;
+      line-height: 1.45;
+    }
+    .msg.user .bubble { border-color: var(--blue); background: #111b2b; }
+    .msg.agent .bubble { border-color: #46506b; }
+    .md h4 { margin: 0 0 6px; color: var(--green); }
+    .md p { margin: 0 0 8px; }
+    .md code { color: var(--yellow); background: #0b0c11; padding: 1px 4px; border-radius: 3px; }
+    .md pre { margin: 8px 0; padding: 8px; background: #090a0f; border: 1px solid #2a2d3d; border-radius: 6px; overflow: hidden; }
+    .attachment {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      margin: 4px 6px 0 0;
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--cyan);
+      background: #10131c;
+    }
+    .composer {
+      border-top: 1px solid var(--border);
+      background: #11131b;
+      display: grid;
+      grid-template-rows: 28px 1fr;
+    }
+    .composer-tabs {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+    }
+    .composer-tabs .active { color: var(--green); }
+    .input {
+      padding: 10px;
+      color: var(--text);
+      position: relative;
+    }
+    .cursor { color: var(--green); animation: blink 1s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .details-body { padding: 10px; overflow: auto; }
+    .kv { display: grid; grid-template-columns: 68px 1fr; gap: 5px; margin-bottom: 10px; }
+    .key { color: var(--muted); }
+    .value { color: var(--text); overflow-wrap: anywhere; }
+    .section { margin-top: 16px; color: var(--blue); border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+    .type-row {
+      display: grid;
+      grid-template-columns: 20px 1fr auto;
+      gap: 6px;
+      align-items: center;
+      padding: 6px 0;
+      color: var(--muted);
+    }
+    .type-row.enabled { color: var(--text); }
+    .popup {
+      position: absolute;
+      inset: 120px 150px;
+      border: 2px solid var(--purple);
+      background: #0c0d12;
+      box-shadow: 0 14px 60px #000;
+      display: none;
+      grid-template-rows: 32px 1fr 26px;
+    }
+    #tab-popup:checked ~ .popup { display: grid; }
+    .popup-title, .popup-footer {
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      background: #1d1930;
+      color: var(--purple);
+    }
+    .popup-footer { color: var(--muted); font-size: 12px; justify-content: space-between; }
+    .nvim {
+      padding: 12px;
+      background: #07080d;
+      color: var(--text);
+      white-space: pre;
+      overflow: hidden;
+    }
+    @media (max-width: 900px) {
+      .main { grid-template-columns: 190px 1fr; }
+      .details-pane { display: none; }
+      .popup { inset: 80px 40px; }
+    }
+  </style>
+</head>
+<body>
+  <input type="radio" name="mock-state" id="tab-plain" checked />
+  <input type="radio" name="mock-state" id="tab-popup" />
+  <nav class="mock-tabs" aria-label="mock states">
+    <label for="tab-plain">Conversation</label>
+    <label for="tab-popup">Attachment open in nvim popup</label>
+  </nav>
+  <div class="terminal">
+    <header class="topbar">
+      <span class="brand">agent-communicator</span>
+      <span class="pill ok">● local tracker connected</span>
+      <span class="pill ok">● registry agents.mundus.in</span>
+      <span class="pill">markdown</span>
+      <span class="pill">3 attachments queued</span>
+    </header>
+
+    <main class="main">
+      <section class="pane">
+        <div class="pane-title">Agents <small>local + remote</small></div>
+        <div class="agent-list">
+          <div class="search">/ filter: status:active type:pi</div>
+          <div class="agent-row selected">
+            <span class="dot"></span>
+            <div><div class="agent-name">pi-nixos</div><div class="agent-meta">local · ~/home-manager-core · idle</div></div>
+            <span class="badge">2</span>
+          </div>
+          <div class="agent-row">
+            <span class="dot busy"></span>
+            <div><div class="agent-name">gemini-docs</div><div class="agent-meta">local · ~/docs/site · working</div></div>
+            <span class="badge">md</span>
+          </div>
+          <div class="agent-row">
+            <span class="dot remote"></span>
+            <div><div class="agent-name">homelab/coder</div><div class="agent-meta">remote · /srv/nix-config · idle</div></div>
+            <span class="badge">ssh</span>
+          </div>
+          <div class="agent-row">
+            <span class="dot offline"></span>
+            <div><div class="agent-name">cloudtop/reviewer</div><div class="agent-meta">remote · ~/reviews · stale 2m</div></div>
+            <span class="badge">!</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="chat">
+        <div class="pane-title">Conversation: pi-nixos <small>Enter send · Ctrl+A attach · Ctrl+O open attachment</small></div>
+        <div class="messages">
+          <div class="msg user"><div class="from">you<br>10:41</div><div class="bubble md"><p>Can you review this module change?</p><span class="attachment">󰈙 module.diff</span></div></div>
+          <div class="msg agent"><div class="from">pi-nixos<br>10:42</div><div class="bubble md"><h4>Review notes</h4><p>The option shape looks good. I would add a Nix eval test and validate <code>registryAuth</code>.</p><pre>services.agent-tracker.registryAuth = true;</pre></div></div>
+          <div class="msg user"><div class="from">you<br>10:43</div><div class="bubble md"><p>Please draft the test patch. Use markdown and attach any generated diff.</p></div></div>
+          <div class="msg agent"><div class="from">pi-nixos<br>typing</div><div class="bubble md"><p>Preparing patch…</p><span class="attachment">󰡯 test_nix_eval.patch</span><span class="attachment">󰈔 notes.md</span></div></div>
+        </div>
+        <div class="composer">
+          <div class="composer-tabs"><span class="active">message: markdown</span><span>type: text/markdown</span><span>attach: a</span><span>send: enter</span></div>
+          <div class="input">Ask selected agent for the final patch and tests<span class="cursor">▊</span></div>
+        </div>
+      </section>
+
+      <section class="pane details-pane">
+        <div class="pane-title">Selected agent <small>metadata</small></div>
+        <div class="details-body">
+          <div class="kv"><div class="key">name</div><div class="value">pi-nixos</div><div class="key">scope</div><div class="value ok">local</div><div class="key">id</div><div class="value">7ecf…9b31</div><div class="key">pane</div><div class="value">%42</div><div class="key">cwd</div><div class="value">/Users/tanmayvijay/home-manager-core</div><div class="key">status</div><div class="value ok">idle</div></div>
+          <div class="section">Supported message types</div>
+          <div class="type-row enabled"><span>✓</span><span>text/markdown</span><span>default</span></div>
+          <div class="type-row enabled"><span>✓</span><span>text/plain</span><span></span></div>
+          <div class="type-row enabled"><span>✓</span><span>application/vnd.diff</span><span>preview</span></div>
+          <div class="type-row"><span>·</span><span>application/json</span><span>later</span></div>
+          <div class="section">Attachment actions</div>
+          <div class="type-row enabled"><span>↵</span><span>open in tmux popup</span><span>nvim</span></div>
+          <div class="type-row enabled"><span>s</span><span>save attachment</span><span>cache</span></div>
+          <div class="type-row enabled"><span>p</span><span>preview markdown/diff</span><span>inline</span></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>↑/↓ select agent</span><span>Tab switch pane</span><span>Enter send</span><span>Ctrl+A attach</span><span>Ctrl+O open selected attachment</span><span>Esc close popup</span><span>q quit</span>
+    </footer>
+  </div>
+
+  <div class="popup" aria-label="tmux popup mock">
+    <div class="popup-title">tmux popup · nvim test_nix_eval.patch</div>
+    <div class="nvim">diff --git a/modules/agent-tracker/test_nix_eval.py b/modules/agent-tracker/test_nix_eval.py
++    def test_registry_auth_requires_token_file(self):
++        expr = """
++        # generated patch preview
++        """
++        self.assertIn("registryTokenFile is required", err)
+~
+~</div>
+    <div class="popup-footer"><span>:w save · :q close</span><span>attachment opened from selected message</span></div>
+  </div>
+</body>
+</html>

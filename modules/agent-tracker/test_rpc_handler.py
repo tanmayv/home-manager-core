@@ -1,6 +1,8 @@
 import datetime
 import json
 import os
+import threading
+import time
 import unittest
 from unittest import mock
 
@@ -13,6 +15,8 @@ class TestRpcHandler(unittest.TestCase):
         state.state = {}
         state.name_index = {}
         state.pane_index = {}
+        state.events = []
+        state.event_seq = 0
         state.INBOX_DIR = "/tmp/test-agent-inboxes"
 
     @mock.patch("tmux_util.set_agent_uuid")
@@ -282,6 +286,146 @@ class TestRpcHandler(unittest.TestCase):
                 os.remove(inbox_path)
 
     @mock.patch("tmux_util.send_keys")
+    def test_deliver_local_message_publishes_event_for_communicator(self, _send_keys):
+        inbox_path = os.path.join(state.INBOX_DIR, "receiver-id.inbox")
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent("receiver", {
+                "agent_id": "receiver-id",
+                "uuid": "receiver-id",
+                "tmux_pane": "%1",
+                "tmux_socket": "sock",
+                "status": "idle",
+            })
+
+            rpc_handler.deliver_local_message("receiver", {
+                "sender": "sender-agent",
+                "timestamp": "now",
+                "message": "hello",
+                "read": False,
+                "message_id": "msg-1",
+            })
+
+            result = rpc_handler.handle_wait_events({"since": 0, "timeout": 0})
+            self.assertEqual(len(result["events"]), 1)
+            event = result["events"][0]
+            self.assertEqual(event["type"], "message_delivered")
+            self.assertEqual(event["target_agent_id"], "receiver-id")
+            self.assertEqual(event["target_agent_name"], "receiver")
+            self.assertEqual(event["sender"], "sender-agent")
+            self.assertEqual(event["message_id"], "msg-1")
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
+    def test_wait_events_timeout_returns_empty_best_effort_response(self):
+        result = rpc_handler.handle_wait_events({"since": 0, "timeout": 0})
+        self.assertEqual(result["events"], [])
+        self.assertEqual(result["last_seq"], 0)
+        self.assertFalse(result["reset"])
+        self.assertFalse(result["gap"])
+
+    def test_wait_events_wakes_on_publish(self):
+        result_box = {}
+        waiter = threading.Thread(
+            target=lambda: result_box.update(rpc_handler.handle_wait_events({"since": 0, "timeout": 2}))
+        )
+        waiter.start()
+        time.sleep(0.05)
+        state.publish_event("message_delivered", {"target_agent_id": "id-1"})
+        waiter.join(timeout=1)
+        self.assertFalse(waiter.is_alive())
+        self.assertEqual(result_box["events"][0]["target_agent_id"], "id-1")
+
+    def test_wait_events_reports_seq_reset(self):
+        result = rpc_handler.handle_wait_events({"since": 99, "timeout": 0})
+        self.assertTrue(result["reset"])
+        self.assertEqual(result["events"], [])
+        state.publish_event("message_delivered", {"target_agent_id": "id-1"})
+        result = rpc_handler.handle_wait_events({"since": 99, "timeout": 0})
+        self.assertTrue(result["reset"])
+        self.assertEqual(len(result["events"]), 1)
+
+    def test_wait_events_reports_gap_when_events_truncated(self):
+        old_max = state.MAX_EVENTS
+        try:
+            state.MAX_EVENTS = 2
+            state.publish_event("message_delivered", {"target_agent_id": "id-1"})
+            state.publish_event("message_delivered", {"target_agent_id": "id-2"})
+            state.publish_event("message_delivered", {"target_agent_id": "id-3"})
+            result = rpc_handler.handle_wait_events({"since": 0, "timeout": 0})
+            self.assertTrue(result["gap"])
+            self.assertEqual([event["target_agent_id"] for event in result["events"]], ["id-2", "id-3"])
+        finally:
+            state.MAX_EVENTS = old_max
+
+    def test_wait_events_filters_and_rejects_invalid_params(self):
+        state.publish_event("message_delivered", {"target_agent_id": "id-1", "target_agent_name": "one"})
+        state.publish_event("message_delivered", {"target_agent_id": "id-2", "target_agent_name": "two"})
+        result = rpc_handler.handle_wait_events({"since": 0, "timeout": 0, "target_agent_id": "id-2"})
+        self.assertEqual(len(result["events"]), 1)
+        self.assertEqual(result["events"][0]["target_agent_name"], "two")
+        with self.assertRaises(ValueError):
+            rpc_handler.handle_wait_events({"since": -1})
+        with self.assertRaises(ValueError):
+            rpc_handler.handle_wait_events({"timeout": "bad"})
+
+    @mock.patch("tmux_util.send_keys")
+    def test_no_notify_with_send_keys_suppresses_tmux_notification(self, send_keys):
+        inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent(
+                "agent1",
+                {
+                    "agent_id": "id-1",
+                    "status": "idle",
+                    "waiting_approval": False,
+                    "pending_notifications": [],
+                    "tmux_pane": "%1",
+                    "tmux_socket": "sock",
+                    "no_notify_with_send_keys": True,
+                },
+            )
+
+            self.assertTrue(
+                rpc_handler.handle_send_message({"agent_id": "id-1", "message": "hello", "sender_name": "tester"})
+            )
+
+            send_keys.assert_not_called()
+            self.assertEqual(state.get_agent("agent1").get("pending_notifications"), [])
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
+    @mock.patch("state.publish_event")
+    def test_get_inbox_publishes_message_read_event_once(self, publish_event):
+        inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
+        try:
+            state.set_agent("agent1", {"agent_id": "id-1", "uuid": "id-1"})
+            os.makedirs(state.INBOX_DIR, exist_ok=True)
+            with open(inbox_path, "w") as f:
+                f.write(json.dumps({"sender": "agent-communicator", "message": "hi", "read": False, "message_id": "m1"}) + "\n")
+
+            result = rpc_handler.handle_get_inbox({"agent_name": "agent1"})
+            self.assertEqual(result["mode"], "unread")
+            publish_event.assert_called_once_with("message_read", {
+                "target_agent_id": "id-1",
+                "target_agent_name": "agent1",
+                "sender": "agent-communicator",
+                "message_id": "m1",
+            })
+
+            publish_event.reset_mock()
+            rpc_handler.handle_get_inbox({"agent_name": "agent1"})
+            publish_event.assert_not_called()
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
+    @mock.patch("tmux_util.send_keys")
     def test_send_message_notifies_recovered_unknown_agent(self, send_keys):
         inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
         try:
@@ -384,14 +528,20 @@ class TestRpcHandler(unittest.TestCase):
     def test_send_message_routes_remote_target_address_via_registry(self, send_remote):
         state.set_agent("sender", {"agent_id": "id-s", "status": "idle"})
         self.assertTrue(rpc_handler.handle_send_message({"agent_name": "sender", "target_address": "remote-host/agent2", "message": "hello"}))
-        send_remote.assert_called_once_with("sender", "id-s", mock.ANY, "remote-host", "agent2", "hello", None)
+        send_remote.assert_called_once_with("sender", "id-s", mock.ANY, "remote-host", "agent2", "hello", None, None)
 
     @mock.patch("registry_client.send_remote_message", return_value=(202, {"ok": True}))
     def test_send_message_routes_remote_uuid_target_address_via_registry(self, send_remote):
         state.set_agent("sender", {"agent_id": "id-s", "status": "idle"})
         target_id = "961477f2-6523-4dae-87ea-bc6223fa04df"
         self.assertTrue(rpc_handler.handle_send_message({"agent_name": "sender", "target_address": f"remote-host/{target_id}", "message": "hello"}))
-        send_remote.assert_called_once_with("sender", "id-s", mock.ANY, "remote-host", target_id, "hello", None)
+        send_remote.assert_called_once_with("sender", "id-s", mock.ANY, "remote-host", target_id, "hello", None, None)
+
+    @mock.patch("registry_client.send_remote_message_to_registry", return_value=(202, {"ok": True}))
+    def test_send_message_routes_explicit_registry_target_address(self, send_remote):
+        state.set_agent("sender", {"agent_id": "id-s", "status": "idle"})
+        self.assertTrue(rpc_handler.handle_send_message({"agent_name": "sender", "target_address": "corp:remote-host/agent2", "message": "hello"}))
+        send_remote.assert_called_once_with("corp", "sender", "id-s", mock.ANY, "remote-host", "agent2", "hello", None, None)
 
     @mock.patch("registry_client.send_remote_message")
     @mock.patch("tmux_util.send_keys")

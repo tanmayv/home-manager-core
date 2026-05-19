@@ -49,8 +49,10 @@ let
     # Python, so provide an explicit cross-platform tool PATH instead of
     # relying on the interactive shell environment.
     PATH = "${agentTrackerToolPath}:${platformFallbackPath}";
-  } // lib.optionalAttrs (cfg.registryUrl != null) {
+  } // lib.optionalAttrs (cfg.registryUrl != null && cfg.registries == []) {
     AGENT_REGISTRY_URL = cfg.registryUrl;
+  } // lib.optionalAttrs (cfg.registries != []) {
+    AGENT_REGISTRIES_JSON = builtins.toJSON cfg.registries;
   };
   monitorEnv = lib.mapAttrsToList (name: value: "${name}=${value}") monitorEnvVars;
 in
@@ -63,6 +65,7 @@ in
     {
       services.agent-tracker.enable = mkDefault (userSettings.enable-agent-tracker or false);
       services.agent-tracker.registryUrl = mkDefault (agentTrackerSettings.registry-url or null);
+      services.agent-tracker.registries = mkDefault (agentTrackerSettings.registries or []);
       services.agent-tracker.registryAuth = mkDefault (agentTrackerSettings.registry-auth or false);
       services.agent-tracker.registryTokenFile = mkDefault registryTokenFileFromSettings;
       services.agent-tracker.httpPort = mkDefault (agentTrackerSettings.http-port or 19876);
@@ -98,7 +101,9 @@ in
           os.environ.setdefault("AGENT_TRACKER_HTTP_PORT", "${toString cfg.httpPort}")
           os.environ.setdefault("AGENT_REGISTRY_HEARTBEAT_SECONDS", "${toString cfg.registryHeartbeatSeconds}")
           os.environ.setdefault("AGENT_REGISTRY_AUTH", "${if cfg.registryAuth then "true" else "false"}")
-          ${lib.optionalString (cfg.registryUrl != null) ''os.environ.setdefault("AGENT_REGISTRY_URL", "${cfg.registryUrl}")''}
+          ${lib.optionalString (cfg.registryUrl != null && cfg.registries == []) ''os.environ.setdefault("AGENT_REGISTRY_URL", "${cfg.registryUrl}")''}
+          ${lib.optionalString (cfg.registryTokenFile != null && cfg.registries == []) ''os.environ.setdefault("AGENT_REGISTRY_TOKEN", open(${builtins.toJSON (toString cfg.registryTokenFile)}).read().strip())''}
+          ${lib.optionalString (cfg.registries != []) ''os.environ.setdefault("AGENT_REGISTRIES_JSON", ${builtins.toJSON (builtins.toJSON cfg.registries)})''}
           os.environ.setdefault("PALETTE_COLOR8", "${palette.color8}")
           os.environ.setdefault("PALETTE_COLOR1", "${palette.color1}")
           os.environ.setdefault("PALETTE_COLOR3", "${palette.color3}")
@@ -129,6 +134,8 @@ in
         # Agent navigation contributed by agent-tracker extension
         bind-key N run-shell "agent-tracker-ctl focus --next"
         bind-key P run-shell "agent-tracker-ctl focus --prev"
+        bind-key -n MouseDown3Status if-shell -F '#{==:#{mouse_status_range},agent-registries}' \
+          { display-popup -w 80% -h 40% -E "agent-tracker-ctl registry-status; echo; printf 'Press Enter to close...'; read _" }
       '';
     })
 

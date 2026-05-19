@@ -87,6 +87,7 @@ def handle_register(params: dict) -> str:
     agent_type = params.get("agent_type", "unknown")
     agent_cmd = params.get("agent_cmd", "unknown")
     agent_id = params.get("agent_id") or str(uuid.uuid4())
+    no_notify_with_send_keys = bool(params.get("no_notify_with_send_keys", False))
     
     if not (session and tmux_pane and wrapper_pid and tmux_socket):
         raise ValueError("Invalid params")
@@ -120,6 +121,7 @@ def handle_register(params: dict) -> str:
         "uuid": agent_id,
         "agent_type": agent_type or (existing_info or {}).get("agent_type", "unknown"),
         "agent_cmd": agent_cmd or (existing_info or {}).get("agent_cmd", "unknown"),
+        "no_notify_with_send_keys": no_notify_with_send_keys,
         "last_heartbeat": time.time(),
         "recovered_at": None,
         "pending_notifications": (existing_info or {}).get("pending_notifications", [])
@@ -155,11 +157,11 @@ def _flush_notifications(agent_name: str):
         return
         
     logging.info(f"Flushing {len(pending)} notifications for {agent_name}")
-    # Send each pending notification
-    for sender_name in pending:
-        notify_msg = f"New message in inbox from {sender_name}"
-        tmux_util.send_keys(info["tmux_pane"], notify_msg, info["tmux_socket"])
-        
+    if not info.get("no_notify_with_send_keys", False):
+        for sender_name in pending:
+            notify_msg = f"New message in inbox from {sender_name}"
+            tmux_util.send_keys(info["tmux_pane"], notify_msg, info["tmux_socket"])
+
     state.update_agent(agent_name, pending_notifications=[])
 
 def handle_update_agent(params: dict, caller_pid: int = None) -> bool:
@@ -357,7 +359,18 @@ def deliver_local_message(target_name_or_id: str, msg_obj: dict, notify_sender: 
         with open(inbox_file, "a") as f:
             f.write(json.dumps(msg_obj) + "\n")
 
-        if _is_agent_waiting(info):
+        notification = {
+            "target_agent_id": info.get("agent_id"),
+            "target_agent_name": current_name,
+            "sender": notify_sender,
+            "message_id": msg_obj.get("message_id"),
+            "has_attachments": bool(msg_obj.get("attachments")),
+        }
+        state.publish_event("message_delivered", notification)
+
+        if info.get("no_notify_with_send_keys", False):
+            logging.info(f"Skipping tmux send-keys notification for {current_name} from {notify_sender}")
+        elif _is_agent_waiting(info):
             logging.info(f"Queuing notification for {current_name} from {notify_sender} (agent is busy)")
             pending = info.get("pending_notifications", [])
             pending.append(notify_sender)
@@ -390,18 +403,28 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
     target_address = params.get("target_address")
 
     if target_address and "/" in target_address:
+        registry_name = None
         hostname, target = target_address.split("/", 1)
+        if ":" in hostname:
+            registry_name, hostname = hostname.split(":", 1)
         if hostname not in {"local", LOCAL_HOSTNAME}:
             sender_info = state.get_agent(params.get("sender_id") or sender_name) or {}
-            status, body = registry_client.send_remote_message(
-                sender_name,
-                sender_info.get("agent_id") or params.get("sender_id"),
-                registry_client.TRACKER_ID,
-                hostname,
-                target,
-                msg,
-                attachments,
-            )
+            sender_id = sender_info.get("agent_id") or params.get("sender_id")
+            if registry_name:
+                status, body = registry_client.send_remote_message_to_registry(
+                    registry_name, sender_name, sender_id, registry_client.TRACKER_ID, hostname, target, msg, attachments, params.get("message_id")
+                )
+            else:
+                status, body = registry_client.send_remote_message(
+                    sender_name,
+                    sender_id,
+                    registry_client.TRACKER_ID,
+                    hostname,
+                    target,
+                    msg,
+                    attachments,
+                    params.get("message_id"),
+                )
             if status == 202:
                 return True
             raise RuntimeError(f"Remote delivery failed: {(body or {}).get('message', 'unknown error')}")
@@ -423,10 +446,11 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
         "message": msg,
         "attachments": attachments,
         "read": False,
+        "message_id": params.get("message_id"),
     }, sender_name)
     return {"success": True, "warning": warning_msg} if warning_msg else True
 
-def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None) -> dict:
+def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None, agent_name: str | None = None, agent_info: dict | None = None) -> dict:
     """Reads the inbox file, handles unread/history/last_n messages, marks them as read, and rewrites the file."""
     if not os.path.exists(inbox_file):
         return {"mode": "history", "messages": []}
@@ -444,10 +468,13 @@ def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None
         mode = "unread"
         result_messages = []
         
+        newly_read = []
         if last_n is not None:
             mode = "last_n"
             result_messages = all_messages[-last_n:] if last_n > 0 else []
             for msg in result_messages:
+                if not msg.get("read", False):
+                    newly_read.append(msg)
                 msg["read"] = True
         else:
             unread_messages = [m for m in all_messages if not m.get("read", False)]
@@ -455,6 +482,8 @@ def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None
                 mode = "unread"
                 result_messages = unread_messages
                 for msg in unread_messages:
+                    if not msg.get("read", False):
+                        newly_read.append(msg)
                     msg["read"] = True
             else:
                 mode = "history"
@@ -466,6 +495,21 @@ def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None
             with open(inbox_file, "w") as f:
                 for m in all_messages:
                     f.write(json.dumps(m) + "\n")
+        if agent_name and agent_info:
+            for msg in newly_read:
+                state.publish_event("message_read", {
+                    "target_agent_id": agent_info.get("agent_id"),
+                    "target_agent_name": agent_name,
+                    "sender": msg.get("sender", "unknown"),
+                    "message_id": msg.get("message_id"),
+                })
+                if msg.get("sender_tracker_id"):
+                    registry_client.publish_tracker_event(msg.get("sender_tracker_id"), "message_read", {
+                        "message_id": msg.get("message_id"),
+                        "sender_agent_id": msg.get("sender_agent_id"),
+                        "reader_agent_id": agent_info.get("agent_id"),
+                        "reader_agent_name": agent_name,
+                    })
         return {"mode": mode, "messages": result_messages}
     except IOError as e:
         raise RuntimeError(f"Failed to access inbox file: {e}")
@@ -533,7 +577,24 @@ def handle_get_inbox(params: dict, caller_pid: int = None) -> dict:
     uuid_str = info.get("uuid") or agent_name
     inbox_file = os.path.join(state.INBOX_DIR, f"{uuid_str}.inbox")
             
-    return _read_and_update_inbox_file(inbox_file, clear, last_n)
+    return _read_and_update_inbox_file(inbox_file, clear, last_n, agent_name, info)
+
+
+def handle_wait_events(params: dict, caller_pid: int = None) -> dict:
+    """Best-effort event long-poll for observers; clients must read inbox for truth."""
+    try:
+        since = int(params.get("since", 0) if params.get("since") is not None else 0)
+        timeout = float(params.get("timeout", 25.0) if params.get("timeout") is not None else 25.0)
+    except (TypeError, ValueError):
+        raise ValueError("since must be an integer and timeout must be a number")
+    if since < 0 or timeout < 0:
+        raise ValueError("since and timeout must be non-negative")
+    filters = {
+        key: params[key]
+        for key in ("target_agent_id", "target_agent_name")
+        if params.get(key)
+    }
+    return state.wait_events(since=since, timeout=timeout, filters=filters)
 
 
 def handle_whoami(params: dict, caller_pid: int = None) -> dict:
@@ -564,6 +625,7 @@ dispatcher = {
     "spin_agent": handle_spin_agent,
     "send_message": handle_send_message,
     "get_inbox": handle_get_inbox,
+    "wait_events": handle_wait_events,
     "whoami": handle_whoami,
     "unregister": handle_unregister
 }
@@ -608,7 +670,7 @@ def handle_client(conn: socket.socket) -> None:
         if handler:
             try:
                 # Pass caller_pid to handlers that might need it
-                if method in ["get_inbox", "update_agent", "heartbeat", "send_message", "whoami", "list", "rename", "unregister"]:
+                if method in ["get_inbox", "update_agent", "heartbeat", "send_message", "wait_events", "whoami", "list", "rename", "unregister"]:
                     result = handler(params, caller_pid=caller_pid)
                 else:
                     result = handler(params)

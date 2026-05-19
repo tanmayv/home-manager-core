@@ -7,6 +7,8 @@ import socket
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 import uuid
 
 CACHE_DIR = os.path.join(os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache")), "agent-tracker")
@@ -112,26 +114,147 @@ def is_uuid(value: str | None) -> bool:
         return False
 
 
-def is_registry_connected(now: float | None = None) -> bool:
-    if not os.environ.get("AGENT_REGISTRY_URL", "").strip():
-        return False
+def _read_token_config(config: dict) -> str:
+    if config.get("token"):
+        return str(config.get("token"))
+    token_file = config.get("token-file") or config.get("tokenFile")
+    if token_file:
+        try:
+            with open(token_file, "r") as f:
+                return f.read().strip()
+        except Exception:
+            return ""
+    return ""
+
+
+def registry_configs() -> list[dict]:
+    raw = os.environ.get("AGENT_REGISTRIES_JSON", "").strip()
+    if raw:
+        try:
+            configs = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+        if isinstance(configs, dict):
+            configs = configs.get("registries") or []
+        return [{**c, "token": _read_token_config(c)} for c in configs if isinstance(c, dict) and c.get("url")]
+    registry_url = os.environ.get("AGENT_REGISTRY_URL", "").strip()
+    if not registry_url:
+        return []
+    return [{"name": "default", "url": registry_url, "token": os.environ.get("AGENT_REGISTRY_TOKEN", "")}]
+
+
+def fetch_registry_agents(timeout: float = 3.0) -> dict:
+    """Best-effort fetch of remote agents from all configured registries."""
+    remote_agents = {}
+    for config in registry_configs():
+        registry_url = str(config.get("url", "")).strip().rstrip("/")
+        if not registry_url:
+            continue
+        token = str(config.get("token") or "")
+        req = urllib.request.Request(
+            f"{registry_url}/agents",
+            headers={**({"Authorization": f"Bearer {token}"} if token else {})},
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status != 200:
+                    continue
+                payload = json.loads(resp.read().decode() or "{}")
+        except (OSError, urllib.error.URLError, json.JSONDecodeError):
+            continue
+        registry_name = config.get("name") or "default"
+        for agent in payload.get("agents") or []:
+            hostname = agent.get("hostname")
+            name = agent.get("name")
+            if not hostname or not name:
+                continue
+            base_key = f"{hostname}/{name}"
+            key = base_key
+            if base_key in remote_agents and remote_agents[base_key].get("agent_id") != agent.get("agent_id"):
+                existing = remote_agents.pop(base_key)
+                existing_registry = existing.get("registry_name") or "default"
+                existing_key = f"{existing_registry}:{base_key}"
+                remote_agents[existing_key] = {**existing, "name": existing_key, "target_address": existing_key}
+                key = f"{registry_name}:{base_key}"
+            elif base_key not in remote_agents and any(k.endswith(f":{base_key}") for k in remote_agents):
+                key = f"{registry_name}:{base_key}"
+            remote_agents[key] = {**agent, "name": key, "scope": "remote", "target_address": key, "registry_name": registry_name}
+    return remote_agents
+
+
+def merge_registry_agents(local_agents: dict, remote_agents: dict) -> dict:
+    merged = {name: {**info, "scope": info.get("scope", "local")} for name, info in (local_agents or {}).items()}
+    local_agent_ids = {info.get("agent_id") for info in (local_agents or {}).values() if info.get("agent_id")}
+    for name, info in (remote_agents or {}).items():
+        if info.get("agent_id") in local_agent_ids:
+            continue
+        merged[name] = info
+    return merged
+
+
+def load_registry_status() -> dict:
     try:
         with open(REGISTRY_STATUS_PATH, "r") as f:
-            status = json.load(f)
+            return json.load(f)
     except Exception:
-        return False
-    if not status.get("connected"):
-        return False
-    last_success = status.get("last_success")
-    if not isinstance(last_success, (int, float)):
-        return False
+        return {}
+
+
+def _is_entry_fresh(entry: dict, now: float, max_age: int) -> bool:
+    last_success = entry.get("last_success")
+    return bool(entry.get("connected") and isinstance(last_success, (int, float)) and now - last_success <= max_age)
+
+
+def registry_connection_states(status: dict | None = None, now: float | None = None) -> list[tuple[str, bool]]:
+    configs = registry_configs()
+    if not configs:
+        return []
+    status = load_registry_status() if status is None else status
     now = time.time() if now is None else now
     heartbeat_interval = int(os.environ.get("AGENT_REGISTRY_HEARTBEAT_SECONDS", "30"))
     max_age = max(heartbeat_interval * 2 + 5, 15)
-    return now - last_success <= max_age
+    entries = status.get("registries") or {}
+    states = []
+    for config in configs:
+        name = config.get("name") or "default"
+        entry = entries.get(name)
+        if entry is None and name == "default":
+            entry = status
+        states.append((name, _is_entry_fresh(entry or {}, now, max_age)))
+    return states
 
 
-def format_status_bar(agents: dict, current_pane: str, registry_connected: bool = False) -> str:
+def is_registry_connected(now: float | None = None) -> bool:
+    return any(connected for _, connected in registry_connection_states(now=now))
+
+
+def format_registry_status(status: dict, now: float | None = None) -> str:
+    now = time.time() if now is None else now
+    registries = status.get("registries") or {"default": status} if status else {}
+    if not registries:
+        return "No registry status found."
+    lines = []
+    for name in sorted(registries):
+        entry = registries[name]
+        ok = "connected" if entry.get("connected") else "disconnected"
+        last_success = entry.get("last_success")
+        age = "never" if not isinstance(last_success, (int, float)) else f"{int(now - last_success)}s ago"
+        detail = entry.get("last_error") or f"status={entry.get('status_code')}"
+        lines.append(f"{name}: {ok}, last_success={age}, url={entry.get('registry_url')}, {detail}")
+    return "\n".join(lines)
+
+
+def format_registry_dots(states: list[tuple[str, bool]] | None, connected_fallback: bool, color_ok: str, color_bad: str) -> str:
+    if not states:
+        color = color_ok if connected_fallback else color_bad
+        dots = f"#[fg={color},bold]●"
+    else:
+        dots = "".join(f"#[fg={color_ok if connected else color_bad},bold]●" for _, connected in states)
+    return f"#[range=user|agent-registries]{dots}#[norange] "
+
+
+def format_status_bar(agents: dict, current_pane: str, registry_connected: bool = False, registry_states: list[tuple[str, bool]] | None = None) -> str:
     if not agents:
         return ""
 
@@ -164,9 +287,9 @@ def format_status_bar(agents: dict, current_pane: str, registry_connected: bool 
     if not formatted:
         return ""
 
-    indicator_color = color2 if registry_connected else color1
-    prefix = f"#[fg={indicator_color},bold]● #[fg={color4},bold]Active Agents: #[fg={color8},nobold]"
-    return f"{prefix}{' · '.join(formatted)}#[default]"
+    indicator = format_registry_dots(registry_states, registry_connected, color2, color1).rstrip()
+    prefix = f"#[fg={color4},bold]Active Agents: #[fg={color8},nobold]"
+    return f"{prefix}{' · '.join(formatted)}#[align=right]{indicator}#[default]"
 
 def main():
     parser = argparse.ArgumentParser(
@@ -187,6 +310,7 @@ def main():
     subparsers.add_parser("list", help="List agents in JSON format")
     status_bar_parser = subparsers.add_parser("status-bar", help="List agents for status bar")
     status_bar_parser.add_argument("current_pane", nargs="?", help="Current tmux pane ID")
+    subparsers.add_parser("registry-status", help="Show per-registry connection status")
     subparsers.add_parser("ensure-running", help="Ensure the tracker daemon is running")
     subparsers.add_parser("daemon", help="Run the tracker daemon in the foreground")
 
@@ -263,14 +387,18 @@ def main():
         elif "AGENT_NAME" in os.environ:
             params["agent_name"] = os.environ["AGENT_NAME"]
         agents = call_rpc("list", params)
+        agents = merge_registry_agents(agents, fetch_registry_agents())
         print(json.dumps(agents))
 
     elif args.subcommand == "status-bar":
         agents = call_rpc("list")
         current_pane = get_current_tmux_pane(args.current_pane)
-        status_bar = format_status_bar(agents, current_pane, registry_connected=is_registry_connected())
+        status_bar = format_status_bar(agents, current_pane, registry_connected=is_registry_connected(), registry_states=registry_connection_states())
         if status_bar:
             print(status_bar, end="")
+
+    elif args.subcommand == "registry-status":
+        print(format_registry_status(load_registry_status()))
 
     elif args.subcommand == "send-message":
         if not args.target and not args.agent_id:

@@ -52,6 +52,28 @@ with lib;
       description = "Optional agent-registry base URL.";
     };
 
+    registries = mkOption {
+      type = types.listOf (types.submodule {
+        options = {
+          name = mkOption {
+            type = types.str;
+            description = "Short name for this agent registry.";
+          };
+          url = mkOption {
+            type = types.str;
+            description = "Agent registry base URL.";
+          };
+          token-file = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = "Optional file containing the Bearer token for this registry.";
+          };
+        };
+      });
+      default = [];
+      description = "Optional list of agent registries. When non-empty, this supersedes registryUrl for registry discovery/sync.";
+    };
+
     registryAuth = mkOption {
       type = types.bool;
       default = false;

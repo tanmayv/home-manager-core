@@ -17,12 +17,15 @@ pkgs.writeShellApplication {
     cmd="$1"
     shift
 
-    # Parse --obs flag
+    # Parse wrapper flags
     obs_enabled=false
+    no_notify_with_send_keys=false
     new_args=()
     for arg in "$@"; do
       if [[ "$arg" == "--obs" ]]; then
         obs_enabled=true
+      elif [[ "$arg" == "--no-notify-with-send-keys" ]]; then
+        no_notify_with_send_keys=true
       else
         new_args+=("$arg")
       fi
@@ -46,7 +49,7 @@ pkgs.writeShellApplication {
       agent_type=$(basename "$cmd")
       agent_id="''${AGENT_ID:-$(python3 -c 'import uuid; print(uuid.uuid4())')}"
       export AGENT_ID="$agent_id"
-      agent_name=$(python3 -c "import socket, json, os, sys; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.connect(os.environ.get('AGENT_TRACKER_SOCKET', os.path.join(os.path.expanduser('~/.cache'), 'agent-tracker', 'agent-tracker.sock'))); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'register', 'params': {'session': sys.argv[1], 'tmux_pane': sys.argv[2], 'wrapper_pid': int(sys.argv[3]), 'tmux_socket': sys.argv[4], 'name': sys.argv[5], 'agent_type': sys.argv[6], 'agent_cmd': sys.argv[7], 'agent_id': sys.argv[8]}, 'id': 1}).encode()); s.shutdown(socket.SHUT_WR); resp = s.recv(1024); data = json.loads(resp.decode()); print(data.get(\"result\", \"\"))" "$session_name" "$pane_id" "$wrapper_pid" "$tmux_socket" "$suggested_name" "$agent_type" "$(basename "$cmd")" "$agent_id" 2>>/tmp/wrapper.log)
+      agent_name=$(python3 -c "import socket, json, os, sys; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.connect(os.environ.get('AGENT_TRACKER_SOCKET', os.path.join(os.path.expanduser('~/.cache'), 'agent-tracker', 'agent-tracker.sock'))); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'register', 'params': {'session': sys.argv[1], 'tmux_pane': sys.argv[2], 'wrapper_pid': int(sys.argv[3]), 'tmux_socket': sys.argv[4], 'name': sys.argv[5], 'agent_type': sys.argv[6], 'agent_cmd': sys.argv[7], 'agent_id': sys.argv[8], 'no_notify_with_send_keys': sys.argv[9].lower() == 'true'}, 'id': 1}).encode()); s.shutdown(socket.SHUT_WR); resp = s.recv(1024); data = json.loads(resp.decode()); print(data.get(\"result\", \"\"))" "$session_name" "$pane_id" "$wrapper_pid" "$tmux_socket" "$suggested_name" "$agent_type" "$(basename "$cmd")" "$agent_id" "$no_notify_with_send_keys" 2>>/tmp/wrapper.log)
 
       resolve_tmux_location() {
         local current_session current_pane current_socket
@@ -103,7 +106,7 @@ pkgs.writeShellApplication {
         current_pane="''${current_pane:-$last_sent_pane}"
         current_socket="''${current_socket:-$last_sent_socket}"
         current_name=$(tmux display-message -p -t "$current_pane" '#{@agent_name}' 2>/dev/null || true)
-        if python3 -c "import socket, json, os, sys; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(2.0); s.connect(os.environ['AGENT_TRACKER_SOCKET']); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'register', 'params': {'session': sys.argv[1], 'tmux_pane': sys.argv[2], 'wrapper_pid': int(sys.argv[3]), 'tmux_socket': sys.argv[4], 'name': sys.argv[5], 'agent_type': sys.argv[6], 'agent_cmd': sys.argv[7], 'agent_id': sys.argv[8]}, 'id': 1}).encode()); s.shutdown(socket.SHUT_WR); data = json.loads(s.recv(1024).decode()); print(data.get(\"result\", \"\"))" "$current_session" "$current_pane" "$wrapper_pid" "$current_socket" "$current_name" "$agent_type" "$(basename "$cmd")" "$agent_id" >/dev/null 2>>/tmp/wrapper.log; then
+        if python3 -c "import socket, json, os, sys; s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM); s.settimeout(2.0); s.connect(os.environ['AGENT_TRACKER_SOCKET']); s.sendall(json.dumps({'jsonrpc': '2.0', 'method': 'register', 'params': {'session': sys.argv[1], 'tmux_pane': sys.argv[2], 'wrapper_pid': int(sys.argv[3]), 'tmux_socket': sys.argv[4], 'name': sys.argv[5], 'agent_type': sys.argv[6], 'agent_cmd': sys.argv[7], 'agent_id': sys.argv[8], 'no_notify_with_send_keys': sys.argv[9].lower() == 'true'}, 'id': 1}).encode()); s.shutdown(socket.SHUT_WR); data = json.loads(s.recv(1024).decode()); print(data.get(\"result\", \"\"))" "$current_session" "$current_pane" "$wrapper_pid" "$current_socket" "$current_name" "$agent_type" "$(basename "$cmd")" "$agent_id" "$no_notify_with_send_keys" >/dev/null 2>>/tmp/wrapper.log; then
           last_sent_session="$current_session"
           last_sent_pane="$current_pane"
           last_sent_socket="$current_socket"

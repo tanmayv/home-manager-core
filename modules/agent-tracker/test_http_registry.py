@@ -150,6 +150,29 @@ class TestHttpAndRegistry(unittest.TestCase):
             self.assertEqual(post(f"{base}/trackers/t2/deliveries/{message_id}/ack", {}, token="secret")[0], 200)
             self.assertEqual(get(f"{base}/trackers/t2/deliveries?wait=0", token="secret")[1]["deliveries"], [])
 
+    def test_registry_tracker_events_queue_ack_and_persist(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_path = os.path.join(tmp, "registry-state.json")
+            store = registry_server.Store(state_path=state_path)
+            source = {"tracker_id": "t1", "hostname": "host1", "address": "host1", "http_port": 19875, "agents": []}
+            target = {"tracker_id": "t2", "hostname": "host2", "address": "host2", "http_port": 19876, "agents": []}
+            store.put_tracker(source)
+            store.put_tracker(target)
+            server, base = start(registry_server.make_handler(store, token="secret"))
+            self.addCleanup(server.shutdown)
+            self.addCleanup(server.server_close)
+
+            code, body = post(f"{base}/tracker-events", {"event_type": "message_read", "source_tracker_id": "t1", "target_tracker_id": "t2", "payload": {"message_id": "m1"}}, token="secret")
+            self.assertEqual(code, 202)
+            event_id = body["event_id"]
+            reloaded = registry_server.Store(state_path=state_path)
+            self.assertEqual(reloaded.wait_for_tracker_events("t2", 0)[0]["event_id"], event_id)
+            code, events = get(f"{base}/trackers/t2/events?wait=0", token="secret")
+            self.assertEqual(code, 200)
+            self.assertEqual(events["events"][0]["payload"]["message_id"], "m1")
+            self.assertEqual(post(f"{base}/trackers/t2/events/{event_id}/ack", {}, token="secret")[0], 200)
+            self.assertEqual(get(f"{base}/trackers/t2/events?wait=0", token="secret")[1]["events"], [])
+
     def test_registry_messages_auth_same_tracker_offline_and_attachment_validation(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = registry_server.Store(state_path=os.path.join(tmp, "registry-state.json"))
