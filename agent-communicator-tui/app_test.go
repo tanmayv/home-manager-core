@@ -68,8 +68,8 @@ func TestCtrlNCtrlPNavigationAndInboxLoad(t *testing.T) {
 	m := model{messageOffset: 3, rows: []agentRow{{Name: "a", Scope: "local"}, {Name: "b", Scope: "local"}}, local: &fakeLocal{}}
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlN})
 	m = updated.(model)
-	if m.selected != 1 || m.messageOffset != 0 {
-		t.Fatalf("selected/offset = %d/%d, want 1/0", m.selected, m.messageOffset)
+	if m.selected != 1 {
+		t.Fatalf("selected = %d, want 1", m.selected)
 	}
 	if cmd == nil {
 		t.Fatal("down should request inbox load")
@@ -77,8 +77,8 @@ func TestCtrlNCtrlPNavigationAndInboxLoad(t *testing.T) {
 	m.messageOffset = 3
 	updated, cmd = m.Update(tea.KeyMsg{Type: tea.KeyCtrlP})
 	m = updated.(model)
-	if m.selected != 0 || m.messageOffset != 0 {
-		t.Fatalf("selected/offset = %d/%d, want 0/0", m.selected, m.messageOffset)
+	if m.selected != 0 {
+		t.Fatalf("selected = %d, want 0", m.selected)
 	}
 	if cmd == nil {
 		t.Fatal("up should request inbox load")

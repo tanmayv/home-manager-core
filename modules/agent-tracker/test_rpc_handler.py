@@ -6,6 +6,7 @@ import time
 import unittest
 from unittest import mock
 
+import registry_client
 import rpc_handler
 import state
 
@@ -542,6 +543,26 @@ class TestRpcHandler(unittest.TestCase):
         state.set_agent("sender", {"agent_id": "id-s", "status": "idle"})
         self.assertTrue(rpc_handler.handle_send_message({"agent_name": "sender", "target_address": "corp:remote-host/agent2", "message": "hello"}))
         send_remote.assert_called_once_with("corp", "sender", "id-s", mock.ANY, "remote-host", "agent2", "hello", None, None)
+
+    @mock.patch("tmux_util.send_keys")
+    def test_local_send_preserves_message_id_and_sender_metadata(self, send_keys):
+        inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent("agent1", {"agent_id": "id-1", "status": "idle", "tmux_pane": "%1", "tmux_socket": "sock"})
+            state.set_agent("agent-communicator", {"agent_id": "sender-id", "status": "idle"})
+
+            self.assertTrue(rpc_handler.handle_send_message({"agent_name": "agent1", "message": "hello", "sender_name": "agent-communicator", "message_id": "m1"}))
+
+            with open(inbox_path) as f:
+                msg = json.loads(f.readline())
+            self.assertEqual(msg["message_id"], "m1")
+            self.assertEqual(msg["sender_agent_id"], "sender-id")
+            self.assertEqual(msg["sender_tracker_id"], registry_client.TRACKER_ID)
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
 
     @mock.patch("registry_client.send_remote_message")
     @mock.patch("tmux_util.send_keys")

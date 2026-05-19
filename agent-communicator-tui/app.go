@@ -52,21 +52,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case tea.KeyCtrlT:
 			m.toggleMode()
+			m.selectLatestMessage()
 			return m, m.reloadMessages()
 		case tea.KeyCtrlF:
 			return m, switchToAgentPane(m.currentRow())
 		case tea.KeyCtrlP:
 			if m.selected > 0 {
 				m.selected--
-				m.messageOffset = 0
-				m.messageSelected = 0
+				m.selectLatestMessage()
 				return m, m.reloadMessages()
 			}
 		case tea.KeyCtrlN:
 			if m.selected < len(m.rows)-1 {
 				m.selected++
-				m.messageOffset = 0
-				m.messageSelected = 0
+				m.selectLatestMessage()
 				return m, m.reloadMessages()
 			}
 		case tea.KeyUp:
@@ -98,6 +97,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.messageFocused = false
 			m.composer = deletePreviousWord(m.composer)
 		case tea.KeyCtrlR:
+			m.selectLatestMessage()
 			return m, tea.Batch(loadAgents(m.local, m.remote), loadOutboxCmd())
 		case tea.KeyCtrlE:
 			messages := m.displayMessages()
@@ -124,6 +124,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.selected = max(0, len(m.rows)-1)
 		}
 		if len(m.rows) > 0 {
+			m.selectLatestMessage()
 			return m, m.reloadMessages()
 		}
 		m.messages = nil
@@ -133,8 +134,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.err = nil
 			m.messages = m.mergeSentMessages(m.currentRow(), msg.Messages)
-			m.messageSelected = clampSelectedMessage(m.messageSelected, len(m.displayMessages()))
-			m.messageOffset = clampMessageOffset(m.messageOffset, len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
+			m.selectLatestMessage()
 		}
 	case allInboxLoaded:
 		if msg.Err != nil {
@@ -142,8 +142,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.err = nil
 			m.allMessages = m.mergeAllMessages(msg.Messages)
-			m.messageSelected = clampSelectedMessage(m.messageSelected, len(m.displayMessages()))
-			m.messageOffset = clampMessageOffset(m.messageOffset, len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
+			m.selectLatestMessage()
 		}
 	case messageSent:
 		m.err = msg.Err
@@ -192,6 +191,11 @@ func (m model) currentRow() agentRow {
 	return m.rows[m.selected]
 }
 func conversationKey(row agentRow) string { return rowTarget(row) }
+
+func (m *model) selectLatestMessage() {
+	m.messageSelected = max(0, len(m.displayMessages())-1)
+	m.messageOffset = messageBottomOffset(len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
+}
 
 func clampSelectedMessage(selected, count int) int {
 	if count <= 0 {

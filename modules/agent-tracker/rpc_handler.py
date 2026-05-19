@@ -401,6 +401,8 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
     msg = params.get("message")
     attachments = params.get("attachments")
     target_address = params.get("target_address")
+    sender_info = state.get_agent(params.get("sender_id") or sender_name) or {}
+    sender_id = sender_info.get("agent_id") or params.get("sender_id")
 
     if target_address and "/" in target_address:
         registry_name = None
@@ -408,8 +410,6 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
         if ":" in hostname:
             registry_name, hostname = hostname.split(":", 1)
         if hostname not in {"local", LOCAL_HOSTNAME}:
-            sender_info = state.get_agent(params.get("sender_id") or sender_name) or {}
-            sender_id = sender_info.get("agent_id") or params.get("sender_id")
             if registry_name:
                 status, body = registry_client.send_remote_message_to_registry(
                     registry_name, sender_name, sender_id, registry_client.TRACKER_ID, hostname, target, msg, attachments, params.get("message_id")
@@ -447,6 +447,8 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
         "attachments": attachments,
         "read": False,
         "message_id": params.get("message_id"),
+        "sender_agent_id": sender_id,
+        "sender_tracker_id": registry_client.TRACKER_ID,
     }, sender_name)
     return {"success": True, "warning": warning_msg} if warning_msg else True
 
