@@ -180,16 +180,22 @@ func (m model) messageViewWithHeight(width, visible int) string {
 func (m model) messageLinesForWidth(width int) []string {
 	start := time.Now()
 	wrapWidth := max(10, width-1)
-	defer func() {
-		debugLogf("message_lines duration=%s messages=%d width=%d", time.Since(start), len(m.displayOrderedMessages()), width)
-	}()
 	messages := m.displayOrderedMessages()
+	defer func() {
+		debugLogf("message_lines duration=%s messages=%d width=%d", time.Since(start), len(messages), width)
+	}()
 	if len(messages) == 0 {
 		if len(m.rows) > 0 && m.rows[m.selected].Scope == "remote" {
 			return wrapLine(mutedStyle.Render("No messages. Remote history is in-memory for sent messages only."), wrapWidth)
 		}
 		return wrapLine(mutedStyle.Render("No messages. Inbox history loads for local agents."), wrapWidth)
 	}
+	cacheKey := messageRenderCacheKey(m, messages, wrapWidth)
+	if lines, ok := cachedMessageLines(cacheKey); ok {
+		debugLogf("message_lines cache=hit messages=%d width=%d", len(messages), width)
+		return lines
+	}
+	debugLogf("message_lines cache=miss messages=%d width=%d", len(messages), width)
 	lines := []string{}
 	for i, msg := range messages {
 		if i > 0 {
@@ -197,6 +203,7 @@ func (m model) messageLinesForWidth(width int) []string {
 		}
 		lines = append(lines, m.messageBubbleLines(msg, i, wrapWidth)...)
 	}
+	storeMessageLines(cacheKey, lines)
 	return lines
 }
 
