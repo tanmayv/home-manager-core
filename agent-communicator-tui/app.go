@@ -99,6 +99,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case tea.KeyEnter:
 				m.showingConfigMenu = false
+				if len(m.agentConfigKeys) > 0 {
+					selectedKey := m.agentConfigKeys[m.configSelected]
+					cfg := m.agentConfigs[selectedKey]
+					return m, spinAgentCmd(cfg)
+				}
 				return m, nil
 			}
 			return m, nil
@@ -317,6 +322,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case paneSwitched:
 		m.err = msg.Err
 	case editorClosed:
+		m.err = msg.Err
+	case agentConfigSpun:
 		m.err = msg.Err
 	}
 	return m, nil

@@ -340,10 +340,13 @@ func TestAgentConfigMenuInteraction(t *testing.T) {
 	}
 
 	// 5. Press Enter to select the config (hides the menu)
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updated.(model)
 	if m.showingConfigMenu {
 		t.Fatalf("expected showingConfigMenu to be false after selection")
+	}
+	if cmd == nil {
+		t.Fatalf("expected spin command, got nil")
 	}
 
 	// 6. Re-open and Press Esc to close

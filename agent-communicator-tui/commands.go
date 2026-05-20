@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -233,4 +235,27 @@ func fallback(v, d string) string {
 		return d
 	}
 	return v
+}
+
+type agentConfigSpun struct {
+	Name string
+	Err  error
+}
+
+func spinAgentCmd(cfg AgentConfig) tea.Cmd {
+	return func() tea.Msg {
+		dir := cfg.Directory
+		if dir == "" {
+			if d, err := os.Getwd(); err == nil {
+				dir = d
+			} else {
+				dir = "."
+			}
+		}
+
+		args := append([]string{"spin", dir, cfg.AgentCommand}, cfg.AgentArgs...)
+		cmd := exec.Command("agent-tracker-ctl", args...)
+		err := cmd.Run()
+		return agentConfigSpun{Name: cfg.Name, Err: err}
+	}
 }
