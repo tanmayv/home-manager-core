@@ -13,9 +13,31 @@ import uuid
 import subprocess
 import struct
 import re
+import fcntl
+from contextlib import contextmanager
 
 BUFFER_SIZE = 4096
 LOCAL_HOSTNAME = os.environ.get("AGENT_TRACKER_HOSTNAME", socket.gethostname())
+
+
+@contextmanager
+def _locked_inbox(inbox_file: str):
+    os.makedirs(os.path.dirname(inbox_file), exist_ok=True)
+    lock_path = inbox_file + ".lock"
+    with open(lock_path, "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+
+
+def _atomic_write_inbox(inbox_file: str, messages: list[dict]) -> None:
+    tmp = inbox_file + ".tmp"
+    with open(tmp, "w") as f:
+        for msg in messages:
+            f.write(json.dumps(msg) + "\n")
+    os.replace(tmp, inbox_file)
 
 
 class DeliveryTargetNotFound(ValueError):
@@ -340,50 +362,50 @@ def deliver_local_message(target_name_or_id: str, msg_obj: dict, notify_sender: 
     msg_id = msg_obj.get("message_id")
 
     try:
-        if msg_id and os.path.exists(inbox_file):
-            with open(inbox_file, "r") as f:
-                for line in f:
-                    if not line.strip():
-                        continue
+        with _locked_inbox(inbox_file):
+            if msg_id and os.path.exists(inbox_file):
+                with open(inbox_file, "r") as f:
+                    for line in f:
+                        if not line.strip():
+                            continue
+                        try:
+                            if json.loads(line).get("message_id") == msg_id:
+                                logging.info(f"Skipping duplicate delivery {msg_id} for {current_name}")
+                                return current_name
+                        except json.JSONDecodeError:
+                            continue
+
+            attachments = []
+            if msg_obj.get("attachments"):
+                msg_id = msg_id or str(uuid.uuid4())
+                attach_dir = os.path.join(state.INBOX_DIR, "attachments", uuid_str, msg_id)
+                os.makedirs(attach_dir, exist_ok=True)
+                seen_names = set()
+                for att in msg_obj["attachments"]:
+                    raw_name = att.get("name")
+                    safe_name = os.path.basename(raw_name or "")
+                    if not safe_name or "content_b64" not in att:
+                        raise DeliveryValidationError("invalid attachments")
+                    if safe_name in seen_names:
+                        raise DeliveryValidationError("duplicate attachment name")
+                    seen_names.add(safe_name)
                     try:
-                        if json.loads(line).get("message_id") == msg_id:
-                            logging.info(f"Skipping duplicate delivery {msg_id} for {current_name}")
-                            return current_name
-                    except json.JSONDecodeError:
-                        continue
+                        content = base64.b64decode(att["content_b64"], validate=True)
+                    except (binascii.Error, ValueError) as e:
+                        raise DeliveryValidationError(f"invalid attachment payload: {e}")
+                    path = os.path.join(attach_dir, safe_name)
+                    with open(path, "wb") as af:
+                        af.write(content)
+                    attachments.append({
+                        "name": safe_name,
+                        "path": path,
+                        "content_type": att.get("content_type", "application/octet-stream"),
+                        "size": os.path.getsize(path),
+                    })
+                msg_obj = {**msg_obj, "message_id": msg_id, "attachments": attachments}
 
-        attachments = []
-        if msg_obj.get("attachments"):
-            msg_id = msg_id or str(uuid.uuid4())
-            attach_dir = os.path.join(state.INBOX_DIR, "attachments", uuid_str, msg_id)
-            os.makedirs(attach_dir, exist_ok=True)
-            seen_names = set()
-            for att in msg_obj["attachments"]:
-                raw_name = att.get("name")
-                safe_name = os.path.basename(raw_name or "")
-                if not safe_name or "content_b64" not in att:
-                    raise DeliveryValidationError("invalid attachments")
-                if safe_name in seen_names:
-                    raise DeliveryValidationError("duplicate attachment name")
-                seen_names.add(safe_name)
-                try:
-                    content = base64.b64decode(att["content_b64"], validate=True)
-                except (binascii.Error, ValueError) as e:
-                    raise DeliveryValidationError(f"invalid attachment payload: {e}")
-                path = os.path.join(attach_dir, safe_name)
-                with open(path, "wb") as af:
-                    af.write(content)
-                attachments.append({
-                    "name": safe_name,
-                    "path": path,
-                    "content_type": att.get("content_type", "application/octet-stream"),
-                    "size": os.path.getsize(path),
-                })
-            msg_obj = {**msg_obj, "message_id": msg_id, "attachments": attachments}
-
-        os.makedirs(os.path.dirname(inbox_file), exist_ok=True)
-        with open(inbox_file, "a") as f:
-            f.write(json.dumps(msg_obj) + "\n")
+            with open(inbox_file, "a") as f:
+                f.write(json.dumps(msg_obj) + "\n")
 
         notification = {
             "target_agent_id": info.get("agent_id"),
@@ -497,50 +519,43 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
     return {"success": True, "warning": warning_msg} if warning_msg else True
 
 def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None, agent_name: str | None = None, agent_info: dict | None = None) -> dict:
-    """Reads the inbox file, handles unread/history/last_n messages, marks them as read, and rewrites the file."""
+    """Reads inbox history and marks returned messages read under a file lock."""
     if not os.path.exists(inbox_file):
         return {"mode": "history", "messages": []}
-        
+
     try:
-        all_messages = []
-        with open(inbox_file, "r") as f:
-            for line in f:
-                if line.strip():
-                    try:
-                        all_messages.append(json.loads(line))
-                    except json.JSONDecodeError:
-                        pass
-        
-        mode = "unread"
-        result_messages = []
-        
-        newly_read = []
-        if last_n is not None:
-            mode = "last_n"
-            result_messages = all_messages[-last_n:] if last_n > 0 else []
-            for msg in result_messages:
-                if not msg.get("read", False):
-                    newly_read.append(msg)
-                msg["read"] = True
-        else:
-            unread_messages = [m for m in all_messages if not m.get("read", False)]
-            if unread_messages:
-                mode = "unread"
-                result_messages = unread_messages
-                for msg in unread_messages:
+        with _locked_inbox(inbox_file):
+            all_messages = []
+            with open(inbox_file, "r") as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            all_messages.append(json.loads(line))
+                        except json.JSONDecodeError:
+                            pass
+
+            mode = "unread"
+            newly_read = []
+            if last_n is not None:
+                mode = "last_n"
+                result_messages = all_messages[-last_n:] if last_n > 0 else []
+            else:
+                result_messages = [m for m in all_messages if not m.get("read", False)]
+                if not result_messages:
+                    mode = "history"
+                    result_messages = all_messages[-5:]
+
+            if mode != "history":
+                for msg in result_messages:
                     if not msg.get("read", False):
                         newly_read.append(msg)
                     msg["read"] = True
+
+            if clear:
+                os.remove(inbox_file)
             else:
-                mode = "history"
-                result_messages = all_messages[-5:]
-                
-        if clear:
-            os.remove(inbox_file)
-        else:
-            with open(inbox_file, "w") as f:
-                for m in all_messages:
-                    f.write(json.dumps(m) + "\n")
+                _atomic_write_inbox(inbox_file, all_messages)
+
         if agent_name and agent_info:
             for msg in newly_read:
                 logging.info("publishing message_read target=%s sender=%s message_id=%s sender_agent_id=%s sender_tracker_id=%s", agent_name, msg.get("sender", "unknown"), msg.get("message_id"), msg.get("sender_agent_id"), msg.get("sender_tracker_id"))

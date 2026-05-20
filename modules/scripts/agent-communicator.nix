@@ -25,7 +25,7 @@ in
         ${registryEnv}
         export SUGGESTED_AGENT_NAME="''${SUGGESTED_AGENT_NAME:-agent-communicator}"
         export AGENT_ID="''${AGENT_ID:-00000000-0000-5000-8000-000000000001}"
-        exec agent-wrapper ${agentCommunicatorTui}/bin/agent-communicator-tui --no-notify-with-send-keys --no-registry "$@"
+        exec agent-wrapper ${agentCommunicatorTui}/bin/agent-communicator-tui --no-notify-with-send-keys "$@"
       '';
     })
   ];

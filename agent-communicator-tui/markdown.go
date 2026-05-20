@@ -12,9 +12,13 @@ var codeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("11"))
 var commentStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Italic(true)
 var keywordStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("13")).Bold(true)
 var stringStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10"))
+var numberStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
+var typeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true)
+var boolStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true)
 
 var urlRE = regexp.MustCompile(`https?://[^\s)]+`)
 var mdLinkRE = regexp.MustCompile(`\[([^\]]+)\]\((https?://[^\s)]+)\)`)
+var numberRE = regexp.MustCompile(`\b(0x[0-9a-fA-F]+|\d+(\.\d+)?)\b`)
 
 func renderMarkdown(s string, width int) string {
 	lines := strings.Split(strings.ReplaceAll(s, "**", ""), "\n")
@@ -150,11 +154,36 @@ func highlightCodeLine(line, lang string) string {
 	if strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "//") {
 		return commentStyle.Render(line)
 	}
-	line = highlightQuotedStrings(line)
-	for _, kw := range languageKeywords(lang) {
-		line = regexp.MustCompile(`\b`+regexp.QuoteMeta(kw)+`\b`).ReplaceAllStringFunc(line, func(s string) string { return keywordStyle.Render(s) })
+	code, comment := splitInlineComment(line, lang)
+	code = highlightWords(code, languageKeywords(lang), keywordStyle)
+	code = highlightWords(code, languageTypes(lang), typeStyle)
+	code = highlightWords(code, []string{"true", "false", "nil", "null", "None"}, boolStyle)
+	code = numberRE.ReplaceAllStringFunc(code, func(s string) string { return numberStyle.Render(s) })
+	code = highlightQuotedStrings(code)
+	if comment != "" {
+		return codeStyle.Render(code) + commentStyle.Render(comment)
 	}
-	return codeStyle.Render(line)
+	return codeStyle.Render(code)
+}
+
+func highlightWords(line string, words []string, style lipgloss.Style) string {
+	for _, word := range words {
+		line = regexp.MustCompile(`\b`+regexp.QuoteMeta(word)+`\b`).ReplaceAllStringFunc(line, func(s string) string { return style.Render(s) })
+	}
+	return line
+}
+
+func splitInlineComment(line, lang string) (string, string) {
+	marker := "//"
+	switch strings.ToLower(strings.Fields(lang + " ")[0]) {
+	case "py", "python", "nix", "sh", "bash", "zsh", "shell":
+		marker = "#"
+	}
+	idx := strings.Index(line, marker)
+	if idx < 0 {
+		return line, ""
+	}
+	return line[:idx], line[idx:]
 }
 
 func highlightQuotedStrings(line string) string {
@@ -181,13 +210,26 @@ func highlightQuotedStrings(line string) string {
 func languageKeywords(lang string) []string {
 	switch strings.ToLower(strings.Fields(lang + " ")[0]) {
 	case "go", "golang":
-		return []string{"package", "import", "func", "return", "if", "else", "for", "range", "type", "struct", "var", "const"}
+		return []string{"package", "import", "func", "return", "if", "else", "for", "range", "type", "struct", "interface", "var", "const", "defer", "go", "select", "case", "switch"}
 	case "py", "python":
-		return []string{"def", "return", "if", "elif", "else", "for", "while", "in", "import", "from", "class", "with", "as"}
+		return []string{"def", "return", "if", "elif", "else", "for", "while", "in", "import", "from", "class", "with", "as", "try", "except", "finally", "yield", "lambda"}
 	case "nix":
 		return []string{"let", "in", "with", "rec", "inherit", "if", "then", "else", "assert"}
 	case "sh", "bash", "zsh", "shell":
-		return []string{"if", "then", "else", "fi", "for", "do", "done", "case", "esac", "function", "export"}
+		return []string{"if", "then", "else", "fi", "for", "do", "done", "case", "esac", "function", "export", "local", "while", "until"}
+	default:
+		return nil
+	}
+}
+
+func languageTypes(lang string) []string {
+	switch strings.ToLower(strings.Fields(lang + " ")[0]) {
+	case "go", "golang":
+		return []string{"string", "int", "int64", "bool", "error", "map", "chan", "any"}
+	case "py", "python":
+		return []string{"str", "int", "bool", "dict", "list", "set", "tuple", "Exception"}
+	case "nix":
+		return []string{"pkgs", "lib", "config", "true", "false", "null"}
 	default:
 		return nil
 	}
