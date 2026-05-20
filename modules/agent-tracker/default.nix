@@ -93,6 +93,8 @@ in
         (pkgs.writeScriptBin "agent-tracker-ctl" ''
           #!${pkgs.python3}/bin/python3
           import os
+          import sys
+          sys.path.insert(0, "${agentTrackerFiles}")
           os.environ.setdefault("AGENT_TRACKER_SOCKET", "${socketPath}")
           ${lib.optionalString (!cfg.enable) ''os.environ.setdefault("AGENT_TRACKER_DAEMON", "${daemonCmd}")''}
           os.environ.setdefault("POLL_INTERVAL", "${toString cfg.pollInterval}")

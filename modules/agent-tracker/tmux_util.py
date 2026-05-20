@@ -189,25 +189,36 @@ def send_keys(pane_id, keys, socket_path=None):
     # 3. Send the Enter key to submit
     enqueue_tmux_cmd(cmd_base + ["send-keys", "-t", pane_id, "Enter"])
 
-def spin_agent(agent_name, command, target_pane=None):
+def spin_agent(agent_name, command, target_pane=None, session=None, directory=None):
     import shlex
-    tmux_cmd = ["tmux"]
-    if target_pane:
-        tmux_cmd.extend(["split-window", "-t", target_pane])
-    else:
-        tmux_cmd.extend(["split-window"])
-    
-    tmux_cmd.extend(["-e", f"SUGGESTED_AGENT_NAME={agent_name}"])
     import os
+
+    tmux_base = ["tmux"]
+    env_args = ["-e", f"SUGGESTED_AGENT_NAME={agent_name}"]
     if "AGENT_TRACKER_SOCKET" in os.environ:
-        tmux_cmd.extend(["-e", f"AGENT_TRACKER_SOCKET={os.environ['AGENT_TRACKER_SOCKET']}"])
-    
+        env_args.extend(["-e", f"AGENT_TRACKER_SOCKET={os.environ['AGENT_TRACKER_SOCKET']}"])
     quoted_parts = [shlex.quote(part) for part in shlex.split(command)]
     full_cmd = f"agent-wrapper {' '.join(quoted_parts)}"
-    tmux_cmd.append(full_cmd)
-    
+
     try:
+        if session and directory:
+            has_session = subprocess.run(tmux_base + ["has-session", "-t", session], capture_output=True).returncode == 0
+            if has_session:
+                cmd = tmux_base + ["new-window", "-t", session, "-c", directory] + env_args + [full_cmd]
+            else:
+                cmd = tmux_base + ["new-session", "-d", "-s", session, "-c", directory] + env_args + [full_cmd]
+            subprocess.run(cmd, check=True, capture_output=True)
+            subprocess.run(tmux_base + ["switch-client", "-t", session], check=False, capture_output=True)
+            return
+
+        tmux_cmd = tmux_base[:]
+        if target_pane:
+            tmux_cmd.extend(["split-window", "-t", target_pane])
+        else:
+            tmux_cmd.extend(["split-window"])
+        tmux_cmd.extend(env_args)
+        tmux_cmd.append(full_cmd)
         subprocess.run(tmux_cmd, check=True, capture_output=True)
     except subprocess.CalledProcessError as e:
-        logging.error(f"Tmux split-window failed: {e.stderr.decode()}")
+        logging.error(f"Tmux spin failed: {e.stderr.decode()}")
         raise
