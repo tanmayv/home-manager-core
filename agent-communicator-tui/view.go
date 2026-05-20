@@ -27,6 +27,9 @@ func (m model) View() string {
 	footer := m.footer(m.width)
 	bodyH := max(3, m.height-lineCount(footer))
 
+	if m.showingPromptMenu {
+		return m.renderPromptMenu(m.width, bodyH) + "\n" + footer
+	}
 	if m.showingConfigMenu {
 		return m.renderConfigMenu(m.width, bodyH) + "\n" + footer
 	}
@@ -75,7 +78,7 @@ func (m model) composerBox(width int) string {
 
 func (m model) footer(width int) string {
 	lines := []string{
-		"ctrl+t view · tab section · ctrl+n/p agent · ctrl+h hide · ctrl+f save · ctrl+enter focus sender",
+		"ctrl+t view · tab section · ctrl+n/p agent · ctrl+i prompts · ctrl+h hide · ctrl+f save",
 		"↑/↓ select msg · ctrl+u/d scroll · ctrl+e open · ctrl+l config · enter send · ctrl+r refresh · ctrl+q quit",
 	}
 	if m.err != nil {
@@ -440,6 +443,32 @@ func localHostname() string {
 		return h
 	}
 	return "local"
+}
+
+func (m model) renderPromptMenu(width, height int) string {
+	var body string
+	if len(m.prompts) == 0 {
+		body = lipgloss.NewStyle().
+			Foreground(palette.Yellow).
+			Render("No prompt templates found.\nAdd <prompt-name>.md files in ~/.config/agent-communicator/prompts/")
+	} else {
+		var listLines []string
+		for i, prompt := range m.prompts {
+			style := lipgloss.NewStyle().Foreground(palette.Text)
+			prefix := "  "
+			if i == m.promptSelected {
+				style = style.Background(palette.Surface0).Foreground(palette.Yellow)
+				prefix = "> "
+			}
+			listLines = append(listLines, prefix+style.Render(prompt.Name))
+		}
+		body = strings.Join(listLines, "\n")
+	}
+
+	title := titleStyle.Render("Prompt Templates")
+	help := mutedStyle.Render("enter edit/send · esc close · only saved edits are sent")
+	boxContent := title + "\n" + help + "\n\n" + body
+	return box(boxContent, width, height)
 }
 
 func (m model) renderConfigMenu(width, height int) string {

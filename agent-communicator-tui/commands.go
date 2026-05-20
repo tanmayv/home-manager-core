@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -54,6 +56,60 @@ type eventsLoaded struct {
 type refreshTick struct{}
 type retryEvents struct{}
 type agentListSpinnerTick struct{}
+
+type promptTemplate struct {
+	Name string
+	Path string
+}
+
+type promptsLoaded struct {
+	Prompts []promptTemplate
+	Err     error
+}
+
+type promptEdited struct {
+	Body  string
+	Saved bool
+	Err   error
+}
+
+func promptDirectory() string {
+	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
+		return filepath.Join(xdg, "agent-communicator", "prompts")
+	}
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return filepath.Join(".", "prompts")
+	}
+	return filepath.Join(home, ".config", "agent-communicator", "prompts")
+}
+
+func loadPromptsCmd() tea.Cmd {
+	return func() tea.Msg {
+		prompts, err := loadPromptTemplates(promptDirectory())
+		return promptsLoaded{Prompts: prompts, Err: err}
+	}
+}
+
+func loadPromptTemplates(dir string) ([]promptTemplate, error) {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	prompts := []promptTemplate{}
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".md" {
+			continue
+		}
+		name := strings.TrimSuffix(entry.Name(), ".md")
+		prompts = append(prompts, promptTemplate{Name: name, Path: filepath.Join(dir, entry.Name())})
+	}
+	sort.Slice(prompts, func(i, j int) bool { return prompts[i].Name < prompts[j].Name })
+	return prompts, nil
+}
 
 func loadInbox(local localClient, inboxOwner string, row agentRow) tea.Cmd {
 	return func() tea.Msg {

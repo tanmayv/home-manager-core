@@ -20,6 +20,7 @@
 - Tracker client: `agent-communicator-tui/internal/tracker/`
 - Registry client: `agent-communicator-tui/internal/registry/`
 - Persistent outbox: `$XDG_STATE_HOME/agent-communicator/outbox.jsonl`, fallback `~/.local/state/agent-communicator/outbox.jsonl`
+- Prompt templates: `$XDG_CONFIG_HOME/agent-communicator/prompts/<prompt-name>.md`, fallback `~/.config/agent-communicator/prompts/<prompt-name>.md`
 - Tracker inbox: `~/.cache/agent-tracker/inboxes/<agent-id>.inbox`
 
 ## Runtime identity
@@ -62,6 +63,16 @@ Important behavior:
   `(PS: Reply in markdown format.)`
 - The persisted/displayed body does **not** include that suffix.
 - Sends are optimistic: the message appears immediately. On send failure, the optimistic message is removed and the body is restored to the composer.
+
+### Prompt templates
+
+Prompt templates are Markdown files in `$XDG_CONFIG_HOME/agent-communicator/prompts/` or `~/.config/agent-communicator/prompts/`.
+
+- File names are `<prompt-name>.md`; non-Markdown files are ignored.
+- Press `P` to open the prompt selector.
+- Selecting a prompt copies it into a temporary Markdown file and opens it in `$EDITOR`, falling back to `nvim`.
+- The edited prompt is sent only if the temporary file was written/saved by the editor. Exiting without saving cancels the send.
+- Home Manager installs a sample `test.md` prompt for smoke testing.
 
 ### Outbox
 
@@ -130,12 +141,13 @@ Constraints:
 - `Ctrl-R`: refresh agent list with longer timeout and reload outbox
 - `Ctrl-T`: toggle Simple/Advanced view
 - `Ctrl-N` / `Ctrl-P`: select next/previous agent within the focused active/hidden section
+- `P`: open prompt-template selector; selected prompts are edited in a temporary file and sent only when saved
 - `Ctrl-H`: toggle selected agent hidden/de-prioritized
 - `Tab`: toggle agent-list focus between active and hidden sections
 - `Up` / `Down`: select message and auto-scroll it into view
 - `Ctrl-U` / `Ctrl-D`: scroll message viewport
 - `Ctrl-E`: open selected message in editor
-- `Ctrl-Enter`: focus/switch to the selected message sender's tmux pane when the sender is a local agent
+- `Ctrl-Enter`: focus/switch to the currently selected agent's tmux pane when the selected agent is local
 - `Ctrl-F`: save/unsave selected message
 - `Enter`: send composer text
 - Plain typing goes to composer

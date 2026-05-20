@@ -39,3 +39,53 @@ func openMessageInEditor(msg tracker.Message) tea.Cmd {
 		})()
 	}
 }
+
+func editPromptTemplate(path string) tea.Cmd {
+	return func() tea.Msg {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return promptEdited{Err: err}
+		}
+		file, err := os.CreateTemp("", "agent-communicator-prompt-*.md")
+		if err != nil {
+			return promptEdited{Err: err}
+		}
+		tempPath := file.Name()
+		if _, err := file.Write(content); err != nil {
+			file.Close()
+			os.Remove(tempPath)
+			return promptEdited{Err: err}
+		}
+		if err := file.Close(); err != nil {
+			os.Remove(tempPath)
+			return promptEdited{Err: err}
+		}
+		before, err := os.Stat(tempPath)
+		if err != nil {
+			os.Remove(tempPath)
+			return promptEdited{Err: err}
+		}
+		editor := os.Getenv("EDITOR")
+		if editor == "" {
+			editor = "nvim"
+		}
+		return tea.ExecProcess(exec.Command(editor, tempPath), func(err error) tea.Msg {
+			defer os.Remove(tempPath)
+			if err != nil {
+				return promptEdited{Err: err}
+			}
+			after, statErr := os.Stat(tempPath)
+			if statErr != nil {
+				return promptEdited{Err: statErr}
+			}
+			if !after.ModTime().After(before.ModTime()) {
+				return promptEdited{Saved: false}
+			}
+			body, readErr := os.ReadFile(tempPath)
+			if readErr != nil {
+				return promptEdited{Err: readErr}
+			}
+			return promptEdited{Body: string(body), Saved: true}
+		})()
+	}
+}

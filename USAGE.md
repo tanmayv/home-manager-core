@@ -238,6 +238,18 @@ Avoid deeply nested pane layouts. If you need more than 3 panes, consider a new 
 
 ---
 
+## Agent Communicator
+
+Prompt templates live in `~/.config/agent-communicator/prompts/<prompt-name>.md`.
+
+| Key | Action |
+|-----|--------|
+| `P` | Open prompt selector, edit selected prompt in Neovim/temp file, send only if saved |
+| `Ctrl+N` / `Ctrl+P` | Select next/previous agent |
+| `Enter` | Send composer text |
+
+---
+
 ## Shell (Zsh)
 
 ### Keybindings

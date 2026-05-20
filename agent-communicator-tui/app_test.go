@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -101,6 +103,59 @@ func TestAgentsLoadedKeepsRowsAndRequestsInbox(t *testing.T) {
 		t.Fatal("agentsLoaded should request inbox load")
 	}
 }
+func TestLoadPromptTemplatesCreatesDirAndSortsMarkdown(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "prompts")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "zeta.md"), []byte("z"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "alpha.md"), []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "ignore.txt"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prompts, err := loadPromptTemplates(dir)
+	if err != nil {
+		t.Fatalf("loadPromptTemplates: %v", err)
+	}
+	if len(prompts) != 2 {
+		t.Fatalf("len(prompts) = %d, want 2", len(prompts))
+	}
+	if prompts[0].Name != "alpha" || prompts[1].Name != "zeta" {
+		t.Fatalf("prompt order = %#v, want alpha,zeta", prompts)
+	}
+}
+
+func TestLoadPromptTemplatesCreatesMissingDir(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "missing", "prompts")
+	prompts, err := loadPromptTemplates(dir)
+	if err != nil {
+		t.Fatalf("loadPromptTemplates missing dir: %v", err)
+	}
+	if len(prompts) != 0 {
+		t.Fatalf("len(prompts) = %d, want 0", len(prompts))
+	}
+	if _, err := os.Stat(dir); err != nil {
+		t.Fatalf("prompt dir was not created: %v", err)
+	}
+}
+
+func TestCtrlIOpensPromptMenu(t *testing.T) {
+	m := model{local: &fakeLocal{}}
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlI})
+	m = updated.(model)
+	if !m.showingPromptMenu {
+		t.Fatal("ctrl+i should open prompt menu")
+	}
+	if cmd == nil {
+		t.Fatal("ctrl+i should reload prompt templates")
+	}
+}
+
 func TestCtrlQQuitsCtrlRRefreshesAndPlainQRTypes(t *testing.T) {
 	m := model{local: &fakeLocal{}}
 	_, quitCmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlQ})

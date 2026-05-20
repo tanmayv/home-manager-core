@@ -49,6 +49,11 @@ type model struct {
 	configItems       []ConfigSelectionItem
 	showingConfigMenu bool
 	configSelected    int
+
+	// Prompt templates (P)
+	prompts           []promptTemplate
+	showingPromptMenu bool
+	promptSelected    int
 }
 
 func newModel(local localClient, remote remoteClient, ownName string) model {
@@ -68,9 +73,10 @@ func (m model) Init() tea.Cmd {
 		loadOutboxCmd(),
 		loadSavedMessagesCmd(),
 		loadHiddenAgentsCmd(),
+		loadPromptsCmd(),
+		loadConfigItemsCmd(m.local),
 		tickRefresh(),
 		waitEvents(m.local, 0),
-		loadConfigItemsCmd(m.local), // Initial load of configs
 	)
 }
 
@@ -84,6 +90,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		defer func() {
 			debugLogf("key end type=%v duration=%s composer_len=%d", msg.Type, time.Since(keyStart), len(m.composer))
 		}()
+		if m.showingPromptMenu {
+			switch msg.Type {
+			case tea.KeyCtrlC, tea.KeyCtrlQ:
+				return m, tea.Quit
+			case tea.KeyCtrlI, tea.KeyEsc:
+				m.showingPromptMenu = false
+				return m, nil
+			case tea.KeyUp, tea.KeyCtrlP:
+				if m.promptSelected > 0 {
+					m.promptSelected--
+				}
+				return m, nil
+			case tea.KeyDown, tea.KeyCtrlN:
+				if m.promptSelected < len(m.prompts)-1 {
+					m.promptSelected++
+				}
+				return m, nil
+			case tea.KeyEnter:
+				m.showingPromptMenu = false
+				if len(m.prompts) > 0 && m.canSendCurrent() {
+					return m, editPromptTemplate(m.prompts[m.promptSelected].Path)
+				}
+				return m, nil
+			}
+			return m, nil
+		}
 		if m.showingConfigMenu {
 			switch msg.Type {
 			case tea.KeyCtrlC, tea.KeyCtrlQ:
@@ -127,6 +159,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.showingConfigMenu = true
 			m.configSelected = 0
 			return m, loadConfigItemsCmd(m.local)
+		case tea.KeyCtrlI:
+			m.showingPromptMenu = true
+			m.promptSelected = 0
+			return m, loadPromptsCmd()
 		case tea.KeyCtrlT:
 			m.toggleMode()
 			m.selectLatestMessage()
@@ -304,6 +340,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmds...)
 		}
 		return m, retryWaitEvents()
+	case promptsLoaded:
+		m.err = msg.Err
+		if msg.Err == nil {
+			m.prompts = msg.Prompts
+			if m.promptSelected >= len(m.prompts) {
+				m.promptSelected = max(0, len(m.prompts)-1)
+			}
+		}
 	case hiddenAgentsLoaded:
 		if msg.Err != nil {
 			m.err = msg.Err
@@ -343,6 +387,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case editorClosed:
 		m.err = msg.Err
+	case promptEdited:
+		m.err = msg.Err
+		if msg.Err == nil && msg.Saved && m.canSendCurrent() && strings.TrimSpace(msg.Body) != "" {
+			row := m.rows[m.selected]
+			record := makeOutboxRecord(m.ownName, row, msg.Body)
+			unhideCmd := m.unhideAgent(row)
+			m.clearUnread(row)
+			m.appendSentMessage(row, record)
+			m.refreshMergedMessages()
+			m.selectLatestMessage()
+			return m, tea.Batch(unhideCmd, sendOutboxRecord(m.local, m.ownName, row, record))
+		}
 	case agentConfigSpun:
 		m.err = msg.Err
 	}
