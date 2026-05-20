@@ -43,7 +43,11 @@ func run(stdout io.Writer, args []string) error {
 		return err
 	}
 	// Use alternate screen so only the message viewport scrolls; no mouse capture.
-	p := tea.NewProgram(newModel(tracker.New(""), nil, os.Getenv("AGENT_NAME")), tea.WithOutput(stdout), tea.WithAltScreen())
+	ownName := os.Getenv("AGENT_NAME")
+	if ownName == "" {
+		ownName = appName
+	}
+	p := tea.NewProgram(newModel(tracker.New(""), nil, ownName), tea.WithOutput(stdout), tea.WithAltScreen())
 	_, err = p.Run()
 	return err
 }

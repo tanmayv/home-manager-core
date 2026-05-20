@@ -83,8 +83,12 @@ func (m model) agentList(width int) string {
 			b.WriteString(mutedStyle.Render("…") + "\n")
 			break
 		}
-		line := truncateCells(fmt.Sprintf("%s %-6s %s", marker(i == m.selected), r.Scope, r.Name), max(1, width-1))
-		line = agentStyle(r.Name, i == m.selected).Render(line)
+		badge := " "
+		if m.hasUnread(r) {
+			badge = "●"
+		}
+		line := truncateCells(fmt.Sprintf("%s%s %-6s %s", marker(i == m.selected), badge, r.Scope, r.Name), max(1, width-1))
+		line = m.agentRowStyle(r, i == m.selected).Render(line)
 		b.WriteString(lipgloss.PlaceHorizontal(max(1, width-2), lipgloss.Left, line) + "\n")
 	}
 	return b.String()
@@ -113,45 +117,25 @@ func (m model) messageLinesForWidth(width int) []string {
 	lines := []string{}
 	for i, msg := range messages {
 		if i > 0 {
-			lines = append(lines, mutedStyle.Render("─"))
+			lines = append(lines, "")
 		}
-		prefix := "  "
-		if i == m.messageSelected {
-			prefix = "> "
-		}
-		sender := fallback(msg.Sender, "unknown")
-		if m.mode == advancedView && !strings.Contains(sender, "→") {
-			sender += " → " + fallback(m.ownName, "agent-communicator")
-		}
-		header := prefix + sentReadMarker(msg) + agentStyle(senderColorKey(sender), true).Render(sender)
-		if msg.Timestamp != "" {
-			header += " " + mutedStyle.Render(msg.Timestamp)
-		}
-		lines = append(lines, wrapLine(header, wrapWidth)...)
-		body := msg.Body
-		if msg.ContentType == "" || msg.ContentType == "text/markdown" {
-			body = renderMarkdown(body, max(10, wrapWidth-4))
-		}
-		bodyLines := messageBodyLines(body, wrapWidth)
-		for _, line := range m.visibleBodyLines(bodyLines, i) {
-			lines = append(lines, line)
-		}
+		lines = append(lines, m.messageBubbleLines(msg, i, wrapWidth)...)
 	}
 	return lines
 }
 
 func sentReadMarker(msg tracker.Message) string {
-	if msg.Sender != "You" && !strings.Contains(msg.Sender, "→") {
+	if msg.Sender != "You" && !strings.Contains(msg.Sender, "→") && !strings.HasPrefix(msg.Sender, "to ") {
 		return ""
 	}
 	if msg.Read {
-		return readStatusStyle.Render("⇒⇒ ")
+		return readStatusStyle.Render("✓✓ ")
 	}
 	if msg.Notified {
-		return "⇒⇒ "
+		return "✓✓ "
 	}
 	if msg.Delivered {
-		return "→ "
+		return "✓ "
 	}
 	return ""
 }

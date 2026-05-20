@@ -83,7 +83,7 @@ func TestPersistedOutboxShownAfterRestartAndAdvanced(t *testing.T) {
 	}
 	m.mode = advancedView
 	all := m.mergeAllMessages(nil)
-	if len(all) != 1 || all[0].Sender != "agent-communicator → alpha" {
+	if len(all) != 1 || all[0].Sender != "to alpha" {
 		t.Fatalf("advanced merged = %+v", all)
 	}
 }

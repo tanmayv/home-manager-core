@@ -33,13 +33,13 @@ func TestApplyStatusEventsMarkOutboxRecordStages(t *testing.T) {
 }
 
 func TestSentReadMarkerShowsStages(t *testing.T) {
-	if !strings.Contains(sentReadMarker(tracker.Message{Sender: "You", Delivered: true}), "→") {
+	if !strings.Contains(sentReadMarker(tracker.Message{Sender: "You", Delivered: true}), "✓") {
 		t.Fatal("delivered marker missing")
 	}
-	if !strings.Contains(sentReadMarker(tracker.Message{Sender: "You", Notified: true}), "⇒⇒") {
+	if !strings.Contains(sentReadMarker(tracker.Message{Sender: "You", Notified: true}), "✓✓") {
 		t.Fatal("notified marker missing")
 	}
-	if !strings.Contains(sentReadMarker(tracker.Message{Sender: "You", Read: true}), "⇒⇒") {
+	if !strings.Contains(sentReadMarker(tracker.Message{Sender: "You", Read: true}), "✓✓") {
 		t.Fatal("read marker missing")
 	}
 	if sentReadMarker(tracker.Message{Sender: "agent"}) != "" {

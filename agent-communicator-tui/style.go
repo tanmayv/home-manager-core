@@ -21,6 +21,14 @@ func agentStyle(name string, bold bool) lipgloss.Style {
 	return style
 }
 
+func (m model) agentRowStyle(row agentRow, selected bool) lipgloss.Style {
+	style := agentStyle(row.Name, selected || m.hasUnread(row))
+	if m.hasUnread(row) && !selected {
+		style = style.Background(lipgloss.Color("4")).Foreground(lipgloss.Color("15"))
+	}
+	return style
+}
+
 func agentColorIndex(name string) int {
 	if name == "" {
 		return 0

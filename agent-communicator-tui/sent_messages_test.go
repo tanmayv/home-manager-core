@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -16,6 +17,9 @@ func TestSuccessfulSendAppendsOutboundMessage(t *testing.T) {
 	m = updated.(model)
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updated.(model)
+	if len(m.sentMessages["alpha"]) != 1 || m.sentMessages["alpha"][0].Body != "hello" {
+		t.Fatalf("optimistic sent messages = %+v", m.sentMessages)
+	}
 	updated, _ = m.Update(cmd())
 	m = updated.(model)
 
@@ -27,6 +31,23 @@ func TestSuccessfulSendAppendsOutboundMessage(t *testing.T) {
 	}
 	if local.sentBody != "hello\n\n(PS: Reply in markdown format.)" {
 		t.Fatalf("delivered body = %q", local.sentBody)
+	}
+}
+
+func TestFailedSendRemovesOptimisticMessage(t *testing.T) {
+	local := &fakeLocal{sendErr: errors.New("boom")}
+	m := model{width: 80, height: 20, rows: []agentRow{{Name: "alpha", Scope: "local"}}, local: local}
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("hello")})
+	m = updated.(model)
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(model)
+	if len(m.sentMessages["alpha"]) != 1 {
+		t.Fatal("optimistic message missing before send completes")
+	}
+	updated, _ = m.Update(cmd())
+	m = updated.(model)
+	if len(m.sentMessages["alpha"]) != 0 || string(m.composer) != "hello" {
+		t.Fatalf("sent=%+v composer=%q", m.sentMessages, string(m.composer))
 	}
 }
 

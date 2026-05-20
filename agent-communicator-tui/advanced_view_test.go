@@ -46,7 +46,7 @@ func TestAdvancedViewAggregatesInboundAndSentMessages(t *testing.T) {
 	}}
 	m.allMessages = m.mergeAllMessages([]tracker.Message{{Sender: "beta", Body: "in", Timestamp: "2026-05-19T12:00:00Z"}})
 	view := m.messageView(100)
-	for _, want := range []string{"beta → agent-communicator", "agent-communicator → alpha", "in", "out"} {
+	for _, want := range []string{"beta → agent-communicator", "to alpha", "in", "out"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("advanced view missing %q:\n%s", want, view)
 		}

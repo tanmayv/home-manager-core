@@ -24,6 +24,7 @@ type model struct {
 	allMessages             []tracker.Message
 	outbox                  []outboxRecord
 	sentMessages            map[string][]tracker.Message
+	unreadRows              map[string]bool
 	messageOffset           int
 	messageSelected         int
 	messageFocused          bool
@@ -36,7 +37,7 @@ type model struct {
 }
 
 func newModel(local localClient, remote remoteClient, ownName string) model {
-	return model{local: local, remote: remote, ownName: ownName, sentMessages: map[string][]tracker.Message{}}
+	return model{local: local, remote: remote, ownName: ownName, sentMessages: map[string][]tracker.Message{}, unreadRows: map[string]bool{}}
 }
 func (m model) Init() tea.Cmd {
 	return tea.Batch(loadAgents(m.local, m.remote), loadOutboxCmd(), tickRefresh(), waitEvents(m.local, 0))
@@ -72,11 +73,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.messageFocused = true
 			if m.messageSelected > 0 {
 				m.messageSelected--
+				m.syncAdvancedTargetToSelection()
+				m.scrollSelectedMessageIntoView()
 			}
 		case tea.KeyDown:
 			m.messageFocused = true
 			if m.messageSelected < len(m.displayMessages())-1 {
 				m.messageSelected++
+				m.syncAdvancedTargetToSelection()
+				m.scrollSelectedMessageIntoView()
 			}
 		case tea.KeyPgUp, tea.KeyCtrlU:
 			m.messageOffset = clampMessageOffset(m.messageOffset-messagePageSize(m.height), len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
@@ -85,8 +90,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEnter:
 			if len(m.rows) > 0 && strings.TrimSpace(string(m.composer)) != "" {
 				body := string(m.composer)
+				row := m.rows[m.selected]
+				record := makeOutboxRecord(m.ownName, row, body)
 				m.composer = nil
-				return m, sendCurrentMessage(m.local, m.ownName, m.rows[m.selected], body)
+				m.clearUnread(row)
+				m.appendSentMessage(row, record)
+				m.refreshMergedMessages()
+				m.selectLatestMessage()
+				return m, sendOutboxRecord(m.local, m.ownName, row, record)
 			}
 		case tea.KeyBackspace:
 			m.messageFocused = false
@@ -148,8 +159,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg.Err
 		if msg.Err != nil {
 			m.composer = []rune(msg.Body)
+			m.removeSentMessage(msg.Row, msg.Record.ID)
+			m.refreshMergedMessages()
 		} else {
 			m.outbox = appendOrReplaceOutbox(m.outbox, msg.Record)
+			m.clearUnread(msg.Row)
 			m.appendSentMessage(msg.Row, msg.Record)
 			m.refreshMergedMessages()
 			m.selectLatestMessage()
@@ -160,6 +174,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case eventsLoaded:
 		if msg.Err == nil {
 			m.eventSeq = msg.Result.LastSeq
+			m.markUnreadFromEvents(msg.Result)
 			m.applyStatusEvents(msg.Result)
 			cmds := []tea.Cmd{waitEvents(m.local, m.eventSeq)}
 			if len(m.rows) > 0 && shouldReloadForEvents(m.ownName, m.rows[m.selected], msg.Result) {
@@ -194,6 +209,7 @@ func conversationKey(row agentRow) string { return rowTarget(row) }
 func (m *model) selectLatestMessage() {
 	m.messageSelected = 0
 	m.messageOffset = 0
+	m.syncAdvancedTargetToSelection()
 }
 
 func clampSelectedMessage(selected, count int) int {
@@ -219,7 +235,22 @@ func (m model) mergeSentMessages(row agentRow, inbound []tracker.Message) []trac
 			merged = append(merged, sent)
 		}
 	}
-	return sortMessagesByTimestamp(merged)
+	return uniqueMessagesByID(sortMessagesByTimestamp(merged))
+}
+
+func uniqueMessagesByID(messages []tracker.Message) []tracker.Message {
+	seen := map[string]bool{}
+	out := messages[:0]
+	for _, msg := range messages {
+		if msg.MessageID != "" {
+			if seen[msg.MessageID] {
+				continue
+			}
+			seen[msg.MessageID] = true
+		}
+		out = append(out, msg)
+	}
+	return out
 }
 
 func sortMessagesByTimestamp(messages []tracker.Message) []tracker.Message {
@@ -282,4 +313,18 @@ func (m *model) appendSentMessage(row agentRow, rec outboxRecord) {
 		return
 	}
 	m.sentMessages[key] = append(m.sentMessages[key], outboxMessage(rec, false))
+}
+
+func (m *model) removeSentMessage(row agentRow, id string) {
+	if id == "" || m.sentMessages == nil {
+		return
+	}
+	key := conversationKey(row)
+	kept := m.sentMessages[key][:0]
+	for _, msg := range m.sentMessages[key] {
+		if msg.MessageID != id {
+			kept = append(kept, msg)
+		}
+	}
+	m.sentMessages[key] = kept
 }

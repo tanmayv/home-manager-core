@@ -138,16 +138,19 @@ func deletePreviousWord(value []rune) []rune {
 const markdownReplyInstruction = "PS: Reply in markdown format."
 
 func sendCurrentMessage(local localClient, senderName string, row agentRow, body string) tea.Cmd {
+	return sendOutboxRecord(local, senderName, row, makeOutboxRecord(senderName, row, body))
+}
+
+func sendOutboxRecord(local localClient, senderName string, row agentRow, record outboxRecord) tea.Cmd {
 	return func() tea.Msg {
 		if local == nil {
-			return messageSent{Body: body, Row: row, Err: errors.New("local tracker client unavailable")}
+			return messageSent{Body: record.Body, Row: row, Record: record, Err: errors.New("local tracker client unavailable")}
 		}
 		target := rowTarget(row)
-		if strings.TrimSpace(body) == "" || target == "" {
-			return messageSent{Body: body, Row: row}
+		if strings.TrimSpace(record.Body) == "" || target == "" {
+			return messageSent{Body: record.Body, Row: row, Record: record}
 		}
-		record := makeOutboxRecord(senderName, row, body)
-		deliveryBody := messageBodyForDelivery(body)
+		deliveryBody := messageBodyForDelivery(record.Body)
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		var err error
@@ -161,7 +164,7 @@ func sendCurrentMessage(local localClient, senderName string, row agentRow, body
 		if err == nil {
 			err = appendOutbox(record)
 		}
-		return messageSent{Body: body, Row: row, Record: record, Err: err}
+		return messageSent{Body: record.Body, Row: row, Record: record, Err: err}
 	}
 }
 

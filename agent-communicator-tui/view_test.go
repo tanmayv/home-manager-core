@@ -44,7 +44,7 @@ func TestMessageLinesWrapLongMessageBody(t *testing.T) {
 }
 
 func TestMessageViewportScrollsIndependently(t *testing.T) {
-	m := model{height: 8, messageOffset: 2, messages: []tracker.Message{{Sender: "a", Body: "one\ntwo\nthree\nfour\nfive"}}}
+	m := model{height: 8, messageOffset: 3, messages: []tracker.Message{{Sender: "a", Body: "one\ntwo\nthree\nfour\nfive"}}}
 	view := m.messageView(60)
 	if strings.Contains(view, "one") || !strings.Contains(view, "two") {
 		t.Fatalf("unexpected scrolled message view:\n%s", view)

@@ -57,11 +57,11 @@ func (m model) mergeAllMessages(inbound []tracker.Message) []tracker.Message {
 				continue
 			}
 			copy := msg
-			copy.Sender = fmt.Sprintf("%s → %s", fallback(m.ownName, "agent-communicator"), row.Name)
+			copy.Sender = fmt.Sprintf("to %s", row.Name)
 			merged = append(merged, copy)
 		}
 	}
-	return sortMessagesByTimestamp(merged)
+	return uniqueMessagesByID(sortMessagesByTimestamp(merged))
 }
 
 func (m model) inboundAllMessages() []tracker.Message {

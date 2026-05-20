@@ -49,6 +49,7 @@ func loadOutbox() ([]outboxRecord, error) {
 	defer file.Close()
 	var records []outboxRecord
 	scanner := bufio.NewScanner(file)
+	seen := map[string]int{}
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {
@@ -56,6 +57,11 @@ func loadOutbox() ([]outboxRecord, error) {
 		}
 		var rec outboxRecord
 		if json.Unmarshal(line, &rec) == nil && rec.ID != "" {
+			if idx, ok := seen[rec.ID]; ok {
+				records[idx] = rec
+				continue
+			}
+			seen[rec.ID] = len(records)
 			records = append(records, rec)
 		}
 	}
@@ -118,7 +124,7 @@ func makeOutboxRecord(sender string, row agentRow, body string) outboxRecord {
 func outboxMessage(rec outboxRecord, advanced bool) tracker.Message {
 	sender := "You"
 	if advanced {
-		sender = fallback(rec.Sender, "agent-communicator") + " → " + fallback(rec.TargetDisplay, rec.TargetAddress)
+		sender = "to " + fallback(rec.TargetDisplay, rec.TargetAddress)
 	}
 	return tracker.Message{Sender: sender, Timestamp: rec.Timestamp, Body: rec.Body, Delivered: rec.Delivered, Notified: rec.Notified, Read: rec.Read, MessageID: rec.ID}
 }
