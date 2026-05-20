@@ -334,3 +334,31 @@ def wait_events(since: int = 0, timeout: float = 25.0, filters: dict | None = No
             if remaining <= 0:
                 return {"events": [], "last_seq": event_seq, "reset": False, "gap": False}
             event_lock.wait(timeout=remaining)
+
+
+def get_local_configs_for_registry() -> list[dict]:
+    """Loads local agent configs and strips out implementation details, sharing name and description only."""
+    home = os.path.expanduser("~")
+    agents_dir = os.path.join(home, ".config", "agent-tracker", "agents")
+    configs = []
+    if not os.path.isdir(agents_dir):
+        return configs
+
+    try:
+        for name in os.listdir(agents_dir):
+            path = os.path.join(agents_dir, name)
+            if not os.path.isdir(path):
+                continue
+            config_file = os.path.join(path, "config.json")
+            if not os.path.isfile(config_file):
+                continue
+            try:
+                with open(config_file, "r") as f:
+                    data = json.load(f)
+                desc = data.get("description") or ""
+                configs.append({"name": name, "description": desc})
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return configs

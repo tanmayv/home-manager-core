@@ -22,7 +22,7 @@ func LoadAgentConfigs() (map[string]AgentConfig, []string, error) {
 		return nil, nil, err
 	}
 
-	agentsDir := filepath.Join(home, ".config", "agent-communicator", "agents")
+	agentsDir := filepath.Join(home, ".config", "agent-tracker", "agents")
 	configs := make(map[string]AgentConfig)
 	var keys []string
 

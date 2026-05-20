@@ -156,6 +156,21 @@ class Store:
             tracker = self.trackers.get(tracker_id)
             return dict(tracker) if tracker else None
 
+    def list_trackers(self):
+        with self.lock:
+            return [
+                {
+                    "tracker_id": t["tracker_id"],
+                    "hostname": t["hostname"],
+                    "address": t["address"],
+                    "http_port": t["http_port"],
+                    "status": t["status"],
+                    "agent_configs": t.get("agent_configs") or [],
+                }
+                for t in self.trackers.values()
+                if t["status"] != "gone"
+            ]
+
     def put_tracker(self, body):
         with self.cv:
             existing = next((tid for tid, t in self.trackers.items() if t["hostname"] == body["hostname"] and tid != body["tracker_id"]), None)
@@ -173,6 +188,7 @@ class Store:
                 "http_port": body["http_port"],
                 "last_heartbeat": time.time(),
                 "status": "active",
+                "agent_configs": body.get("agent_configs") or [],
             }
             self._replace_agents_locked(body["tracker_id"], body.get("agents", []))
             self.deliveries.setdefault(body["tracker_id"], {})
@@ -202,13 +218,14 @@ class Store:
                 "http_port": tracker["http_port"],
             }
 
-    def heartbeat(self, tracker_id, agents):
+    def heartbeat(self, tracker_id, agents, agent_configs=None):
         with self.cv:
             if tracker_id not in self.trackers:
                 LOG.warning("heartbeat for unknown tracker_id=%s agents=%s", tracker_id, len(agents))
                 return False
             self.trackers[tracker_id]["last_heartbeat"] = time.time()
             self.trackers[tracker_id]["status"] = "active"
+            self.trackers[tracker_id]["agent_configs"] = agent_configs or []
             self._replace_agents_locked(tracker_id, agents)
             self._persist_locked()
             self.cv.notify_all()
@@ -378,6 +395,8 @@ def make_handler(store=None, token=None, auth_required=None):
             parts = self._parts()
             query = parse_qs(urlparse(self.path).query)
             agents = store.list_agents()
+            if parts == ["trackers"]:
+                return self._json(200, {"trackers": store.list_trackers()})
             if parts == ["agents"]:
                 for key in ("name", "hostname", "status"):
                     if query.get(key):
@@ -420,7 +439,7 @@ def make_handler(store=None, token=None, auth_required=None):
                     LOG.warning("tracker write %s for unknown tracker_id=%s", parts[2], tracker_id)
                     return self._json(404, {"error": "tracker_not_found", "message": "tracker not registered; call POST /trackers first"})
                 if parts[2] == "heartbeat":
-                    store.heartbeat(tracker_id, body.get("agents", []))
+                    store.heartbeat(tracker_id, body.get("agents", []), body.get("agent_configs", []))
                     return self._json(200, {"ok": True})
                 if not {"agent_id", "status"}.issubset(body):
                     return self._json(400, {"error": "invalid_request", "message": "agent_id and status are required"})

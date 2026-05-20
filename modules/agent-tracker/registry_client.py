@@ -54,10 +54,14 @@ class RegistryClient:
             "address": os.environ.get("AGENT_TRACKER_ADDRESS", self.hostname),
             "http_port": self.http_port,
             "agents": state.get_agents_for_registry(),
+            "agent_configs": state.get_local_configs_for_registry(),
         })[0]
 
     def heartbeat(self):
-        return self.request("POST", f"/trackers/{self.tracker_id}/heartbeat", {"agents": state.get_agents_for_registry()})[0]
+        return self.request("POST", f"/trackers/{self.tracker_id}/heartbeat", {
+            "agents": state.get_agents_for_registry(),
+            "agent_configs": state.get_local_configs_for_registry(),
+        })[0]
 
     def fetch_deliveries(self):
         return self.request("GET", f"/trackers/{self.tracker_id}/deliveries?wait={DELIVERY_WAIT_SECONDS}", timeout=DELIVERY_WAIT_SECONDS + 5)
@@ -152,6 +156,7 @@ def register():
             "address": os.environ.get("AGENT_TRACKER_ADDRESS", HOSTNAME),
             "http_port": HTTP_PORT,
             "agents": state.get_agents_for_registry(),
+            "agent_configs": state.get_local_configs_for_registry(),
         },
     )[0]
     if status in (200, 201):
@@ -162,7 +167,10 @@ def register():
 
 
 def heartbeat():
-    return _request("POST", f"/trackers/{TRACKER_ID}/heartbeat", {"agents": state.get_agents_for_registry()})[0]
+    return _request("POST", f"/trackers/{TRACKER_ID}/heartbeat", {
+        "agents": state.get_agents_for_registry(),
+        "agent_configs": state.get_local_configs_for_registry(),
+    })[0]
 
 
 def push_agent_update(agent_id, status):

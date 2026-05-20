@@ -23,7 +23,7 @@ func TestLoadAgentConfigs(t *testing.T) {
 	os.Setenv("HOME", tempDir)
 
 	// Create the config folder structure
-	agentsDir := filepath.Join(tempDir, ".config", "agent-communicator", "agents")
+	agentsDir := filepath.Join(tempDir, ".config", "agent-tracker", "agents")
 	err = os.MkdirAll(agentsDir, 0755)
 	if err != nil {
 		t.Fatalf("failed to create agents dir: %v", err)
