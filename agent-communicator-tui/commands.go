@@ -65,7 +65,7 @@ func loadInbox(local localClient, inboxOwner string, row agentRow) tea.Cmd {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		inbox, err := local.ReadInbox(ctx, owner, 50, false)
+		inbox, err := local.ReadInbox(ctx, owner, simpleInboxFetchLimit, false)
 		return inboxLoaded{Messages: filterConversation(inbox.Messages, row), Err: err}
 	}
 }
@@ -77,7 +77,7 @@ func loadAllInbox(local localClient, inboxOwner string) tea.Cmd {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		inbox, err := local.ReadInbox(ctx, inboxOwner, 50, false)
+		inbox, err := local.ReadInbox(ctx, inboxOwner, advancedInboxFetchLimit, false)
 		return allInboxLoaded{Messages: inbox.Messages, Err: err}
 	}
 }

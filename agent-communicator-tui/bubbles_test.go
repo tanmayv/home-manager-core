@@ -7,13 +7,32 @@ import (
 	"github.com/tanmayvijay/home-manager-core/agent-communicator-tui/internal/tracker"
 )
 
-func TestMessagesUseBoxesAndSelectionDot(t *testing.T) {
+func TestMessagesUseBoxesAndWideSelectionBorder(t *testing.T) {
 	m := model{messageSelected: 0, messages: []tracker.Message{{Sender: "alice", Body: "hello"}}}
 	view := strings.Join(m.messageLinesForWidth(60), "\n")
-	for _, want := range []string{"╭", "╰", "│", "● alice", "hello"} {
+	for _, want := range []string{"╔", "╚", "║ alice", "hello"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("message view missing %q:\n%s", want, view)
 		}
+	}
+	if strings.Contains(view, "●") {
+		t.Fatalf("selected message should not render selector dot:\n%s", view)
+	}
+}
+
+func TestIncomingMessagesAreIndentedFiveCells(t *testing.T) {
+	m := model{messages: []tracker.Message{{Sender: "alice", Body: "hello"}}}
+	lines := m.messageLinesForWidth(60)
+	if len(lines) == 0 || !strings.HasPrefix(lines[0], "     ") {
+		t.Fatalf("incoming bubble not indented:\n%s", strings.Join(lines, "\n"))
+	}
+}
+
+func TestOutgoingMessagesAreLeftAligned(t *testing.T) {
+	m := model{messages: []tracker.Message{{Sender: "You", Body: "hello"}}}
+	lines := m.messageLinesForWidth(60)
+	if len(lines) == 0 || strings.HasPrefix(lines[0], "     ") {
+		t.Fatalf("outgoing bubble should not be indented:\n%s", strings.Join(lines, "\n"))
 	}
 }
 

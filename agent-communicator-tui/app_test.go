@@ -283,8 +283,8 @@ func TestLoadInboxUsesOwnInboxAndFiltersBySelectedAgent(t *testing.T) {
 	if len(loaded.Messages) != 1 || loaded.Messages[0].Body != "from alpha" {
 		t.Fatalf("loaded messages = %+v", loaded.Messages)
 	}
-	if local.lastLimit != 50 {
-		t.Fatalf("ReadInbox limit = %d, want 50", local.lastLimit)
+	if local.lastLimit != simpleInboxFetchLimit {
+		t.Fatalf("ReadInbox limit = %d, want %d", local.lastLimit, simpleInboxFetchLimit)
 	}
 }
 

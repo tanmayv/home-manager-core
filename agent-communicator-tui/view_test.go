@@ -33,7 +33,7 @@ func TestMessageLinesWrapLongMessageBody(t *testing.T) {
 	m := model{messages: []tracker.Message{{Sender: "alice", Body: "one two three four five six seven"}}}
 	lines := m.messageLinesForWidth(16)
 	joined := strings.Join(lines, "\n")
-	if !strings.Contains(joined, "one") || !strings.Contains(joined, "three") {
+	if !strings.Contains(joined, "one") || !strings.Contains(joined, "four") {
 		t.Fatalf("expected wrapped lines, got:\n%s", joined)
 	}
 	for _, line := range lines {

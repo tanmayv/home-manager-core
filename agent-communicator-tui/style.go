@@ -14,7 +14,7 @@ func senderColorKey(sender string) string {
 }
 
 func agentStyle(name string, bold bool) lipgloss.Style {
-	style := lipgloss.NewStyle().Foreground(agentColors[agentColorIndex(name)])
+	style := lipgloss.NewStyle().Foreground(palette.AgentColors[agentColorIndex(name)])
 	if bold {
 		style = style.Bold(true)
 	}
@@ -24,7 +24,7 @@ func agentStyle(name string, bold bool) lipgloss.Style {
 func (m model) agentRowStyle(row agentRow, selected bool) lipgloss.Style {
 	style := agentStyle(row.Name, selected || m.hasUnread(row))
 	if m.hasUnread(row) && !selected {
-		style = style.Background(lipgloss.Color("4")).Foreground(lipgloss.Color("15"))
+		style = style.Background(palette.Surface0).Foreground(palette.Text)
 	}
 	return style
 }
@@ -35,7 +35,7 @@ func agentColorIndex(name string) int {
 	}
 	h := 0
 	for _, r := range name {
-		h = (h*31 + int(r)) % len(agentColors)
+		h = (h*31 + int(r)) % len(palette.AgentColors)
 	}
 	return h
 }

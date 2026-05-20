@@ -26,6 +26,9 @@ type model struct {
 	outbox                  []outboxRecord
 	sentMessages            map[string][]tracker.Message
 	unreadRows              map[string]bool
+	hiddenAgents            map[string]bool
+	agentSection            agentSection
+	autoHiddenApplied       bool
 	messageOffset           int
 	messageSelected         int
 	messageFocused          bool
@@ -41,10 +44,10 @@ type model struct {
 }
 
 func newModel(local localClient, remote remoteClient, ownName string) model {
-	return model{local: local, remote: remote, ownName: ownName, sentMessages: map[string][]tracker.Message{}, unreadRows: map[string]bool{}}
+	return model{local: local, remote: remote, ownName: ownName, sentMessages: map[string][]tracker.Message{}, unreadRows: map[string]bool{}, hiddenAgents: map[string]bool{}}
 }
 func (m model) Init() tea.Cmd {
-	return tea.Batch(loadAgents(m.local, m.remote), loadOutboxCmd(), tickRefresh(), waitEvents(m.local, 0))
+	return tea.Batch(loadAgents(m.local, m.remote), loadOutboxCmd(), loadHiddenAgentsCmd(), tickRefresh(), waitEvents(m.local, 0))
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -63,30 +66,41 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, switchToAgentPane(m.currentRow())
 		case tea.KeyCtrlP:
 			if len(m.rows) > 0 {
-				m.selected = (m.selected - 1 + len(m.rows)) % len(m.rows)
+				m.selectNextInSection(-1)
 				m.scrollSelectedAgentIntoView()
 				m.selectLatestMessage()
 				return m, m.reloadMessages()
 			}
 		case tea.KeyCtrlN:
 			if len(m.rows) > 0 {
-				m.selected = (m.selected + 1) % len(m.rows)
+				m.selectNextInSection(1)
 				m.scrollSelectedAgentIntoView()
 				m.selectLatestMessage()
 				return m, m.reloadMessages()
+			}
+		case tea.KeyTab:
+			if len(m.rows) > 0 {
+				m.toggleAgentSection()
+				m.scrollSelectedAgentIntoView()
+				m.selectLatestMessage()
+				return m, m.reloadMessages()
+			}
+		case tea.KeyCtrlH:
+			if len(m.rows) > 0 {
+				cmd := m.toggleHiddenCurrentAgent()
+				m.selectLatestMessage()
+				return m, tea.Batch(cmd, m.reloadMessages())
 			}
 		case tea.KeyUp:
 			m.messageFocused = true
 			if m.messageSelected > 0 {
 				m.messageSelected--
-				m.syncAdvancedTargetToSelection()
 				m.scrollSelectedMessageIntoView()
 			}
 		case tea.KeyDown:
 			m.messageFocused = true
-			if m.messageSelected < len(m.displayMessages())-1 {
+			if m.messageSelected < len(m.displayOrderedMessages())-1 {
 				m.messageSelected++
-				m.syncAdvancedTargetToSelection()
 				m.scrollSelectedMessageIntoView()
 			}
 		case tea.KeyPgUp, tea.KeyCtrlU:
@@ -99,11 +113,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				row := m.rows[m.selected]
 				record := makeOutboxRecord(m.ownName, row, body)
 				m.composer = nil
+				unhideCmd := m.unhideAgent(row)
 				m.clearUnread(row)
 				m.appendSentMessage(row, record)
 				m.refreshMergedMessages()
 				m.selectLatestMessage()
-				return m, sendOutboxRecord(m.local, m.ownName, row, record)
+				return m, tea.Batch(unhideCmd, sendOutboxRecord(m.local, m.ownName, row, record))
 			}
 		case tea.KeyBackspace:
 			m.messageFocused = false
@@ -149,10 +164,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			break
 		}
 		m.agentListStale = false
+		preserveKey := conversationKey(m.currentRow())
 		m.rows = filterOwnAgent(msg.Rows, m.ownName)
+		m.sortRowsByHidden(preserveKey)
 		if m.selected >= len(m.rows) {
 			m.selected = max(0, len(m.rows)-1)
 		}
+		m.applyInitialHiddenForNoHistory()
 		m.scrollSelectedAgentIntoView()
 		if len(m.rows) > 0 {
 			m.selectLatestMessage()
@@ -183,13 +201,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.refreshMergedMessages()
 		} else {
 			m.outbox = appendOrReplaceOutbox(m.outbox, msg.Record)
+			unhideCmd := m.unhideAgent(msg.Row)
 			m.clearUnread(msg.Row)
 			m.appendSentMessage(msg.Row, msg.Record)
 			m.refreshMergedMessages()
 			m.selectLatestMessage()
 			if len(m.rows) > 0 {
-				return m, m.reloadMessages()
+				return m, tea.Batch(unhideCmd, m.reloadMessages())
 			}
+			return m, unhideCmd
 		}
 	case eventsLoaded:
 		if msg.Err == nil {
@@ -203,11 +223,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmds...)
 		}
 		return m, retryWaitEvents()
+	case hiddenAgentsLoaded:
+		if msg.Err != nil {
+			m.err = msg.Err
+		} else {
+			m.hiddenAgents = msg.Hidden
+			m.sortRowsByHidden("")
+			m.scrollSelectedAgentIntoView()
+		}
+	case hiddenAgentsSaved:
+		m.err = msg.Err
 	case outboxLoaded:
 		if msg.Err != nil {
 			m.err = msg.Err
 		} else {
 			m.outbox = msg.Records
+			m.applyInitialHiddenForNoHistory()
 			m.refreshMergedMessages()
 		}
 	case paneSwitched:
@@ -234,7 +265,6 @@ func conversationKey(row agentRow) string { return rowTarget(row) }
 func (m *model) selectLatestMessage() {
 	m.messageSelected = 0
 	m.messageOffset = 0
-	m.syncAdvancedTargetToSelection()
 }
 
 func clampSelectedMessage(selected, count int) int {

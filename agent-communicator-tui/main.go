@@ -47,6 +47,7 @@ func run(stdout io.Writer, args []string) error {
 	if ownName == "" {
 		ownName = appName
 	}
+	_ = cleanupHistoryOnStart()
 	p := tea.NewProgram(newModel(tracker.New(""), nil, ownName), tea.WithOutput(stdout), tea.WithAltScreen())
 	_, err = p.Run()
 	return err

@@ -21,22 +21,35 @@ func TestCtrlTTogglesAdvancedViewAndLoadsAllInbox(t *testing.T) {
 	if len(m.allMessages) != 2 {
 		t.Fatalf("allMessages = %+v", m.allMessages)
 	}
-	if local.lastLimit != 50 {
-		t.Fatalf("ReadInbox limit = %d, want 50", local.lastLimit)
+	if local.lastLimit != advancedInboxFetchLimit {
+		t.Fatalf("ReadInbox limit = %d, want %d", local.lastLimit, advancedInboxFetchLimit)
 	}
 }
 
-func TestAdvancedComposerShowsSelectedReceiver(t *testing.T) {
+func TestAdvancedComposerDoesNotShowReceiverName(t *testing.T) {
 	m := model{mode: advancedView, rows: []agentRow{{Name: "alpha"}}}
 	view := m.composerView(80)
-	if !strings.Contains(view, "@alpha") || !strings.Contains(view, ": ") || !strings.Contains(view, "type message") {
-		t.Fatalf("composer = %q", view)
+	if strings.Contains(view, "@alpha") || strings.Contains(view, "alpha:") {
+		t.Fatalf("composer should not show receiver name: %q", view)
 	}
-	if agentColorIndex("alpha") != agentColorIndex(m.currentRow().Name) {
-		t.Fatalf("composer should color by selected receiver")
+	if !strings.Contains(view, "> ") || !strings.Contains(view, "type message") {
+		t.Fatalf("composer = %q", view)
 	}
 	if strings.Index(view, "█") > strings.Index(view, "type message") {
 		t.Fatalf("cursor should appear before placeholder: %q", view)
+	}
+}
+
+func TestAdvancedViewUsesAgentListAndConversationPanels(t *testing.T) {
+	m := model{mode: advancedView, width: 100, height: 20, rows: []agentRow{{Name: "alpha", Scope: "local"}}, allMessages: []tracker.Message{{Sender: "beta", Body: "hello"}}}
+	view := m.View()
+	for _, want := range []string{"Agents", "Conversation", "alpha", "hello"} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("advanced view missing %q:\n%s", want, view)
+		}
+	}
+	if strings.Contains(view, "Simple View") || strings.Contains(view, "Advanced View") {
+		t.Fatalf("advanced view should not show old mode heading:\n%s", view)
 	}
 }
 
