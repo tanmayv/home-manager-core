@@ -175,7 +175,7 @@ func highlightWords(line string, words []string, style lipgloss.Style) string {
 
 func splitInlineComment(line, lang string) (string, string) {
 	marker := "//"
-	switch strings.ToLower(strings.Fields(lang + " ")[0]) {
+	switch langName(lang) {
 	case "py", "python", "nix", "sh", "bash", "zsh", "shell":
 		marker = "#"
 	}
@@ -184,6 +184,14 @@ func splitInlineComment(line, lang string) (string, string) {
 		return line, ""
 	}
 	return line[:idx], line[idx:]
+}
+
+func langName(lang string) string {
+	fields := strings.Fields(lang)
+	if len(fields) == 0 {
+		return ""
+	}
+	return strings.ToLower(fields[0])
 }
 
 func highlightQuotedStrings(line string) string {
@@ -208,7 +216,7 @@ func highlightQuotedStrings(line string) string {
 }
 
 func languageKeywords(lang string) []string {
-	switch strings.ToLower(strings.Fields(lang + " ")[0]) {
+	switch langName(lang) {
 	case "go", "golang":
 		return []string{"package", "import", "func", "return", "if", "else", "for", "range", "type", "struct", "interface", "var", "const", "defer", "go", "select", "case", "switch"}
 	case "py", "python":
@@ -223,7 +231,7 @@ func languageKeywords(lang string) []string {
 }
 
 func languageTypes(lang string) []string {
-	switch strings.ToLower(strings.Fields(lang + " ")[0]) {
+	switch langName(lang) {
 	case "go", "golang":
 		return []string{"string", "int", "int64", "bool", "error", "map", "chan", "any"}
 	case "py", "python":

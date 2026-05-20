@@ -13,6 +13,7 @@ var selectedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(tr
 var mutedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 var readStatusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("12"))
 var composerBoxStyle = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).Padding(0, 1)
+var panelBoxStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("8")).Padding(0, 1)
 
 const composerMaxLines = 5
 
@@ -29,7 +30,7 @@ func (m model) View() string {
 	}
 	leftW, midW, rightW := m.layoutWidths()
 	_ = rightW
-	left := box(titleStyle.Render("Agents")+"\n"+m.agentList(leftW), leftW, bodyH)
+	left := box(m.agentListTitle()+"\n"+m.agentList(leftW-4, panelInnerHeight(bodyH)-1), leftW, bodyH)
 	mid := m.conversationPanel(midW, bodyH)
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, mid) + "\n" + footer
 }
@@ -44,18 +45,28 @@ func (m model) layoutWidths() (int, int, int) {
 }
 
 func (m model) conversationPanel(width, height int) string {
-	body := titleStyle.Render("Conversation") + "\n" + m.composerBox(width) + "\n" + m.messageView(width)
+	innerW := panelInnerWidth(width)
+	innerH := panelInnerHeight(height)
+	title := titleStyle.Render("Conversation")
+	composer := m.composerBox(innerW)
+	messageH := max(1, innerH-lineCount(title)-lineCount(composer)-2)
+	body := title + "\n" + composer + "\n" + m.messageViewWithHeight(innerW, messageH)
 	return box(body, width, height)
 }
 
 func (m model) advancedBody(width, height int) string {
-	body := titleStyle.Render("Simple View                                    Advanced View") + "\n" + m.composerBox(width) + "\n" + m.messageView(width)
+	innerW := panelInnerWidth(width)
+	innerH := panelInnerHeight(height)
+	title := titleStyle.Render("Simple View                                    Advanced View")
+	composer := m.composerBox(innerW)
+	messageH := max(1, innerH-lineCount(title)-lineCount(composer)-2)
+	body := title + "\n" + composer + "\n" + m.messageViewWithHeight(innerW, messageH)
 	return box(body, width, height)
 }
 
 func (m model) composerBox(width int) string {
 	inner := max(1, width-4)
-	return composerBoxStyle.Width(inner).Render(m.composerView(inner))
+	return composerBoxStyle.Width(inner).MaxWidth(max(1, width)).Render(m.composerView(inner))
 }
 
 func (m model) footer(width int) string {
@@ -72,37 +83,76 @@ func (m model) footer(width int) string {
 	return mutedStyle.Render(text)
 }
 
-func (m model) agentList(width int) string {
+func (m model) agentListTitle() string {
+	title := "Agents"
+	if m.agentListLoading {
+		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		title += " " + mutedStyle.Render(frames[m.agentListFrame%len(frames)])
+	}
+	return titleStyle.Render(title)
+}
+
+func (m model) agentCard(row agentRow, selected bool, width int) string {
+	inner := max(8, width-6)
+	badge := ""
+	if m.hasUnread(row) {
+		badge = "●"
+	}
+	name := truncateCells(row.Name, inner)
+	if badge != "" {
+		left := truncateCells(row.Name, max(1, inner-2))
+		name = left + strings.Repeat(" ", max(1, inner-lipgloss.Width(left)-1)) + badge
+	}
+	detail := row.Scope
+	if row.Scope == "remote" {
+		detail += " · " + fallback(row.Hostname, splitHost(row.TargetAddress))
+	}
+	lines := name + "\n" + mutedStyle.Render(truncateCells(detail, inner))
+	style := lipgloss.NewStyle().Width(inner).Border(lipgloss.RoundedBorder()).BorderForeground(agentColors[agentColorIndex(row.Name)]).Padding(0, 1)
+	if selected {
+		style = style.Background(lipgloss.Color("4")).Foreground(lipgloss.Color("15")).Bold(true)
+	}
+	return style.Render(lines)
+}
+
+func splitHost(target string) string {
+	host, _ := splitRemoteTarget(target)
+	return host
+}
+
+func (m model) agentList(width, height int) string {
 	if len(m.rows) == 0 {
 		return mutedStyle.Render("no agents")
 	}
-	limit := max(3, m.height-3)
+	visible := max(1, height/agentCardHeight)
+	offset := min(max(0, m.agentOffset), max(0, len(m.rows)-visible))
+	end := min(len(m.rows), offset+visible)
 	var b strings.Builder
-	for i, r := range m.rows {
-		if i >= limit {
-			b.WriteString(mutedStyle.Render("…") + "\n")
-			break
+	for i := offset; i < end; i++ {
+		b.WriteString(m.agentCard(m.rows[i], i == m.selected, width-2))
+		if i < end-1 {
+			b.WriteString("\n")
 		}
-		badge := " "
-		if m.hasUnread(r) {
-			badge = "●"
-		}
-		line := truncateCells(fmt.Sprintf("%s%s %-6s %s", marker(i == m.selected), badge, r.Scope, r.Name), max(1, width-1))
-		line = m.agentRowStyle(r, i == m.selected).Render(line)
-		b.WriteString(lipgloss.PlaceHorizontal(max(1, width-2), lipgloss.Left, line) + "\n")
 	}
-	return b.String()
+	if end < len(m.rows) {
+		b.WriteString("\n" + mutedStyle.Render("…"))
+	}
+	return truncateLines(b.String(), height)
 }
 
 func (m model) messageView(width int) string {
+	return m.messageViewWithHeight(width, m.messageVisibleLines())
+}
+
+func (m model) messageViewWithHeight(width, visible int) string {
 	lines := m.messageLinesForWidth(width)
-	visible := m.messageVisibleLines()
+	visible = max(1, visible)
 	if len(lines) == 0 {
 		return ""
 	}
 	offset := clampMessageOffset(m.messageOffset, len(lines), visible)
 	end := min(len(lines), offset+visible)
-	return lipgloss.NewStyle().Width(max(1, width)).Render(strings.Join(lines[offset:end], "\n"))
+	return lipgloss.NewStyle().Width(max(1, width)).Height(visible).MaxHeight(visible).Render(strings.Join(lines[offset:end], "\n"))
 }
 
 func (m model) messageLinesForWidth(width int) []string {
@@ -157,10 +207,10 @@ func (m model) visibleBodyLines(lines []string, index int) []string {
 
 func (m model) messageContentWidth() int {
 	if m.mode == advancedView {
-		return max(1, m.width-3)
+		return panelInnerWidth(m.width)
 	}
 	_, mid, _ := m.layoutWidths()
-	return max(1, mid-3)
+	return panelInnerWidth(mid)
 }
 
 func (m model) messageChromeHeight() int {
@@ -206,7 +256,11 @@ func (m model) composerLines(width int) []string {
 	prefix := m.composerPrefix()
 	prompt := prefix + string(m.composer) + cursor
 	if len(m.composer) == 0 {
-		prompt = prefix + cursor + mutedStyle.Render("type message")
+		placeholder := "type message"
+		if m.agentListStale {
+			placeholder = "agent tracker unavailable; sending disabled"
+		}
+		prompt = prefix + cursor + mutedStyle.Render(placeholder)
 	}
 	wrapped := wrapLine(prompt, max(1, width-1))
 	if len(wrapped) > composerMaxLines {
@@ -224,6 +278,14 @@ func (m model) composerPrefix() string {
 	}
 	name := fallback(m.currentRow().Name, "agent")
 	return agentStyle(name, true).Render("@"+name) + mutedStyle.Render(": ")
+}
+
+func truncateLines(s string, height int) string {
+	lines := strings.Split(s, "\n")
+	if len(lines) > height {
+		lines = lines[:height]
+	}
+	return strings.Join(lines, "\n")
 }
 
 func wrapLine(s string, width int) []string {
@@ -273,8 +335,13 @@ func marker(selected bool) string {
 	}
 	return " "
 }
+func panelInnerWidth(w int) int  { return max(1, w-4) }
+func panelInnerHeight(h int) int { return max(1, h-2) }
+
 func box(s string, w, h int) string {
-	return lipgloss.NewStyle().Width(max(1, w)).Height(max(1, h)).Render(s)
+	innerW := panelInnerWidth(w)
+	innerH := panelInnerHeight(h)
+	return panelBoxStyle.Width(innerW).Height(innerH).MaxWidth(max(1, w)).Render(s)
 }
 func min(a, b int) int {
 	if a < b {

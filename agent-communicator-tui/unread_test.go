@@ -13,7 +13,7 @@ func TestIncomingEventHighlightsAgentListRow(t *testing.T) {
 	if !m.hasUnread(m.rows[0]) {
 		t.Fatal("incoming event did not mark row unread")
 	}
-	if view := m.agentList(40); !strings.Contains(view, "●") {
+	if view := m.agentList(40, 10); !strings.Contains(view, "●") {
 		t.Fatalf("agent list missing unread badge:\n%s", view)
 	}
 }

@@ -18,6 +18,7 @@ const (
 
 type model struct {
 	width, height, selected int
+	agentOffset             int
 	mode                    viewMode
 	rows                    []agentRow
 	messages                []tracker.Message
@@ -28,6 +29,9 @@ type model struct {
 	messageOffset           int
 	messageSelected         int
 	messageFocused          bool
+	agentListStale          bool
+	agentListLoading        bool
+	agentListFrame          int
 	composer                []rune
 	err                     error
 	eventSeq                int64
@@ -60,12 +64,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyCtrlP:
 			if len(m.rows) > 0 {
 				m.selected = (m.selected - 1 + len(m.rows)) % len(m.rows)
+				m.scrollSelectedAgentIntoView()
 				m.selectLatestMessage()
 				return m, m.reloadMessages()
 			}
 		case tea.KeyCtrlN:
 			if len(m.rows) > 0 {
 				m.selected = (m.selected + 1) % len(m.rows)
+				m.scrollSelectedAgentIntoView()
 				m.selectLatestMessage()
 				return m, m.reloadMessages()
 			}
@@ -88,7 +94,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyPgDown, tea.KeyCtrlD:
 			m.messageOffset = clampMessageOffset(m.messageOffset+messagePageSize(m.height), len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
 		case tea.KeyEnter:
-			if len(m.rows) > 0 && strings.TrimSpace(string(m.composer)) != "" {
+			if m.canSendCurrent() && strings.TrimSpace(string(m.composer)) != "" {
 				body := string(m.composer)
 				row := m.rows[m.selected]
 				record := makeOutboxRecord(m.ownName, row, body)
@@ -109,7 +115,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.composer = deletePreviousWord(m.composer)
 		case tea.KeyCtrlR:
 			m.selectLatestMessage()
-			return m, tea.Batch(loadAgents(m.local, m.remote), loadOutboxCmd())
+			m.agentListLoading = true
+			return m, tea.Batch(loadAgentsFromCtlCmd(30*time.Second), loadOutboxCmd(), tickAgentListSpinner())
 		case tea.KeyCtrlE:
 			messages := m.displayOrderedMessages()
 			if len(messages) > 0 {
@@ -125,15 +132,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.messageOffset = 0
 		}
 	case refreshTick:
-		return m, tea.Batch(loadAgents(m.local, m.remote), loadOutboxCmd(), tickRefresh())
+		m.agentListLoading = true
+		return m, tea.Batch(loadAgents(m.local, m.remote), loadOutboxCmd(), tickRefresh(), tickAgentListSpinner())
+	case agentListSpinnerTick:
+		if m.agentListLoading {
+			m.agentListFrame++
+			return m, tickAgentListSpinner()
+		}
 	case retryEvents:
 		return m, waitEvents(m.local, m.eventSeq)
 	case agentsLoaded:
+		m.agentListLoading = false
 		m.err = msg.Err
+		if msg.Err != nil {
+			m.agentListStale = true
+			break
+		}
+		m.agentListStale = false
 		m.rows = filterOwnAgent(msg.Rows, m.ownName)
 		if m.selected >= len(m.rows) {
 			m.selected = max(0, len(m.rows)-1)
 		}
+		m.scrollSelectedAgentIntoView()
 		if len(m.rows) > 0 {
 			m.selectLatestMessage()
 			return m, m.reloadMessages()
@@ -204,6 +224,11 @@ func (m model) currentRow() agentRow {
 	}
 	return m.rows[m.selected]
 }
+
+func (m model) canSendCurrent() bool {
+	return len(m.rows) > 0 && !m.agentListStale
+}
+
 func conversationKey(row agentRow) string { return rowTarget(row) }
 
 func (m *model) selectLatestMessage() {

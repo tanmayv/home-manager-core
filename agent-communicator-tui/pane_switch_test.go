@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/tanmayvijay/home-manager-core/agent-communicator-tui/internal/tracker"
 )
 
 func TestCtrlFAttemptsPaneSwitchForSelectedAgent(t *testing.T) {
@@ -31,8 +32,8 @@ func TestCtrlFWorksInAdvancedViewForSelectedReceiver(t *testing.T) {
 	}
 }
 
-func TestRowFromCtlAgentKeepsLocalTmuxPane(t *testing.T) {
-	row := rowFromCtlAgent("alpha", ctlAgent{Scope: "local", TmuxPane: "%7"})
+func TestRowFromTrackerAgentKeepsLocalTmuxPane(t *testing.T) {
+	row := rowFromTrackerAgent("alpha", tracker.Agent{Scope: "local", TmuxPane: "%7"})
 	if row.TmuxPane != "%7" {
 		t.Fatalf("row = %+v", row)
 	}

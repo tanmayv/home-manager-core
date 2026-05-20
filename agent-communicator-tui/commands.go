@@ -49,6 +49,7 @@ type eventsLoaded struct {
 }
 type refreshTick struct{}
 type retryEvents struct{}
+type agentListSpinnerTick struct{}
 
 func loadInbox(local localClient, inboxOwner string, row agentRow) tea.Cmd {
 	return func() tea.Msg {
@@ -208,6 +209,9 @@ func shouldReloadForEvents(ownName string, row agentRow, result tracker.WaitEven
 
 func tickRefresh() tea.Cmd {
 	return tea.Tick(refreshInterval, func(time.Time) tea.Msg { return refreshTick{} })
+}
+func tickAgentListSpinner() tea.Cmd {
+	return tea.Tick(150*time.Millisecond, func(time.Time) tea.Msg { return agentListSpinnerTick{} })
 }
 func retryWaitEvents() tea.Cmd {
 	return tea.Tick(2*time.Second, func(time.Time) tea.Msg { return retryEvents{} })

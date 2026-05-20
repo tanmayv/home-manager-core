@@ -12,7 +12,7 @@ import (
 func TestMessageLinesHighlightSenderAndSeparateMessages(t *testing.T) {
 	m := model{messages: []tracker.Message{{Sender: "alice", Timestamp: "t1", Body: "**hello**"}, {Sender: "bob", Body: "second"}}}
 	lines := strings.Join(m.messageLinesForWidth(80), "\n")
-	for _, want := range []string{"alice", "t1", "  hello", "─", "bob", "  second"} {
+	for _, want := range []string{"alice", "t1", "hello", "─", "bob", "second"} {
 		if !strings.Contains(lines, want) {
 			t.Fatalf("message lines missing %q:\n%s", want, lines)
 		}
@@ -33,7 +33,7 @@ func TestMessageLinesWrapLongMessageBody(t *testing.T) {
 	m := model{messages: []tracker.Message{{Sender: "alice", Body: "one two three four five six seven"}}}
 	lines := m.messageLinesForWidth(16)
 	joined := strings.Join(lines, "\n")
-	if !strings.Contains(joined, "one two") || !strings.Contains(joined, "three") {
+	if !strings.Contains(joined, "one") || !strings.Contains(joined, "three") {
 		t.Fatalf("expected wrapped lines, got:\n%s", joined)
 	}
 	for _, line := range lines {
@@ -76,11 +76,13 @@ func TestCtrlUCtrlDClampMessageScroll(t *testing.T) {
 	if m.messageOffset != wantOlder {
 		t.Fatalf("ctrl+d offset = %d, want clamped %d", m.messageOffset, wantOlder)
 	}
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
-	m = updated.(model)
+	for i := 0; i < 10; i++ {
+		updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlD})
+		m = updated.(model)
+	}
 	wantMax := messageBottomOffset(len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
 	if m.messageOffset != wantMax {
-		t.Fatalf("second ctrl+d offset = %d, want %d", m.messageOffset, wantMax)
+		t.Fatalf("repeated ctrl+d offset = %d, want %d", m.messageOffset, wantMax)
 	}
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlU})
 	m = updated.(model)

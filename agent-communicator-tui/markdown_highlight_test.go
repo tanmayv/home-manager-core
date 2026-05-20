@@ -22,3 +22,10 @@ func TestMarkdownHighlightsFencedCode(t *testing.T) {
 		}
 	}
 }
+
+func TestMarkdownCodeBlockWithoutLanguageAndBlankLinesDoesNotPanic(t *testing.T) {
+	rendered := renderMarkdown("```\n\nvalue // comment\n```", 80)
+	if !strings.Contains(rendered, "value") || !strings.Contains(rendered, "comment") {
+		t.Fatalf("rendered code missing content:\n%s", rendered)
+	}
+}

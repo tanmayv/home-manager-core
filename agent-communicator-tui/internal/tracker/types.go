@@ -15,6 +15,9 @@ type Agent struct {
 	Aliases         []string `json:"aliases"`
 	IsThisMe        bool     `json:"is_this_me"`
 	CWD             string   `json:"cwd,omitempty"`
+	Scope           string   `json:"scope,omitempty"`
+	Hostname        string   `json:"hostname,omitempty"`
+	TargetAddress   string   `json:"target_address,omitempty"`
 }
 
 type Attachment struct {

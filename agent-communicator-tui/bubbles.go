@@ -10,24 +10,18 @@ import (
 var bubbleBorder = lipgloss.RoundedBorder()
 
 func (m model) messageBubbleLines(msg tracker.Message, index, width int) []string {
-	sent := isSentMessage(msg)
-	bubbleWidth := min(max(8, width), max(8, (width*78)/100))
-	innerWidth := max(4, bubbleWidth-4)
 	colorKey := m.messageColorKey(msg)
-	lines := []string{m.messageBubbleHeader(msg, index, colorKey)}
+	innerWidth := max(4, width-6)
+	lines := []string{m.messageHeader(msg, index, colorKey, innerWidth)}
 	body := msg.Body
 	if msg.ContentType == "" || msg.ContentType == "text/markdown" {
 		body = renderMarkdown(body, innerWidth)
 	}
-	lines = append(lines, m.visibleBodyLines(messageBodyLines(body, innerWidth), index)...)
-	box := lipgloss.NewStyle().Width(bubbleWidth).Padding(0, 1).Border(bubbleBorder).BorderForeground(bubbleColor(colorKey, index == m.messageSelected))
-	if index == m.messageSelected {
-		box = box.Bold(true)
-	}
-	return placeBubble(strings.Split(box.Render(strings.Join(lines, "\n")), "\n"), width, !sent)
+	lines = append(lines, m.visibleBodyLines(bubbleBodyLines(body, innerWidth), index)...)
+	return renderBubble(lines, innerWidth, m.messageBorderColor(msg, colorKey), isSentMessage(msg))
 }
 
-func (m model) messageBubbleHeader(msg tracker.Message, index int, colorKey string) string {
+func (m model) messageHeader(msg tracker.Message, index int, colorKey string, width int) string {
 	selector := ""
 	if index == m.messageSelected {
 		selector = selectedStyle.Render("● ")
@@ -36,21 +30,34 @@ func (m model) messageBubbleHeader(msg tracker.Message, index int, colorKey stri
 	if m.mode == advancedView && !strings.Contains(sender, "→") && !strings.HasPrefix(sender, "to ") {
 		sender += " → " + fallback(m.ownName, "agent-communicator")
 	}
-	header := selector + sentReadMarker(msg) + agentStyle(colorKey, true).Render(sender)
-	if msg.Timestamp != "" {
-		header += " " + mutedStyle.Render(msg.Timestamp)
+	header := selector + sentReadMarker(msg) + agentStyle(colorKey, true).Render(truncateCells(sender, max(1, width-25)))
+	if ts := formatDisplayTime(msg.Timestamp); ts != "" && lipgloss.Width(header)+1 < width {
+		header += " " + mutedStyle.Render(truncateCells(ts, width-lipgloss.Width(header)-1))
 	}
 	return header
 }
 
-func placeBubble(lines []string, width int, right bool) []string {
-	out := make([]string, 0, len(lines))
+func renderBubble(lines []string, innerWidth int, color lipgloss.Color, outgoing bool) []string {
+	border := lipgloss.NewStyle().Foreground(color)
+	left, right := "│", "│"
+	if outgoing {
+		left = "║"
+	} else {
+		right = "║"
+	}
+	out := []string{border.Render("╭" + strings.Repeat("─", innerWidth+2) + "╮")}
 	for _, line := range lines {
-		if right {
-			out = append(out, lipgloss.PlaceHorizontal(max(1, width), lipgloss.Right, line))
-		} else {
-			out = append(out, lipgloss.PlaceHorizontal(max(1, width), lipgloss.Left, line))
-		}
+		cell := lipgloss.PlaceHorizontal(innerWidth, lipgloss.Left, truncateCells(line, innerWidth))
+		out = append(out, border.Render(left)+" "+cell+" "+border.Render(right))
+	}
+	out = append(out, border.Render("╰"+strings.Repeat("─", innerWidth+2)+"╯"))
+	return out
+}
+
+func bubbleBodyLines(body string, wrapWidth int) []string {
+	var out []string
+	for _, line := range strings.Split(body, "\n") {
+		out = append(out, wrapLine(line, wrapWidth)...)
 	}
 	return out
 }
@@ -73,9 +80,9 @@ func (m model) messageColorKey(msg tracker.Message) string {
 	return senderColorKey(sender)
 }
 
-func bubbleColor(colorKey string, selected bool) lipgloss.Color {
-	if selected {
-		return lipgloss.Color("10")
+func (m model) messageBorderColor(msg tracker.Message, colorKey string) lipgloss.Color {
+	if isSentMessage(msg) {
+		return lipgloss.Color("12")
 	}
 	return agentColors[agentColorIndex(colorKey)]
 }
