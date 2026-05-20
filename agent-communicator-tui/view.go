@@ -23,6 +23,11 @@ func (m model) View() string {
 	}
 	footer := m.footer(m.width)
 	bodyH := max(3, m.height-lineCount(footer))
+
+	if m.showingConfigMenu {
+		return m.renderConfigMenu(m.width, bodyH) + "\n" + footer
+	}
+
 	leftW, midW, rightW := m.layoutWidths()
 	_ = rightW
 	left := box(m.agentListTitle()+"\n"+m.agentList(leftW-4, panelInnerHeight(bodyH)-1), leftW, bodyH)
@@ -59,7 +64,7 @@ func (m model) composerBox(width int) string {
 }
 
 func (m model) footer(width int) string {
-	text := "ctrl+t view · tab section · ctrl+n/p receiver · ctrl+h hide · ctrl+f focus · ↑/↓ msg · ctrl+e open · enter send · ctrl+q quit"
+	text := "ctrl+t view · tab section · ctrl+n/p receiver · ctrl+h hide · ctrl+f focus · ↑/↓ msg · ctrl+e open · ctrl+l config · enter send · ctrl+q quit"
 	if m.err != nil {
 		text = m.err.Error()
 	}
@@ -357,4 +362,30 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func (m model) renderConfigMenu(width, height int) string {
+	var body string
+	if len(m.agentConfigKeys) == 0 {
+		body = lipgloss.NewStyle().
+			Foreground(palette.Red).
+			Render("No custom agent configurations found.\nPlace config.json in ~/.config/agent-communicator/agents/<name>/")
+	} else {
+		var listLines []string
+		for i, key := range m.agentConfigKeys {
+			cfg := m.agentConfigs[key]
+			style := lipgloss.NewStyle().Foreground(palette.Text)
+			prefix := "  "
+			if i == m.configSelected {
+				style = style.Background(palette.Surface0).Foreground(palette.Yellow)
+				prefix = "> "
+			}
+			listLines = append(listLines, prefix+style.Render(cfg.Name)+" - "+cfg.Description)
+		}
+		body = strings.Join(listLines, "\n")
+	}
+
+	title := titleStyle.Render("Custom Agent Configurations")
+	boxContent := title + "\n\n" + body
+	return box(boxContent, width, height)
 }

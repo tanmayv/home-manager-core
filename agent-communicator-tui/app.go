@@ -41,10 +41,27 @@ type model struct {
 	ownName                 string
 	local                   localClient
 	remote                  remoteClient
+
+	// Custom Agent Configurations (Ctrl-L)
+	agentConfigs      map[string]AgentConfig
+	agentConfigKeys   []string
+	showingConfigMenu bool
+	configSelected    int
 }
 
 func newModel(local localClient, remote remoteClient, ownName string) model {
-	return model{local: local, remote: remote, ownName: ownName, sentMessages: map[string][]tracker.Message{}, unreadRows: map[string]bool{}, hiddenAgents: map[string]bool{}}
+	configs, keys, _ := LoadAgentConfigs()
+	return model{
+		local:             local,
+		remote:            remote,
+		ownName:           ownName,
+		sentMessages:      map[string][]tracker.Message{},
+		unreadRows:        map[string]bool{},
+		hiddenAgents:      map[string]bool{},
+		agentConfigs:      configs,
+		agentConfigKeys:   keys,
+		showingConfigMenu: false,
+	}
 }
 func (m model) Init() tea.Cmd {
 	return tea.Batch(loadAgents(m.local, m.remote), loadOutboxCmd(), loadHiddenAgentsCmd(), tickRefresh(), waitEvents(m.local, 0))
@@ -55,9 +72,38 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 	case tea.KeyMsg:
+		if m.showingConfigMenu {
+			switch msg.Type {
+			case tea.KeyCtrlC, tea.KeyCtrlQ:
+				return m, tea.Quit
+			case tea.KeyCtrlL, tea.KeyEsc:
+				m.showingConfigMenu = false
+				return m, nil
+			case tea.KeyUp, tea.KeyCtrlP:
+				if m.configSelected > 0 {
+					m.configSelected--
+				}
+				return m, nil
+			case tea.KeyDown, tea.KeyCtrlN:
+				if m.configSelected < len(m.agentConfigKeys)-1 {
+					m.configSelected++
+				}
+				return m, nil
+			case tea.KeyEnter:
+				// Future work: Execute selected agent configuration
+				m.showingConfigMenu = false
+				return m, nil
+			}
+			return m, nil // Ignore other keys
+		}
+
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyCtrlQ:
 			return m, tea.Quit
+		case tea.KeyCtrlL:
+			m.showingConfigMenu = true
+			m.configSelected = 0
+			return m, nil
 		case tea.KeyCtrlT:
 			m.toggleMode()
 			m.selectLatestMessage()

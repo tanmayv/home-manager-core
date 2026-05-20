@@ -296,3 +296,62 @@ func TestFilterConversationMatchesRemoteSenderFormat(t *testing.T) {
 		t.Fatalf("filtered = %+v", filtered)
 	}
 }
+
+func TestAgentConfigMenuInteraction(t *testing.T) {
+	m := model{
+		agentConfigs: map[string]AgentConfig{
+			"jetski": {Name: "jetski", Description: "Jetski agent"},
+			"pi":     {Name: "pi", Description: "Pi agent"},
+		},
+		agentConfigKeys:   []string{"jetski", "pi"},
+		showingConfigMenu: false,
+		configSelected:    0,
+	}
+
+	// 1. Press Ctrl-L to open the menu
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlL})
+	m = updated.(model)
+	if !m.showingConfigMenu {
+		t.Fatalf("expected showingConfigMenu to be true")
+	}
+	if m.configSelected != 0 {
+		t.Fatalf("expected configSelected to be 0, got %d", m.configSelected)
+	}
+
+	// 2. Press KeyDown to go to next option
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(model)
+	if m.configSelected != 1 {
+		t.Fatalf("expected configSelected to be 1, got %d", m.configSelected)
+	}
+
+	// 3. Press KeyDown again (should stay at index 1 because it's capped at len-1)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = updated.(model)
+	if m.configSelected != 1 {
+		t.Fatalf("expected configSelected to be 1, got %d", m.configSelected)
+	}
+
+	// 4. Press KeyUp to go back to index 0
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = updated.(model)
+	if m.configSelected != 0 {
+		t.Fatalf("expected configSelected to be 0, got %d", m.configSelected)
+	}
+
+	// 5. Press Enter to select the config (hides the menu)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = updated.(model)
+	if m.showingConfigMenu {
+		t.Fatalf("expected showingConfigMenu to be false after selection")
+	}
+
+	// 6. Re-open and Press Esc to close
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlL})
+	m = updated.(model)
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(model)
+	if m.showingConfigMenu {
+		t.Fatalf("expected showingConfigMenu to be false after Esc")
+	}
+}
