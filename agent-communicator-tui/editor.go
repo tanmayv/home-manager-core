@@ -65,11 +65,10 @@ func editPromptTemplate(path string) tea.Cmd {
 			os.Remove(tempPath)
 			return promptEdited{Err: err}
 		}
-		editor := os.Getenv("EDITOR")
-		if editor == "" {
-			editor = "nvim"
-		}
-		return tea.ExecProcess(exec.Command(editor, tempPath), func(err error) tea.Msg {
+		// Open prompt templates in Neovim and mark the buffer modified so `:x`
+		// performs an actual write even when the user sends the template unchanged.
+		// Users can still cancel with `:q!`, which leaves the temp file unwritten.
+		return tea.ExecProcess(exec.Command("nvim", "-c", "setlocal modified", tempPath), func(err error) tea.Msg {
 			defer os.Remove(tempPath)
 			if err != nil {
 				return promptEdited{Err: err}

@@ -70,8 +70,9 @@ Prompt templates are Markdown files in `$XDG_CONFIG_HOME/agent-communicator/prom
 
 - File names are `<prompt-name>.md`; non-Markdown files are ignored.
 - Press `P` to open the prompt selector.
-- Selecting a prompt copies it into a temporary Markdown file and opens it in `$EDITOR`, falling back to `nvim`.
-- The edited prompt is sent only if the temporary file was written/saved by the editor. Exiting without saving cancels the send.
+- Selecting a prompt copies it into a temporary Markdown file and opens it in Neovim.
+- The temporary buffer is marked modified so `:x` writes/sends even if the template text is unchanged.
+- The edited prompt is sent only if the temporary file was written/saved by the editor. Exiting with `:q!` cancels the send.
 - Home Manager installs a sample `test.md` prompt for smoke testing.
 
 ### Outbox
