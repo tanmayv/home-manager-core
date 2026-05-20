@@ -14,6 +14,7 @@ type viewMode int
 const (
 	simpleView viewMode = iota
 	advancedView
+	savedView
 )
 
 type model struct {
@@ -24,6 +25,8 @@ type model struct {
 	messages                []tracker.Message
 	allMessages             []tracker.Message
 	outbox                  []outboxRecord
+	savedMessages           []savedMessageRecord
+	savedSelected           int
 	sentMessages            map[string][]tracker.Message
 	unreadRows              map[string]bool
 	hiddenAgents            map[string]bool
@@ -64,7 +67,7 @@ func newModel(local localClient, remote remoteClient, ownName string) model {
 	}
 }
 func (m model) Init() tea.Cmd {
-	return tea.Batch(loadAgents(m.local, m.remote), loadOutboxCmd(), loadHiddenAgentsCmd(), tickRefresh(), waitEvents(m.local, 0))
+	return tea.Batch(loadAgents(m.local, m.remote), loadOutboxCmd(), loadSavedMessagesCmd(), loadHiddenAgentsCmd(), tickRefresh(), waitEvents(m.local, 0))
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -112,8 +115,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.selectLatestMessage()
 			return m, m.reloadMessages()
 		case tea.KeyCtrlF:
-			return m, switchToAgentPane(m.currentRow())
+			return m, m.toggleSaveSelectedMessage()
 		case tea.KeyCtrlP:
+			if m.mode == savedView {
+				m.selectSavedRow(-1)
+				m.selectLatestMessage()
+				return m, nil
+			}
 			if len(m.rows) > 0 {
 				m.selectNextInSection(-1)
 				m.scrollSelectedAgentIntoView()
@@ -121,6 +129,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.reloadMessages()
 			}
 		case tea.KeyCtrlN:
+			if m.mode == savedView {
+				m.selectSavedRow(1)
+				m.selectLatestMessage()
+				return m, nil
+			}
 			if len(m.rows) > 0 {
 				m.selectNextInSection(1)
 				m.scrollSelectedAgentIntoView()
@@ -156,8 +169,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.messageOffset = clampMessageOffset(m.messageOffset-messagePageSize(m.height), len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
 		case tea.KeyPgDown, tea.KeyCtrlD:
 			m.messageOffset = clampMessageOffset(m.messageOffset+messagePageSize(m.height), len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
+		case tea.KeyCtrlJ:
+			return m, m.switchToSelectedMessageSenderPane()
 		case tea.KeyEnter:
-			if m.canSendCurrent() && strings.TrimSpace(string(m.composer)) != "" {
+			if m.mode != savedView && m.canSendCurrent() && strings.TrimSpace(string(m.composer)) != "" {
 				body := string(m.composer)
 				row := m.rows[m.selected]
 				record := makeOutboxRecord(m.ownName, row, body)
@@ -281,6 +296,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.scrollSelectedAgentIntoView()
 		}
 	case hiddenAgentsSaved:
+		m.err = msg.Err
+	case savedMessagesLoaded:
+		if msg.Err != nil {
+			m.err = msg.Err
+		} else {
+			m.savedMessages = msg.Records
+			m.clampSavedSelected()
+		}
+	case savedMessagesSaved:
 		m.err = msg.Err
 	case outboxLoaded:
 		if msg.Err != nil {

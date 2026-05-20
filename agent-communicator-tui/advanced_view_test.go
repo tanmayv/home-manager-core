@@ -26,13 +26,13 @@ func TestCtrlTTogglesAdvancedViewAndLoadsAllInbox(t *testing.T) {
 	}
 }
 
-func TestAdvancedComposerDoesNotShowReceiverName(t *testing.T) {
+func TestAdvancedComposerShowsSelectedReceiverName(t *testing.T) {
 	m := model{mode: advancedView, rows: []agentRow{{Name: "alpha"}}}
 	view := m.composerView(80)
-	if strings.Contains(view, "@alpha") || strings.Contains(view, "alpha:") {
-		t.Fatalf("composer should not show receiver name: %q", view)
+	if !strings.Contains(view, "@alpha") || !strings.Contains(view, ": ") {
+		t.Fatalf("composer should show receiver name: %q", view)
 	}
-	if !strings.Contains(view, "> ") || !strings.Contains(view, "type message") {
+	if !strings.Contains(view, "type message") {
 		t.Fatalf("composer = %q", view)
 	}
 	if strings.Index(view, "█") > strings.Index(view, "type message") {

@@ -8,11 +8,18 @@ import (
 	"github.com/tanmayvijay/home-manager-core/agent-communicator-tui/internal/tracker"
 )
 
-func TestCtrlFAttemptsPaneSwitchForSelectedAgent(t *testing.T) {
-	m := model{rows: []agentRow{{Name: "alpha", Scope: "local"}}}
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlF})
+func TestRowFromTrackerAgentKeepsLocalTmuxPane(t *testing.T) {
+	row := rowFromTrackerAgent("alpha", tracker.Agent{Scope: "local", TmuxPane: "%7"})
+	if row.TmuxPane != "%7" {
+		t.Fatalf("row = %+v", row)
+	}
+}
+
+func TestCtrlEnterAttemptsPaneSwitchForSelectedLocalSender(t *testing.T) {
+	m := model{rows: []agentRow{{Name: "alpha", Scope: "local"}}, messages: []tracker.Message{{Sender: "alpha", Body: "hi"}}}
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlJ})
 	if cmd == nil {
-		t.Fatal("ctrl+f should attempt pane switch")
+		t.Fatal("ctrl+enter should attempt pane switch")
 	}
 	msg := cmd().(paneSwitched)
 	if msg.Err == nil || !strings.Contains(msg.Err.Error(), "no tmux pane") {
@@ -20,21 +27,14 @@ func TestCtrlFAttemptsPaneSwitchForSelectedAgent(t *testing.T) {
 	}
 }
 
-func TestCtrlFWorksInAdvancedViewForSelectedReceiver(t *testing.T) {
-	m := model{mode: advancedView, rows: []agentRow{{Name: "alpha", Scope: "remote"}}}
-	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlF})
+func TestCtrlEnterRejectsRemoteOrOutgoingSender(t *testing.T) {
+	m := model{rows: []agentRow{{Name: "alpha", Scope: "remote"}}, messages: []tracker.Message{{Sender: "You", Body: "hi"}}}
+	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlJ})
 	if cmd == nil {
-		t.Fatal("ctrl+f should attempt pane switch in advanced view")
+		t.Fatal("ctrl+enter should return error command")
 	}
 	msg := cmd().(paneSwitched)
-	if msg.Err == nil || !strings.Contains(msg.Err.Error(), "remote agent") {
+	if msg.Err == nil || !strings.Contains(msg.Err.Error(), "not a local agent") {
 		t.Fatalf("pane switch msg = %#v", msg)
-	}
-}
-
-func TestRowFromTrackerAgentKeepsLocalTmuxPane(t *testing.T) {
-	row := rowFromTrackerAgent("alpha", tracker.Agent{Scope: "local", TmuxPane: "%7"})
-	if row.TmuxPane != "%7" {
-		t.Fatalf("row = %+v", row)
 	}
 }

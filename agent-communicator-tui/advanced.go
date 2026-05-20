@@ -8,12 +8,15 @@ import (
 )
 
 func (m *model) toggleMode() {
-	m.mode = (m.mode + 1) % 2
+	m.mode = (m.mode + 1) % 3
 	m.messageOffset = 0
 	m.messageSelected = clampSelectedMessage(m.messageSelected, len(m.displayOrderedMessages()))
 }
 
 func (m model) reloadMessages() tea.Cmd {
+	if m.mode == savedView {
+		return nil
+	}
 	if m.mode == advancedView && m.ownName != "" {
 		return loadAllInbox(m.local, m.ownName)
 	}
@@ -21,6 +24,9 @@ func (m model) reloadMessages() tea.Cmd {
 }
 
 func (m model) displayMessages() []tracker.Message {
+	if m.mode == savedView {
+		return m.savedDisplayMessages()
+	}
 	if m.mode == advancedView {
 		return m.allMessages
 	}
@@ -33,7 +39,7 @@ func (m model) displayOrderedMessages() []tracker.Message {
 		messages[i], messages[j] = messages[j], messages[i]
 	}
 	limit := simpleConversationLimit
-	if m.mode == advancedView {
+	if m.mode == advancedView || m.mode == savedView {
 		limit = advancedConversationLimit
 	}
 	return limitLatestMessages(messages, limit)

@@ -135,6 +135,8 @@ Constraints:
 - `Up` / `Down`: select message and auto-scroll it into view
 - `Ctrl-U` / `Ctrl-D`: scroll message viewport
 - `Ctrl-E`: open selected message in editor
+- `Ctrl-Enter`: focus/switch to the selected message sender's tmux pane when the sender is a local agent
+- `Ctrl-F`: save/unsave selected message
 - `Enter`: send composer text
 - Plain typing goes to composer
 - `Ctrl-W`: delete previous word

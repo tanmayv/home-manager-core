@@ -54,8 +54,14 @@ func (m model) conversationPanel(width, height int) string {
 	if m.mode == advancedView {
 		titleText = "Conversation 🤖🤖🤖"
 	}
+	if m.mode == savedView {
+		titleText = "Saved Messages ⭐"
+	}
 	title := titleStyle.Render(titleText)
 	composer := m.composerBox(innerW)
+	if m.mode == savedView {
+		composer = mutedStyle.Render("ctrl+f unsave selected · ctrl+n/p saved entry")
+	}
 	messageH := max(1, innerH-lineCount(title)-lineCount(composer)-2)
 	body := title + "\n" + composer + "\n" + m.messageViewWithHeight(innerW, messageH)
 	return box(body, width, height)
@@ -67,13 +73,19 @@ func (m model) composerBox(width int) string {
 }
 
 func (m model) footer(width int) string {
-	text := "ctrl+t view · tab section · ctrl+n/p receiver · ctrl+h hide · ctrl+f focus · ↑/↓ msg · ctrl+e open · ctrl+l config · enter send · ctrl+q quit"
+	lines := []string{
+		"ctrl+t view · tab section · ctrl+n/p agent · ctrl+h hide · ctrl+f save · ctrl+enter focus sender",
+		"↑/↓ select msg · ctrl+u/d scroll · ctrl+e open · ctrl+l config · enter send · ctrl+r refresh · ctrl+q quit",
+	}
 	if m.err != nil {
-		text = m.err.Error()
+		lines = []string{m.err.Error()}
 	}
-	if lipgloss.Width(text) > width {
-		text = truncateCells(text, max(1, width-1)) + "…"
+	for i, text := range lines {
+		if lipgloss.Width(text) > width {
+			lines[i] = truncateCells(text, max(1, width-1)) + "…"
+		}
 	}
+	text := strings.Join(lines, "\n")
 	if m.err != nil {
 		return lipgloss.NewStyle().Foreground(palette.Red).Render(text)
 	}
@@ -82,6 +94,9 @@ func (m model) footer(width int) string {
 
 func (m model) agentListTitle() string {
 	title := "Agents"
+	if m.mode == savedView {
+		title = "Saved"
+	}
 	if m.agentListLoading {
 		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 		title += " " + mutedStyle.Render(frames[m.agentListFrame%len(frames)])
@@ -138,6 +153,9 @@ func splitHost(target string) string {
 }
 
 func (m model) agentList(width, height int) string {
+	if m.mode == savedView {
+		return m.savedAgentList(width, height)
+	}
 	if len(m.rows) == 0 {
 		return mutedStyle.Render("no agents")
 	}
@@ -159,6 +177,36 @@ func (m model) agentList(width, height int) string {
 		b.WriteString("\n" + mutedStyle.Render("…"))
 	}
 	return truncateLines(b.String(), height)
+}
+
+func (m model) savedAgentList(width, height int) string {
+	rows := m.savedRows()
+	if len(rows) == 0 {
+		return mutedStyle.Render("no saved messages")
+	}
+	visible := max(1, height/agentCardHeight)
+	offset := min(max(0, m.agentOffset), max(0, len(rows)-visible))
+	end := min(len(rows), offset+visible)
+	var b strings.Builder
+	for i := offset; i < end; i++ {
+		b.WriteString(m.savedCard(rows[i], i == m.savedSelected, width-2))
+		if i < end-1 {
+			b.WriteString("\n")
+		}
+	}
+	return truncateLines(b.String(), height)
+}
+
+func (m model) savedCard(row agentRow, selected bool, width int) string {
+	count := 0
+	for _, rec := range m.savedMessages {
+		if fallback(rec.AgentName, rec.ConversationKey) == row.Name {
+			count++
+		}
+	}
+	copy := row
+	copy.Scope = fmt.Sprintf("saved · %d", count)
+	return m.agentCard(copy, selected, width)
 }
 
 func (m model) messageView(width int) string {
@@ -300,6 +348,10 @@ func (m model) composerLines(width int) []string {
 }
 
 func (m model) composerPrefix() string {
+	if m.mode == advancedView {
+		name := fallback(m.currentRow().Name, "agent")
+		return agentStyle(name, true).Render("@"+name) + mutedStyle.Render(": ")
+	}
 	return mutedStyle.Render("> ")
 }
 

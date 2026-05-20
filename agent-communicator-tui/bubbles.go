@@ -35,8 +35,15 @@ func (m model) messageHeader(msg tracker.Message, index int, colorKey string, wi
 	if m.mode == advancedView && !strings.Contains(sender, "→") && !strings.HasPrefix(sender, "to ") {
 		sender += " → " + fallback(m.ownName, "agent-communicator")
 	}
-	header := sentReadMarker(msg) + agentStyle(colorKey, true).Render(truncateCells(sender, max(1, width-25)))
+	saved := ""
+	if m.isSavedMessage(msg) {
+		saved = lipgloss.NewStyle().Foreground(palette.Yellow).Render("★ ")
+	}
+	header := saved + sentReadMarker(msg) + agentStyle(colorKey, true).Render(truncateCells(sender, max(1, width-25)))
 	if ts := formatDisplayTime(msg.Timestamp); ts != "" && lipgloss.Width(header)+1 < width {
+		if m.isSavedMessage(msg) {
+			ts += " ★"
+		}
 		header += " " + mutedStyle.Render(truncateCells(ts, width-lipgloss.Width(header)-1))
 	}
 	return header
@@ -103,6 +110,9 @@ func (m model) messageColorKey(msg tracker.Message) string {
 }
 
 func (m model) messageBorderColor(msg tracker.Message, colorKey string) lipgloss.Color {
+	if m.isSavedMessage(msg) {
+		return palette.Yellow
+	}
 	if isSentMessage(msg) {
 		return palette.Blue
 	}

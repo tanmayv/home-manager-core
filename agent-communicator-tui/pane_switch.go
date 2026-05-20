@@ -10,6 +10,31 @@ import (
 
 type paneSwitched struct{ Err error }
 
+func (m model) switchToSelectedMessageSenderPane() tea.Cmd {
+	messages := m.displayOrderedMessages()
+	if len(messages) == 0 || m.messageSelected >= len(messages) {
+		return nil
+	}
+	row, ok := m.localSenderRow(messages[m.messageSelected])
+	if !ok {
+		return func() tea.Msg { return paneSwitched{Err: fmt.Errorf("selected message sender is not a local agent")} }
+	}
+	return switchToAgentPane(row)
+}
+
+func (m model) localSenderRow(msg tracker.Message) (agentRow, bool) {
+	sender := msg.Sender
+	if isSentMessage(msg) {
+		return agentRow{}, false
+	}
+	for _, row := range m.rows {
+		if row.Scope == "local" && senderMatchesRow(sender, row) {
+			return row, true
+		}
+	}
+	return agentRow{}, false
+}
+
 func switchToAgentPane(row agentRow) tea.Cmd {
 	return func() tea.Msg {
 		if row.Scope != "local" {
