@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/tanmayvijay/home-manager-core/agent-communicator-tui/internal/tracker"
@@ -18,6 +19,7 @@ var panelBoxStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderF
 const composerMaxLines = 5
 
 func (m model) View() string {
+	defer debugSince("view", time.Now())
 	if m.width == 0 {
 		return "loading..."
 	}
@@ -45,6 +47,7 @@ func (m model) layoutWidths() (int, int, int) {
 }
 
 func (m model) conversationPanel(width, height int) string {
+	defer debugSince("conversation_panel", time.Now())
 	innerW := panelInnerWidth(width)
 	innerH := panelInnerHeight(height)
 	titleText := "Conversation 🤖"
@@ -163,6 +166,7 @@ func (m model) messageView(width int) string {
 }
 
 func (m model) messageViewWithHeight(width, visible int) string {
+	defer debugSince("message_view", time.Now())
 	lines := m.messageLinesForWidth(width)
 	visible = max(1, visible)
 	if len(lines) == 0 {
@@ -174,7 +178,11 @@ func (m model) messageViewWithHeight(width, visible int) string {
 }
 
 func (m model) messageLinesForWidth(width int) []string {
+	start := time.Now()
 	wrapWidth := max(10, width-1)
+	defer func() {
+		debugLogf("message_lines duration=%s messages=%d width=%d", time.Since(start), len(m.displayOrderedMessages()), width)
+	}()
 	messages := m.displayOrderedMessages()
 	if len(messages) == 0 {
 		if len(m.rows) > 0 && m.rows[m.selected].Scope == "remote" {

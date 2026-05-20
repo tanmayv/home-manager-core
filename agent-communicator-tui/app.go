@@ -72,6 +72,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 	case tea.KeyMsg:
+		keyStart := time.Now()
+		debugLogf("key start type=%v runes=%d", msg.Type, len(msg.Runes))
+		defer func() {
+			debugLogf("key end type=%v duration=%s composer_len=%d", msg.Type, time.Since(keyStart), len(m.composer))
+		}()
 		if m.showingConfigMenu {
 			switch msg.Type {
 			case tea.KeyCtrlC, tea.KeyCtrlQ:
@@ -90,13 +95,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			case tea.KeyEnter:
-				// Future work: Execute selected agent configuration
 				m.showingConfigMenu = false
 				return m, nil
 			}
-			return m, nil // Ignore other keys
+			return m, nil
 		}
-
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyCtrlQ:
 			return m, tea.Quit

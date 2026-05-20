@@ -2,6 +2,7 @@ package main
 
 import (
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/tanmayvijay/home-manager-core/agent-communicator-tui/internal/tracker"
@@ -10,6 +11,10 @@ import (
 var bubbleBorder = lipgloss.RoundedBorder()
 
 func (m model) messageBubbleLines(msg tracker.Message, index, width int) []string {
+	start := time.Now()
+	defer func() {
+		debugLogf("message_bubble duration=%s index=%d body_bytes=%d markdown=%t", time.Since(start), index, len(msg.Body), msg.ContentType == "" || msg.ContentType == "text/markdown")
+	}()
 	colorKey := m.messageColorKey(msg)
 	innerWidth := max(4, width-12)
 	lines := []string{m.messageHeader(msg, index, colorKey, innerWidth)}
