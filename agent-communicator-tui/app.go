@@ -46,14 +46,12 @@ type model struct {
 	remote                  remoteClient
 
 	// Custom Agent Configurations (Ctrl-L)
-	agentConfigs      map[string]AgentConfig
-	agentConfigKeys   []string
+	configItems       []ConfigSelectionItem
 	showingConfigMenu bool
 	configSelected    int
 }
 
 func newModel(local localClient, remote remoteClient, ownName string) model {
-	configs, keys, _ := LoadAgentConfigs()
 	return model{
 		local:             local,
 		remote:            remote,
@@ -61,13 +59,19 @@ func newModel(local localClient, remote remoteClient, ownName string) model {
 		sentMessages:      map[string][]tracker.Message{},
 		unreadRows:        map[string]bool{},
 		hiddenAgents:      map[string]bool{},
-		agentConfigs:      configs,
-		agentConfigKeys:   keys,
 		showingConfigMenu: false,
 	}
 }
 func (m model) Init() tea.Cmd {
-	return tea.Batch(loadAgents(m.local, m.remote), loadOutboxCmd(), loadSavedMessagesCmd(), loadHiddenAgentsCmd(), tickRefresh(), waitEvents(m.local, 0))
+	return tea.Batch(
+		loadAgents(m.local, m.remote),
+		loadOutboxCmd(),
+		loadSavedMessagesCmd(),
+		loadHiddenAgentsCmd(),
+		tickRefresh(),
+		waitEvents(m.local, 0),
+		loadConfigItemsCmd(m.local), // Initial load of configs
+	)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -93,16 +97,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			case tea.KeyDown, tea.KeyCtrlN:
-				if m.configSelected < len(m.agentConfigKeys)-1 {
+				if m.configSelected < len(m.configItems)-1 {
 					m.configSelected++
 				}
 				return m, nil
 			case tea.KeyEnter:
 				m.showingConfigMenu = false
-				if len(m.agentConfigKeys) > 0 {
-					selectedKey := m.agentConfigKeys[m.configSelected]
-					cfg := m.agentConfigs[selectedKey]
-					return m, spinAgentCmd(cfg)
+				if len(m.configItems) > 0 {
+					item := m.configItems[m.configSelected]
+					if item.IsRemote {
+						return m, spinRemoteAgentCmd(m.local, item.TrackerID, item.Name)
+					} else {
+						localConfigs, _, err := LoadAgentConfigs()
+						if err == nil {
+							if cfg, exists := localConfigs[item.Name]; exists {
+								return m, spinAgentCmd(cfg)
+							}
+						}
+					}
 				}
 				return m, nil
 			}
@@ -114,7 +126,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyCtrlL:
 			m.showingConfigMenu = true
 			m.configSelected = 0
-			return m, nil
+			return m, loadConfigItemsCmd(m.local)
 		case tea.KeyCtrlT:
 			m.toggleMode()
 			m.selectLatestMessage()
@@ -321,6 +333,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case paneSwitched:
 		m.err = msg.Err
+	case configItemsLoaded:
+		m.err = msg.Err
+		if msg.Err == nil {
+			m.configItems = msg.Items
+			if m.configSelected >= len(m.configItems) {
+				m.configSelected = max(0, len(m.configItems)-1)
+			}
+		}
 	case editorClosed:
 		m.err = msg.Err
 	case agentConfigSpun:

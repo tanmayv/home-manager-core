@@ -1,4 +1,4 @@
-import fcntl, json, logging, os, socket, threading, time, urllib.error, urllib.request, uuid
+import fcntl, json, logging, os, socket, threading, time, urllib.error, urllib.request, uuid, shlex
 import state
 
 LOG = logging.getLogger("agent-tracker.registry")
@@ -86,6 +86,9 @@ class RegistryClient:
 
     def fetch_agents(self):
         return self.request("GET", "/agents")
+
+    def fetch_trackers(self):
+        return self.request("GET", "/trackers")
 
 
 def _read_token_config(config):
@@ -241,6 +244,10 @@ def fetch_events():
     return _request("GET", f"/trackers/{TRACKER_ID}/events?wait={DELIVERY_WAIT_SECONDS}", timeout=DELIVERY_WAIT_SECONDS + 5)
 
 
+def fetch_trackers():
+    return _request("GET", "/trackers")
+
+
 def ack_event(event_id):
     return _request("POST", f"/trackers/{TRACKER_ID}/events/{event_id}/ack", {})[0]
 
@@ -359,6 +366,48 @@ def publish_tracker_event(target_tracker_id, event_type, payload):
     return None
 
 
+def _handle_remote_spin(config_name):
+    """Loads local config for config_name and spins a new agent securely locally."""
+    home = os.path.expanduser("~")
+    config_path = os.path.join(home, ".config", "agent-tracker", "agents", config_name, "config.json")
+    if not os.path.isfile(config_path):
+        LOG.warning("remote spin request for missing config: %s", config_name)
+        return
+
+    try:
+        with open(config_path, "r") as f:
+            cfg = json.load(f)
+        
+        directory = cfg.get("directory")
+        if not directory:
+            directory = home # fallback
+        directory = os.path.abspath(os.path.expanduser(directory))
+
+        agent_command = cfg.get("agent-command")
+        agent_args = cfg.get("agent-args") or []
+        if not agent_command:
+            LOG.warning("remote spin request config missing agent-command: %s", config_name)
+            return
+
+        # Generate session name from directory leaf
+        from ctl_commands.common import spin_session_name
+        session = spin_session_name(directory)
+        
+        command = shlex.join([agent_command] + agent_args)
+
+        from rpc_handler import handle_spin_agent
+        resolved_name = handle_spin_agent({
+            "session": session,
+            "command": command,
+            "directory": directory,
+            "name": session
+        })
+        LOG.info("remote spin request successfully executed for %s: spun as %s", config_name, resolved_name)
+
+    except Exception as e:
+        LOG.error("failed to execute remote spin request for %s: %s", config_name, e)
+
+
 def _event_loop(client=None):
     while True:
         status, body = (fetch_events() if client is None else client.fetch_events())
@@ -373,6 +422,11 @@ def _event_loop(client=None):
                 sender_name, local_payload = _local_tracker_event_payload(event.get("event_type"), payload)
                 LOG.info("mapping remote %s sender=%s message_id=%s target=%s", event.get("event_type"), sender_name, payload.get("message_id"), local_payload.get("target_agent_name"))
                 state.publish_event(event.get("event_type"), local_payload)
+            elif event.get("event_type") == "spin_request":
+                payload = event.get("payload") or {}
+                config_name = payload.get("config_name")
+                if config_name:
+                    threading.Thread(target=_handle_remote_spin, args=(config_name,), daemon=True).start()
             ack = ack_event(event.get("event_id")) if client is None else client.ack_event(event.get("event_id"))
             if ack != 200:
                 LOG.warning("failed to ack tracker event event_id=%s status=%s", event.get("event_id"), ack)

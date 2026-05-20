@@ -680,6 +680,27 @@ def handle_whoami(params: dict, caller_pid: int = None) -> dict:
     }
 
 
+def handle_publish_tracker_event(params: dict) -> dict:
+    target_tracker_id = params.get("target_tracker_id")
+    event_type = params.get("event_type")
+    payload = params.get("payload")
+    if not target_tracker_id or not event_type or not payload:
+        raise ValueError("target_tracker_id, event_type, and payload are required")
+
+    status = registry_client.publish_tracker_event(target_tracker_id, event_type, payload)
+    if status in (200, 202):
+        return {"success": True}
+    raise RuntimeError(f"Failed to publish tracker event: status {status}")
+
+
+def handle_list_trackers(params: dict) -> list[dict]:
+    """Fetches registered trackers and configs from the registry."""
+    status, body = registry_client.fetch_trackers()
+    if status == 200:
+        return body.get("trackers") or []
+    raise RuntimeError(f"Failed to list trackers from registry: status {status}")
+
+
 dispatcher = {
     "register": handle_register,
     "list": handle_list,
@@ -691,7 +712,9 @@ dispatcher = {
     "get_inbox": handle_get_inbox,
     "wait_events": handle_wait_events,
     "whoami": handle_whoami,
-    "unregister": handle_unregister
+    "unregister": handle_unregister,
+    "publish_tracker_event": handle_publish_tracker_event,
+    "list_trackers": handle_list_trackers
 }
 
 def handle_client(conn: socket.socket) -> None:

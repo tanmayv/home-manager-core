@@ -74,3 +74,17 @@ type WaitOptions struct {
 	TargetAgentID   string
 	TargetAgentName string
 }
+
+type AgentConfig struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+type RemoteTracker struct {
+	TrackerID    string        `json:"tracker_id"`
+	Hostname     string        `json:"hostname"`
+	Address      string        `json:"address"`
+	HTTPPort     int           `json:"http_port"`
+	Status       string        `json:"status"`
+	AgentConfigs []AgentConfig `json:"agent_configs"`
+}

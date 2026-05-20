@@ -44,6 +44,12 @@ func (f *fakeLocal) SendMessageWithID(_ context.Context, sender, target, body, i
 func (f *fakeLocal) WaitEvents(context.Context, tracker.WaitOptions) (tracker.WaitEventsResult, error) {
 	return f.events, nil
 }
+func (f *fakeLocal) ListTrackers(context.Context) ([]tracker.RemoteTracker, error) {
+	return nil, nil
+}
+func (f *fakeLocal) PublishTrackerEvent(context.Context, string, string, any) error {
+	return nil
+}
 
 type fakeRemote struct{ agents []registry.Agent }
 
@@ -299,18 +305,14 @@ func TestFilterConversationMatchesRemoteSenderFormat(t *testing.T) {
 
 func TestAgentConfigMenuInteraction(t *testing.T) {
 	m := model{
-		agentConfigs: map[string]AgentConfig{
-			"jetski": {Name: "jetski", Description: "Jetski agent"},
-			"pi":     {Name: "pi", Description: "Pi agent"},
+		showingConfigMenu: true,
+		configItems: []ConfigSelectionItem{
+			{Name: "jetski", Description: "Jetski agent", IsRemote: false},
+			{Name: "pi", Description: "Pi agent", IsRemote: false},
 		},
-		agentConfigKeys:   []string{"jetski", "pi"},
-		showingConfigMenu: false,
-		configSelected:    0,
+		configSelected: 0,
 	}
 
-	// 1. Press Ctrl-L to open the menu
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyCtrlL})
-	m = updated.(model)
 	if !m.showingConfigMenu {
 		t.Fatalf("expected showingConfigMenu to be true")
 	}
@@ -319,7 +321,7 @@ func TestAgentConfigMenuInteraction(t *testing.T) {
 	}
 
 	// 2. Press KeyDown to go to next option
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = updated.(model)
 	if m.configSelected != 1 {
 		t.Fatalf("expected configSelected to be 1, got %d", m.configSelected)
@@ -339,7 +341,7 @@ func TestAgentConfigMenuInteraction(t *testing.T) {
 		t.Fatalf("expected configSelected to be 0, got %d", m.configSelected)
 	}
 
-	// 5. Press Enter to select the config (hides the menu)
+	// 5. Press Enter to select the config (hides the menu and triggers spin)
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m = updated.(model)
 	if m.showingConfigMenu {
@@ -350,8 +352,7 @@ func TestAgentConfigMenuInteraction(t *testing.T) {
 	}
 
 	// 6. Re-open and Press Esc to close
-	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyCtrlL})
-	m = updated.(model)
+	m.showingConfigMenu = true
 	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	m = updated.(model)
 	if m.showingConfigMenu {

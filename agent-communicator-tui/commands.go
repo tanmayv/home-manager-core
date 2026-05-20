@@ -18,6 +18,8 @@ type localClient interface {
 	SendMessage(context.Context, string, string, []tracker.Attachment) error
 	SendMessageFrom(context.Context, string, string, string, []tracker.Attachment) error
 	WaitEvents(context.Context, tracker.WaitOptions) (tracker.WaitEventsResult, error)
+	ListTrackers(context.Context) ([]tracker.RemoteTracker, error)
+	PublishTrackerEvent(ctx context.Context, targetTrackerID, eventType string, payload any) error
 }
 
 type messageIDSender interface {
@@ -257,5 +259,84 @@ func spinAgentCmd(cfg AgentConfig) tea.Cmd {
 		cmd := exec.Command("agent-tracker-ctl", args...)
 		err := cmd.Run()
 		return agentConfigSpun{Name: cfg.Name, Err: err}
+	}
+}
+
+type ConfigSelectionItem struct {
+	Name        string
+	Description string
+	IsRemote    bool
+	TrackerID   string
+	Hostname    string
+}
+
+type configItemsLoaded struct {
+	Items []ConfigSelectionItem
+	Err   error
+}
+
+func loadConfigItemsCmd(local localClient) tea.Cmd {
+	return func() tea.Msg {
+		var items []ConfigSelectionItem
+
+		// 1. Load Local custom configurations
+		localConfigs, localKeys, err := LoadAgentConfigs()
+		if err == nil {
+			for _, key := range localKeys {
+				cfg := localConfigs[key]
+				items = append(items, ConfigSelectionItem{
+					Name:        cfg.Name,
+					Description: cfg.Description,
+					IsRemote:    false,
+				})
+			}
+		}
+
+		// 2. Fetch Remote Configurations from Registry
+		if local != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			trackers, err := local.ListTrackers(ctx)
+			if err == nil {
+				ownTrackerID := os.Getenv("AGENT_TRACKER_ID")
+				ownHostname := os.Getenv("AGENT_TRACKER_HOSTNAME")
+				if ownHostname == "" {
+					ownHostname, _ = os.Hostname()
+				}
+				for _, t := range trackers {
+					if t.TrackerID == ownTrackerID || t.Hostname == ownHostname {
+						continue // Skip local tracker remote configs
+					}
+					for _, cfg := range t.AgentConfigs {
+						items = append(items, ConfigSelectionItem{
+							Name:        cfg.Name,
+							Description: cfg.Description,
+							IsRemote:    true,
+							TrackerID:   t.TrackerID,
+							Hostname:    t.Hostname,
+						})
+					}
+				}
+			}
+		}
+
+		return configItemsLoaded{Items: items, Err: err}
+	}
+}
+
+func spinRemoteAgentCmd(local localClient, targetTrackerID, configName string) tea.Cmd {
+	return func() tea.Msg {
+		if local == nil {
+			return agentConfigSpun{Name: configName, Err: errors.New("local client unavailable")}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		payload := map[string]any{
+			"config_name": configName,
+		}
+
+		err := local.PublishTrackerEvent(ctx, targetTrackerID, "spin_request", payload)
+		return agentConfigSpun{Name: configName, Err: err}
 	}
 }

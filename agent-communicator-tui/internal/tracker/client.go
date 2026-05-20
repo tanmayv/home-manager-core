@@ -202,3 +202,20 @@ func isUUID(value string) bool {
 	}
 	return true
 }
+
+func (c *Client) ListTrackers(ctx context.Context) ([]RemoteTracker, error) {
+	var trackers []RemoteTracker
+	if err := c.call(ctx, "list_trackers", map[string]any{}, 10*time.Second, &trackers); err != nil {
+		return nil, err
+	}
+	return trackers, nil
+}
+
+func (c *Client) PublishTrackerEvent(ctx context.Context, targetTrackerID, eventType string, payload any) error {
+	params := map[string]any{
+		"target_tracker_id": targetTrackerID,
+		"event_type":        eventType,
+		"payload":           payload,
+	}
+	return c.call(ctx, "publish_tracker_event", params, 10*time.Second, nil)
+}

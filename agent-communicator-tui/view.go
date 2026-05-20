@@ -433,21 +433,31 @@ func max(a, b int) int {
 
 func (m model) renderConfigMenu(width, height int) string {
 	var body string
-	if len(m.agentConfigKeys) == 0 {
+	if len(m.configItems) == 0 {
 		body = lipgloss.NewStyle().
 			Foreground(palette.Red).
-			Render("No custom agent configurations found.\nPlace config.json in ~/.config/agent-communicator/agents/<name>/")
+			Render("No custom agent configurations found.\nPlace config.json in ~/.config/agent-tracker/agents/<name>/")
 	} else {
 		var listLines []string
-		for i, key := range m.agentConfigKeys {
-			cfg := m.agentConfigs[key]
+		for i, item := range m.configItems {
 			style := lipgloss.NewStyle().Foreground(palette.Text)
 			prefix := "  "
 			if i == m.configSelected {
 				style = style.Background(palette.Surface0).Foreground(palette.Yellow)
 				prefix = "> "
 			}
-			listLines = append(listLines, prefix+style.Render(cfg.Name)+" - "+cfg.Description)
+
+			scopePrefix := "[local] "
+			if item.IsRemote {
+				scopePrefix = fmt.Sprintf("[%s] ", shortHost(item.Hostname))
+			}
+
+			scopeStyle := lipgloss.NewStyle().Foreground(palette.Overlay0)
+			if i == m.configSelected {
+				scopeStyle = scopeStyle.Background(palette.Surface0).Foreground(palette.Peach)
+			}
+
+			listLines = append(listLines, prefix+scopeStyle.Render(scopePrefix)+style.Render(item.Name)+" - "+item.Description)
 		}
 		body = strings.Join(listLines, "\n")
 	}
