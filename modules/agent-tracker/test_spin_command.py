@@ -16,6 +16,7 @@ class TestSpinCommand(unittest.TestCase):
     def test_spin_session_name_uses_directory_leaf(self):
         self.assertEqual(ctl.spin_session_name("/tmp/my-project"), "my-project")
         self.assertEqual(ctl.spin_session_name("/tmp/a:b"), "a_b")
+        self.assertEqual(ctl.spin_session_name("/tmp/spin-bug.test"), "spin-bug_test")
 
     def test_spin_subcommand_sends_directory_session_and_command(self):
         with tempfile.TemporaryDirectory() as tmp, \

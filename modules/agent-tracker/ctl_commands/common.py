@@ -69,8 +69,11 @@ def ensure_tracker_running(timeout: float = DEFAULT_STARTUP_TIMEOUT) -> bool:
 
 
 def spin_session_name(directory: str) -> str:
+    import re
     leaf = os.path.basename(os.path.abspath(directory)) or "root"
-    return leaf.replace(":", "_")
+    leaf = re.sub(r"[^A-Za-z0-9_-]", "_", leaf)
+    leaf = re.sub(r"_+", "_", leaf).strip("_")
+    return leaf or "root"
 
 
 def call_rpc(method, params={}):

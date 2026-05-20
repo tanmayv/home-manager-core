@@ -197,6 +197,14 @@ def spin_agent(agent_name, command, target_pane=None, session=None, directory=No
     env_args = ["-e", f"SUGGESTED_AGENT_NAME={agent_name}"]
     if "AGENT_TRACKER_SOCKET" in os.environ:
         env_args.extend(["-e", f"AGENT_TRACKER_SOCKET={os.environ['AGENT_TRACKER_SOCKET']}"])
+    home_manager_bins = [
+        os.path.expanduser("~/.nix-profile/bin"),
+        "/nix/var/nix/profiles/default/bin",
+    ]
+    path_parts = home_manager_bins + [p for p in os.environ.get("PATH", "").split(":") if p]
+    seen = set()
+    spin_path = ":".join(p for p in path_parts if not (p in seen or seen.add(p)))
+    env_args.extend(["-e", f"PATH={spin_path}"])
     quoted_parts = [shlex.quote(part) for part in shlex.split(command)]
     full_cmd = f"agent-wrapper {' '.join(quoted_parts)}"
 

@@ -223,7 +223,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyPgDown, tea.KeyCtrlD:
 			m.messageOffset = clampMessageOffset(m.messageOffset+messagePageSize(m.height), len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
 		case tea.KeyCtrlJ:
-			return m, m.switchToSelectedMessageSenderPane()
+			return m, switchToAgentPane(m.currentRow())
 		case tea.KeyEnter:
 			if m.mode != savedView && m.canSendCurrent() && strings.TrimSpace(string(m.composer)) != "" {
 				body := string(m.composer)

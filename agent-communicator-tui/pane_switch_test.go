@@ -15,8 +15,8 @@ func TestRowFromTrackerAgentKeepsLocalTmuxPane(t *testing.T) {
 	}
 }
 
-func TestCtrlEnterAttemptsPaneSwitchForSelectedLocalSender(t *testing.T) {
-	m := model{rows: []agentRow{{Name: "alpha", Scope: "local"}}, messages: []tracker.Message{{Sender: "alpha", Body: "hi"}}}
+func TestCtrlEnterAttemptsPaneSwitchForSelectedAgent(t *testing.T) {
+	m := model{rows: []agentRow{{Name: "alpha", Scope: "local"}}}
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlJ})
 	if cmd == nil {
 		t.Fatal("ctrl+enter should attempt pane switch")
@@ -27,14 +27,14 @@ func TestCtrlEnterAttemptsPaneSwitchForSelectedLocalSender(t *testing.T) {
 	}
 }
 
-func TestCtrlEnterRejectsRemoteOrOutgoingSender(t *testing.T) {
-	m := model{rows: []agentRow{{Name: "alpha", Scope: "remote"}}, messages: []tracker.Message{{Sender: "You", Body: "hi"}}}
+func TestCtrlEnterRejectsRemoteSelectedAgent(t *testing.T) {
+	m := model{rows: []agentRow{{Name: "alpha", Scope: "remote"}}}
 	_, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlJ})
 	if cmd == nil {
 		t.Fatal("ctrl+enter should return error command")
 	}
 	msg := cmd().(paneSwitched)
-	if msg.Err == nil || !strings.Contains(msg.Err.Error(), "not a local agent") {
+	if msg.Err == nil || !strings.Contains(msg.Err.Error(), "remote agent") {
 		t.Fatalf("pane switch msg = %#v", msg)
 	}
 }
