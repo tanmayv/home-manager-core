@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -431,6 +432,16 @@ func max(a, b int) int {
 	return b
 }
 
+func localHostname() string {
+	if h := os.Getenv("AGENT_TRACKER_HOSTNAME"); h != "" {
+		return h
+	}
+	if h, err := os.Hostname(); err == nil {
+		return h
+	}
+	return "local"
+}
+
 func (m model) renderConfigMenu(width, height int) string {
 	var body string
 	if len(m.configItems) == 0 {
@@ -447,12 +458,15 @@ func (m model) renderConfigMenu(width, height int) string {
 				prefix = "> "
 			}
 
-			scopePrefix := "[local] "
+			scopePrefix := fmt.Sprintf("[%s] (local) ", shortHost(localHostname()))
 			if item.IsRemote {
 				scopePrefix = fmt.Sprintf("[%s] ", shortHost(item.Hostname))
 			}
 
 			scopeStyle := lipgloss.NewStyle().Foreground(palette.Overlay0)
+			if !item.IsRemote {
+				scopeStyle = lipgloss.NewStyle().Foreground(palette.Green)
+			}
 			if i == m.configSelected {
 				scopeStyle = scopeStyle.Background(palette.Surface0).Foreground(palette.Peach)
 			}
