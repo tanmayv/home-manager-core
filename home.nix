@@ -24,6 +24,8 @@
 
   home.packages = with pkgs; [
     fzf
+    gawk
+    git
     ripgrep
     bat
     pure-prompt

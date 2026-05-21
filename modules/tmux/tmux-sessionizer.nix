@@ -3,9 +3,21 @@ with lib;
 let
   escapeSedPattern = v: builtins.replaceStrings ["[" "]" "*" "."] ["\\[" "\\]" "\\*" "\\."] v;
   reverseReplacements = concatStringsSep " " (mapAttrsToList (k: v: "| sed \"s#^${escapeSedPattern v}#${k}/#\"") displayReplacements);
+  runtimePath = lib.makeBinPath [
+    pkgs.coreutils
+    pkgs.findutils
+    pkgs.fzf
+    pkgs.gawk
+    pkgs.git
+    pkgs.gnugrep
+    pkgs.gnused
+    pkgs.tmux
+  ];
 in
 pkgs.writeScriptBin "tmux-sessionizer" ''
   #!${pkgs.stdenv.shell}
+  export PATH="${runtimePath}:$PATH"
+
   CONFIG_FILE_NAME="tmux-sessionizer.conf"
   CONFIG_DIR="''${XDG_CONFIG_HOME:-$HOME/.config}/tmux-sessionizer"
   CONFIG_FILE="$CONFIG_DIR/$CONFIG_FILE_NAME"
@@ -217,7 +229,7 @@ pkgs.writeScriptBin "tmux-sessionizer" ''
                   [[ -d "$path" ]] && find "$path" -mindepth 1 -maxdepth "''${depth:-''${TS_MAX_DEPTH:-1}}" -name ".*" -prune -o -type d -print0
               fi
           done
-      ) | awk -v RS='\0' -v ORS='\0' -F/ 'length($NF) <= ${toString maxDirLength}' | (
+      ) | ${pkgs.gawk}/bin/awk -v RS='\0' -v ORS='\0' -F/ 'length($NF) <= ${toString maxDirLength}' | (
           if stat -c "%Y %n" . >/dev/null 2>&1; then
               xargs -0 stat -c "%Y %n" 2>/dev/null
           else
