@@ -113,6 +113,7 @@ def handle_register(params: dict) -> str:
     agent_id = params.get("agent_id") or str(uuid.uuid4())
     no_notify_with_send_keys = bool(params.get("no_notify_with_send_keys", False))
     no_registry = bool(params.get("no_registry", False))
+    cwd = params.get("cwd")
     
     if not (session and tmux_pane and wrapper_pid and tmux_socket):
         raise ValueError("Invalid params")
@@ -148,6 +149,7 @@ def handle_register(params: dict) -> str:
         "agent_cmd": agent_cmd or (existing_info or {}).get("agent_cmd", "unknown"),
         "no_notify_with_send_keys": no_notify_with_send_keys,
         "no_registry": no_registry,
+        "cwd": cwd or (existing_info or {}).get("cwd"),
         "last_heartbeat": time.time(),
         "recovered_at": None,
         "pending_notifications": (existing_info or {}).get("pending_notifications", [])
@@ -343,7 +345,14 @@ def handle_spin_agent(params: dict) -> str:
     state.set_agent(agent_name, {"status": "spawning", "timestamp": time.time(), "cwd": directory or "unknown"})
     
     try:
-        tmux_util.spin_agent(agent_name, command, target_pane, session=session, directory=directory)
+        pane_id = tmux_util.spin_agent(agent_name, command, target_pane, session=session, directory=directory)
+        placeholder_updates = {}
+        if session:
+            placeholder_updates["session"] = session
+        if pane_id:
+            placeholder_updates["tmux_pane"] = pane_id
+        if placeholder_updates:
+            state.update_agent(agent_name, **placeholder_updates)
         return agent_name
     except Exception as e:
         state.delete_agent(agent_name)

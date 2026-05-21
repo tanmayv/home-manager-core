@@ -91,15 +91,16 @@ class TestHttpAndRegistry(unittest.TestCase):
             server, base = start(registry_server.make_handler(store=store, token="secret"))
             self.addCleanup(server.shutdown)
             self.addCleanup(server.server_close)
-            payload = {"tracker_id": "t1", "hostname": "host1", "address": "127.0.0.1", "http_port": 19876, "agents": [{"agent_id": "a1", "name": "agent1", "aliases": [], "status": "idle", "agent_type": "pi", "agent_cmd": "pi"}]}
+            payload = {"tracker_id": "t1", "hostname": "host1", "address": "127.0.0.1", "http_port": 19876, "agents": [{"agent_id": "a1", "name": "agent1", "aliases": [], "status": "idle", "agent_type": "pi", "agent_cmd": "pi", "cwd": "/work/project"}]}
             self.assertEqual(post(f"{base}/trackers", payload, token="secret")[0], 201)
             self.assertEqual(post(f"{base}/trackers/t1/agent-update", {"agent_id": "a1", "status": "working"}, token="secret")[0], 200)
             code, body = get(f"{base}/agents/a1", token="secret")
-            self.assertEqual((code, body["status"], body["hostname"]), (200, "working", "host1"))
+            self.assertEqual((code, body["status"], body["hostname"], body["cwd"]), (200, "working", "host1", "/work/project"))
             agents = get(f"{base}/agents", token="secret")[1]["agents"]
             self.assertIn("address", body)
             self.assertNotIn("address", agents[0])
             self.assertNotIn("http_port", agents[0])
+            self.assertEqual(agents[0]["cwd"], "/work/project")
             self.assertEqual(post(f"{base}/trackers/t1/heartbeat", {"agents": payload["agents"]}, token="secret")[0], 200)
             old_stale, old_gone = registry_server.STALE, registry_server.GONE
             registry_server.STALE, registry_server.GONE = 1, 2

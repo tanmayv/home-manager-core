@@ -147,11 +147,13 @@ class TestRpcHandler(unittest.TestCase):
             "agent_id": "id-9",
             "no_notify_with_send_keys": True,
             "no_registry": True,
+            "cwd": "/work/project",
         })
         self.assertEqual(name, "agent9")
         info = state.get_agent("agent9")
         self.assertTrue(info["no_notify_with_send_keys"])
         self.assertTrue(info["no_registry"])
+        self.assertEqual(info["cwd"], "/work/project")
         set_agent_no_notify.assert_called_once_with("%9", True, "sock")
         set_agent_no_registry.assert_called_once_with("%9", True, "sock")
 
@@ -643,12 +645,15 @@ class TestRpcHandler(unittest.TestCase):
     @mock.patch("tmux_util.set_agent_uuid")
     @mock.patch("tmux_util.set_agent_id")
     def test_placeholder_spawning_replaced_by_real_register(self, _set_agent_id, _set_agent_uuid, _spin):
+        _spin.return_value = "%42"
         assigned_name = rpc_handler.handle_spin_agent(
             {"session": "sess", "command": "jetski", "name": "agent1"}
         )
         self.assertEqual(assigned_name, "agent1")
         spawning_info = state.get_agent("agent1")
         self.assertEqual(spawning_info["status"], "spawning")
+        self.assertEqual(spawning_info["session"], "sess")
+        self.assertEqual(spawning_info["tmux_pane"], "%42")
 
         real_name = rpc_handler.handle_register(
             {

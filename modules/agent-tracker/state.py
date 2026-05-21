@@ -287,6 +287,7 @@ def get_agents_for_registry() -> list[dict]:
             "status": info.get("status", "unknown"),
             "agent_type": info.get("agent_type", "unknown"),
             "agent_cmd": info.get("agent_cmd", "unknown"),
+            "cwd": info.get("cwd"),
         } for agent_id, info in state.items() if not info.get("no_registry", False)]
 
 
