@@ -103,6 +103,24 @@ class TestSpinCommand(unittest.TestCase):
 
         self.assertTrue(any(cmd == ["tmux", "new-window", "-P", "-F", "#{pane_id}", "-t", "proj", "-c", "/tmp/proj", "-e", "PATH=/my/custom/path", "gemini"] for cmd in calls))
 
+    def test_spin_command_strips_identity_environment_variables(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+             mock.patch.object(ctl, "ensure_tracker_running", return_value=True), \
+             mock.patch.dict(os.environ, {"PATH": "/mock/path", "AGENT_ID": "a1", "AGENT_NAME": "agent1", "AGENT_UUID": "u1", "TMUX": "1", "TMUX_PANE": "%1"}), \
+             mock.patch("ctl_commands.spin.call_rpc", return_value="proj") as call_rpc, \
+             mock.patch.object(ctl.sys, "argv", ["agent-tracker-ctl", "spin", tmp, "gemini"]):
+            ctl.main()
+        call_rpc.assert_called_once()
+        method, params = call_rpc.call_args.args
+        self.assertEqual(method, "spin_agent")
+        env = params["env"]
+        self.assertNotIn("TMUX", env)
+        self.assertNotIn("TMUX_PANE", env)
+        self.assertNotIn("AGENT_ID", env)
+        self.assertNotIn("AGENT_NAME", env)
+        self.assertNotIn("AGENT_UUID", env)
+        self.assertEqual(env["PATH"], "/mock/path")
+
 
 if __name__ == "__main__":
     unittest.main()
