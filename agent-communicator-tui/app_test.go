@@ -156,15 +156,25 @@ func TestCtrlOOpensPromptMenu(t *testing.T) {
 	}
 }
 
-func TestCtrlQQuitsCtrlRRefreshesAndPlainQRTypes(t *testing.T) {
+func TestCtrlQQuitsCtrlROpensConfigAndPlainQRTypes(t *testing.T) {
 	m := model{local: &fakeLocal{}}
 	_, quitCmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlQ})
 	if quitCmd == nil {
 		t.Fatal("ctrl+q should quit")
 	}
-	_, refreshCmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
-	if refreshCmd == nil {
-		t.Fatal("ctrl+r should refresh")
+	updated, configCmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlR})
+	m = updated.(model)
+	if !m.showingConfigMenu {
+		t.Fatal("ctrl+r should open config menu")
+	}
+	if configCmd == nil {
+		t.Fatal("ctrl+r should return a non-nil load command")
+	}
+	// Close the config menu by pressing Esc
+	updated, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = updated.(model)
+	if m.showingConfigMenu {
+		t.Fatal("Esc should close config menu")
 	}
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("qr")})
 	m = updated.(model)

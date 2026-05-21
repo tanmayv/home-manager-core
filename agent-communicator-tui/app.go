@@ -129,7 +129,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.Type {
 			case tea.KeyCtrlC, tea.KeyCtrlQ:
 				return m, tea.Quit
-			case tea.KeyCtrlL, tea.KeyEsc:
+			case tea.KeyCtrlR, tea.KeyEsc:
 				m.showingConfigMenu = false
 				return m, nil
 			case tea.KeyUp, tea.KeyCtrlP:
@@ -164,7 +164,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyCtrlQ:
 			return m, tea.Quit
-		case tea.KeyCtrlL:
+		case tea.KeyCtrlR:
 			m.showingConfigMenu = true
 			m.configSelected = 0
 			return m, loadConfigItemsCmd(m.local)
@@ -257,10 +257,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyCtrlW:
 			m.messageFocused = false
 			m.composer = deletePreviousWord(m.composer)
-		case tea.KeyCtrlR:
-			m.selectLatestMessage()
-			m.agentListLoading = true
-			return m, tea.Batch(loadAgentsFromCtlCmd(30*time.Second), loadOutboxCmd(), tickAgentListSpinner())
 		case tea.KeyCtrlE:
 			messages := m.displayOrderedMessages()
 			if len(messages) > 0 {

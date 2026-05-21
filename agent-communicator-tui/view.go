@@ -95,7 +95,7 @@ func (m model) conversationPanel(width, height int) string {
 	title := titleStyle.Render(titleText)
 	composer := m.composerBox(innerW)
 	if m.mode == savedView {
-		composer = mutedStyle.Render("ctrl+f unsave selected · ctrl+n/p saved entry")
+		composer = mutedStyle.Render("c-f unsave selected · c-n/p saved entry")
 	}
 	messageH := max(1, innerH-lineCount(title)-lineCount(composer)-2)
 	if width < 70 {
@@ -125,8 +125,8 @@ func (m model) composerBox(width int) string {
 
 func (m model) footer(width int) string {
 	lines := []string{
-		"ctrl+t view · tab section · ctrl+n/p agent · ctrl+o prompts · ctrl+h hide · ctrl+f save · ctrl+s save agent",
-		"↑/↓ select msg · ctrl+u/d scroll · ctrl+e open · ctrl+l config · enter send · ctrl+r refresh · ctrl+q quit",
+		"c-t view · tab section · c-n/p agent · c-o prompts · c-h hide · c-f save · c-s save agent",
+		"↑/↓ select msg · c-u/d scroll · c-e open · c-r config · enter send · c-q quit",
 	}
 	if m.err != nil {
 		lines = []string{m.err.Error()}
