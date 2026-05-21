@@ -50,7 +50,7 @@ type model struct {
 	showingConfigMenu bool
 	configSelected    int
 
-	// Prompt templates (P)
+	// Prompt templates (Ctrl-G)
 	prompts           []promptTemplate
 	showingPromptMenu bool
 	promptSelected    int
@@ -94,7 +94,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.Type {
 			case tea.KeyCtrlC, tea.KeyCtrlQ:
 				return m, tea.Quit
-			case tea.KeyCtrlI, tea.KeyEsc:
+			case tea.KeyCtrlG, tea.KeyEsc:
 				m.showingPromptMenu = false
 				return m, nil
 			case tea.KeyUp, tea.KeyCtrlP:
@@ -159,7 +159,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.showingConfigMenu = true
 			m.configSelected = 0
 			return m, loadConfigItemsCmd(m.local)
-		case tea.KeyCtrlI:
+		case tea.KeyCtrlG:
 			m.showingPromptMenu = true
 			m.promptSelected = 0
 			return m, loadPromptsCmd()

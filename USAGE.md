@@ -244,7 +244,7 @@ Prompt templates live in `~/.config/agent-communicator/prompts/<prompt-name>.md`
 
 | Key | Action |
 |-----|--------|
-| `P` | Open prompt selector, edit selected prompt in Neovim temp file; `:x` saves/sends, `:q!` cancels |
+| `Ctrl+G` | Open prompt selector, edit selected prompt in Neovim temp file; `:x` saves/sends, `:q!` cancels |
 | `Ctrl+N` / `Ctrl+P` | Select next/previous agent |
 | `Enter` | Send composer text |
 
