@@ -74,8 +74,6 @@ in
 
   } // (if aiFeatures.enable_ai_ssa_creator_skill then {
     ".gemini/skills/ai-ssa-creator".source = ./dotfiles/skills/ai-ssa-creator;
-  } else { }) // (if aiFeatures.enable_tmux_based_agent_comms then {
-    ".gemini/skills/tmux-agent-comms".source = ./dotfiles/skills/tmux-agent-comms;
   } else { });
 
 }
