@@ -79,7 +79,7 @@ func (m model) composerBox(width int) string {
 
 func (m model) footer(width int) string {
 	lines := []string{
-		"ctrl+t view · shift+tab section · ctrl+n/p agent · ctrl+g prompts · ctrl+h hide · ctrl+f save",
+		"ctrl+t view · tab section · ctrl+n/p agent · ctrl+o prompts · ctrl+h hide · ctrl+f save",
 		"↑/↓ select msg · ctrl+u/d scroll · ctrl+e open · ctrl+l config · enter send · ctrl+r refresh · ctrl+q quit",
 	}
 	if m.err != nil {

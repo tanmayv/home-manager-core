@@ -69,7 +69,7 @@ Important behavior:
 Prompt templates are Markdown files in `$XDG_CONFIG_HOME/agent-communicator/prompts/` or `~/.config/agent-communicator/prompts/`.
 
 - File names are `<prompt-name>.md`; non-Markdown files are ignored.
-- Press `Ctrl-G` to open the prompt selector.
+- Press `Ctrl-O` to open the prompt selector.
 - Selecting a prompt copies it into a temporary Markdown file and opens it in Neovim.
 - The temporary buffer is marked modified so `:x` writes/sends even if the template text is unchanged.
 - The edited prompt is sent only if the temporary file was written/saved by the editor. Exiting with `:q!` cancels the send.
@@ -142,9 +142,9 @@ Constraints:
 - `Ctrl-R`: refresh agent list with longer timeout and reload outbox
 - `Ctrl-T`: toggle Simple/Advanced view
 - `Ctrl-N` / `Ctrl-P`: select next/previous agent within the focused active/hidden section
-- `Ctrl-G`: open prompt-template selector; selected prompts are edited in a temporary file and sent only when saved
+- `Ctrl-O`: open prompt-template selector; selected prompts are edited in a temporary file and sent only when saved
 - `Ctrl-H`: toggle selected agent hidden/de-prioritized
-- `Shift-Tab`: toggle agent-list focus between active and hidden sections
+- `Tab` / `Shift-Tab`: toggle agent-list focus between active and hidden sections
 - `Up` / `Down`: select message and auto-scroll it into view
 - `Ctrl-U` / `Ctrl-D`: scroll message viewport
 - `Ctrl-E`: open selected message in editor

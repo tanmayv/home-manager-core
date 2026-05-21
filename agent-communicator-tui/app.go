@@ -50,7 +50,7 @@ type model struct {
 	showingConfigMenu bool
 	configSelected    int
 
-	// Prompt templates (Ctrl-G)
+	// Prompt templates (Ctrl-O)
 	prompts           []promptTemplate
 	showingPromptMenu bool
 	promptSelected    int
@@ -94,7 +94,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.Type {
 			case tea.KeyCtrlC, tea.KeyCtrlQ:
 				return m, tea.Quit
-			case tea.KeyCtrlG, tea.KeyEsc:
+			case tea.KeyCtrlO, tea.KeyEsc:
 				m.showingPromptMenu = false
 				return m, nil
 			case tea.KeyUp, tea.KeyCtrlP:
@@ -159,7 +159,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.showingConfigMenu = true
 			m.configSelected = 0
 			return m, loadConfigItemsCmd(m.local)
-		case tea.KeyCtrlG:
+		case tea.KeyCtrlO:
 			m.showingPromptMenu = true
 			m.promptSelected = 0
 			return m, loadPromptsCmd()
@@ -193,7 +193,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selectLatestMessage()
 				return m, m.reloadMessages()
 			}
-		case tea.KeyShiftTab:
+		case tea.KeyTab, tea.KeyShiftTab:
 			if len(m.rows) > 0 {
 				m.toggleAgentSection()
 				m.scrollSelectedAgentIntoView()

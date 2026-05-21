@@ -144,15 +144,15 @@ func TestLoadPromptTemplatesCreatesMissingDir(t *testing.T) {
 	}
 }
 
-func TestCtrlGOpensPromptMenu(t *testing.T) {
+func TestCtrlOOpensPromptMenu(t *testing.T) {
 	m := model{local: &fakeLocal{}}
-	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlG})
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlO})
 	m = updated.(model)
 	if !m.showingPromptMenu {
-		t.Fatal("ctrl+g should open prompt menu")
+		t.Fatal("ctrl+o should open prompt menu")
 	}
 	if cmd == nil {
-		t.Fatal("ctrl+g should reload prompt templates")
+		t.Fatal("ctrl+o should reload prompt templates")
 	}
 }
 
