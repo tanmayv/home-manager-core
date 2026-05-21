@@ -193,7 +193,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selectLatestMessage()
 				return m, m.reloadMessages()
 			}
-		case tea.KeyTab:
+		case tea.KeyShiftTab:
 			if len(m.rows) > 0 {
 				m.toggleAgentSection()
 				m.scrollSelectedAgentIntoView()

@@ -97,7 +97,7 @@ Read status:
 - Right panel: `Conversation` for selected agent.
 - `Ctrl-N` / `Ctrl-P` changes selected agent within the focused active/hidden section and keeps it visible in the agent-list viewport.
 - `Ctrl-H` toggles the selected agent's hidden/de-prioritized state. Hidden agents remain sendable.
-- `Tab` toggles agent-list focus between active and hidden sections.
+- `Shift-Tab` toggles agent-list focus between active and hidden sections.
 
 ### Advanced View
 
@@ -142,9 +142,9 @@ Constraints:
 - `Ctrl-R`: refresh agent list with longer timeout and reload outbox
 - `Ctrl-T`: toggle Simple/Advanced view
 - `Ctrl-N` / `Ctrl-P`: select next/previous agent within the focused active/hidden section
-- `P`: open prompt-template selector; selected prompts are edited in a temporary file and sent only when saved
+- `Ctrl-I`: open prompt-template selector; selected prompts are edited in a temporary file and sent only when saved
 - `Ctrl-H`: toggle selected agent hidden/de-prioritized
-- `Tab`: toggle agent-list focus between active and hidden sections
+- `Shift-Tab`: toggle agent-list focus between active and hidden sections
 - `Up` / `Down`: select message and auto-scroll it into view
 - `Ctrl-U` / `Ctrl-D`: scroll message viewport
 - `Ctrl-E`: open selected message in editor

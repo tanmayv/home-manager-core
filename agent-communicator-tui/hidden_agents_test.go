@@ -67,10 +67,10 @@ func TestCtrlHToggleHiddenFallsBackWhenSectionBecomesEmpty(t *testing.T) {
 	}
 }
 
-func TestTabTogglesAgentSection(t *testing.T) {
+func TestShiftTabTogglesAgentSection(t *testing.T) {
 	m := model{rows: []agentRow{{Name: "alpha", Scope: "local"}, {Name: "beta", Scope: "local"}}, hiddenAgents: map[string]bool{"beta": true}}
 	m.sortRowsByHidden("")
-	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyShiftTab})
 	m = updated.(model)
 	if m.agentSection != hiddenAgents || m.currentRow().Name != "beta" {
 		t.Fatalf("section=%v selected=%+v", m.agentSection, m.currentRow())

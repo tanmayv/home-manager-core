@@ -360,10 +360,11 @@ func TestFilterConversationMatchesRemoteSenderFormat(t *testing.T) {
 
 func TestAgentConfigMenuInteraction(t *testing.T) {
 	m := model{
+		local:             &fakeLocal{},
 		showingConfigMenu: true,
 		configItems: []ConfigSelectionItem{
-			{Name: "jetski", Description: "Jetski agent", IsRemote: false},
-			{Name: "pi", Description: "Pi agent", IsRemote: false},
+			{Name: "jetski", Description: "Jetski agent", IsRemote: true, TrackerID: "t1"},
+			{Name: "pi", Description: "Pi agent", IsRemote: true, TrackerID: "t2"},
 		},
 		configSelected: 0,
 	}
