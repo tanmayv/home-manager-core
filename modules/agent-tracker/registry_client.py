@@ -245,6 +245,20 @@ def fetch_events():
 
 
 def fetch_trackers():
+    clients = load_registry_clients()
+    if clients:
+        trackers = []
+        last_status, last_body = None, {}
+        for client in clients:
+            status, body = client.fetch_trackers()
+            last_status, last_body = status, body
+            if status != 200:
+                continue
+            for tracker in body.get("trackers") or []:
+                trackers.append({**tracker, "registry_name": client.name})
+        if trackers:
+            return 200, {"trackers": trackers}
+        return last_status, last_body
     return _request("GET", "/trackers")
 
 
