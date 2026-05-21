@@ -30,6 +30,11 @@ let
     if pkgs.stdenv.isDarwin
     then "/usr/bin:/bin:/usr/sbin:/sbin"
     else "/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin";
+  userNixPaths = lib.concatStringsSep ":" [
+    "${config.home.homeDirectory}/.nix-profile/bin"
+    "/etc/profiles/per-user/${config.home.username}/bin"
+    "/nix/var/nix/profiles/default/bin"
+  ];
   daemonCmd = toString (pkgs.writeShellScript "agent-tracker-daemon" ''
     export AGENT_REGISTRY_AUTH=${if cfg.registryAuth then "true" else "false"}
     ${lib.optionalString (cfg.registryAuth && cfg.registryTokenFile != null) ''export AGENT_REGISTRY_TOKEN="$(cat ${lib.escapeShellArg (toString cfg.registryTokenFile)})"''}
@@ -48,7 +53,7 @@ let
     # agent-tracker intentionally invokes `tmux` and `sleep` by name from
     # Python, so provide an explicit cross-platform tool PATH instead of
     # relying on the interactive shell environment.
-    PATH = "${agentTrackerToolPath}:${platformFallbackPath}";
+    PATH = "${userNixPaths}:${agentTrackerToolPath}:${platformFallbackPath}";
   } // lib.optionalAttrs (cfg.registryUrl != null && cfg.registries == []) {
     AGENT_REGISTRY_URL = cfg.registryUrl;
   } // lib.optionalAttrs (cfg.registries != []) {
