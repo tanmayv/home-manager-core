@@ -34,26 +34,48 @@ class TestSpinCommand(unittest.TestCase):
 
     def test_tmux_spin_creates_new_session_for_missing_session(self):
         calls = []
+
         def fake_run(cmd, **kwargs):
             calls.append(cmd)
             if cmd[:2] == ["tmux", "has-session"]:
                 return mock.Mock(returncode=1)
-            return mock.Mock(returncode=0)
+            if cmd[:2] == ["tmux", "new-session"]:
+                return mock.Mock(returncode=0, stdout="%9\n")
+            if cmd[:2] == ["tmux", "switch-client"]:
+                return mock.Mock(returncode=0, stdout="")
+            return mock.Mock(returncode=0, stdout="")
+
         with mock.patch.object(tmux_util.subprocess, "run", fake_run):
-            tmux_util.spin_agent("proj", "gemini --model flash", session="proj", directory="/tmp/proj")
+            pane_id = tmux_util.spin_agent("proj", "gemini --model flash", session="proj", directory="/tmp/proj")
+
+        self.assertEqual(pane_id, "%9")
         self.assertIn(["tmux", "has-session", "-t", "proj"], calls)
-        self.assertTrue(any(cmd[:7] == ["tmux", "new-session", "-d", "-s", "proj", "-c", "/tmp/proj"] for cmd in calls))
+        self.assertTrue(any(cmd == ["tmux", "new-session", "-d", "-P", "-F", "#{pane_id}", "-s", "proj", "-c", "/tmp/proj"] for cmd in calls))
+        self.assertTrue(any(cmd == ["tmux", "switch-client", "-t", "proj"] for cmd in calls))
+        self.assertFalse(any(any(isinstance(part, str) and part.startswith("PATH=") for part in cmd) for cmd in calls))
+        self.assertFalse(any(cmd[:2] == ["tmux", "send-keys"] for cmd in calls))
 
     def test_tmux_spin_opens_window_for_existing_session(self):
         calls = []
+
         def fake_run(cmd, **kwargs):
             calls.append(cmd)
             if cmd[:2] == ["tmux", "has-session"]:
                 return mock.Mock(returncode=0)
-            return mock.Mock(returncode=0)
+            if cmd[:2] == ["tmux", "new-window"]:
+                return mock.Mock(returncode=0, stdout="%10\n")
+            if cmd[:2] == ["tmux", "switch-client"]:
+                return mock.Mock(returncode=0, stdout="")
+            return mock.Mock(returncode=0, stdout="")
+
         with mock.patch.object(tmux_util.subprocess, "run", fake_run):
-            tmux_util.spin_agent("proj", "gemini", session="proj", directory="/tmp/proj")
-        self.assertTrue(any(cmd[:6] == ["tmux", "new-window", "-t", "proj", "-c", "/tmp/proj"] for cmd in calls))
+            pane_id = tmux_util.spin_agent("proj", "gemini", session="proj", directory="/tmp/proj")
+
+        self.assertEqual(pane_id, "%10")
+        self.assertTrue(any(cmd == ["tmux", "new-window", "-P", "-F", "#{pane_id}", "-t", "proj", "-c", "/tmp/proj"] for cmd in calls))
+        self.assertTrue(any(cmd == ["tmux", "switch-client", "-t", "proj"] for cmd in calls))
+        self.assertFalse(any(any(isinstance(part, str) and part.startswith("PATH=") for part in cmd) for cmd in calls))
+        self.assertFalse(any(cmd[:2] == ["tmux", "send-keys"] for cmd in calls))
 
 
 if __name__ == "__main__":

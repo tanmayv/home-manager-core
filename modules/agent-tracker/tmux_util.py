@@ -3,6 +3,7 @@ import logging
 import threading
 import queue
 import sys
+import os
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', stream=sys.stderr)
 
@@ -191,42 +192,45 @@ def send_keys(pane_id, keys, socket_path=None):
 
 def spin_agent(agent_name, command, target_pane=None, session=None, directory=None):
     import shlex
-    import os
 
     tmux_base = ["tmux"]
-    env_args = ["-e", f"SUGGESTED_AGENT_NAME={agent_name}"]
-    if "AGENT_TRACKER_SOCKET" in os.environ:
-        env_args.extend(["-e", f"AGENT_TRACKER_SOCKET={os.environ['AGENT_TRACKER_SOCKET']}"])
-    home_manager_bins = [
-        os.path.expanduser("~/.nix-profile/bin"),
-        "/nix/var/nix/profiles/default/bin",
-    ]
-    path_parts = home_manager_bins + [p for p in os.environ.get("PATH", "").split(":") if p]
-    seen = set()
-    spin_path = ":".join(p for p in path_parts if not (p in seen or seen.add(p)))
-    env_args.extend(["-e", f"PATH={spin_path}"])
-    quoted_parts = [shlex.quote(part) for part in shlex.split(command)]
-    full_cmd = f"agent-wrapper {' '.join(quoted_parts)}"
+    command_parts = shlex.split(command)
 
     try:
+        logging.info(
+            "spin_agent request agent_name=%s session=%s directory=%s target_pane=%s command=%s parsed_command=%s debug_create_only=true",
+            agent_name,
+            session,
+            directory,
+            target_pane,
+            command,
+            command_parts,
+        )
         if session and directory:
             has_session = subprocess.run(tmux_base + ["has-session", "-t", session], capture_output=True).returncode == 0
             if has_session:
-                cmd = tmux_base + ["new-window", "-t", session, "-c", directory] + env_args + [full_cmd]
+                cmd = tmux_base + ["new-window", "-P", "-F", "#{pane_id}", "-t", session, "-c", directory]
             else:
-                cmd = tmux_base + ["new-session", "-d", "-s", session, "-c", directory] + env_args + [full_cmd]
-            subprocess.run(cmd, check=True, capture_output=True)
+                cmd = tmux_base + ["new-session", "-d", "-P", "-F", "#{pane_id}", "-s", session, "-c", directory]
+            logging.info("spin_agent tmux_cmd=%s", cmd)
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            pane_id = result.stdout.strip() or None
+            logging.info("spin_agent tmux_result pane_id=%s has_session=%s", pane_id, has_session)
             subprocess.run(tmux_base + ["switch-client", "-t", session], check=False, capture_output=True)
-            return
+            return pane_id
 
         tmux_cmd = tmux_base[:]
         if target_pane:
-            tmux_cmd.extend(["split-window", "-t", target_pane])
+            tmux_cmd.extend(["split-window", "-P", "-F", "#{pane_id}", "-t", target_pane])
         else:
-            tmux_cmd.extend(["split-window"])
+            tmux_cmd.extend(["split-window", "-P", "-F", "#{pane_id}"])
         tmux_cmd.extend(env_args)
         tmux_cmd.append(full_cmd)
-        subprocess.run(tmux_cmd, check=True, capture_output=True)
+        logging.info("spin_agent tmux_cmd=%s", tmux_cmd)
+        result = subprocess.run(tmux_cmd, check=True, capture_output=True, text=True)
+        pane_id = result.stdout.strip() or None
+        logging.info("spin_agent tmux_result pane_id=%s", pane_id)
+        return pane_id
     except subprocess.CalledProcessError as e:
-        logging.error(f"Tmux spin failed: {e.stderr.decode()}")
+        logging.error("Tmux spin failed cmd=%s stderr=%s", cmd if 'cmd' in locals() else tmux_cmd, e.stderr.decode())
         raise
