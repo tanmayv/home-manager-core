@@ -25,6 +25,35 @@ func TestSelectedAgentCardUsesDoubleBorder(t *testing.T) {
 	}
 }
 
+func TestAgentCardShowsCompactCWD(t *testing.T) {
+	m := model{}
+	card := m.agentCard(agentRow{Name: "alpha", Scope: "local", CWD: "/Users/tanmayvijay/home-manager-core"}, false, 60)
+	if !strings.Contains(card, "tanmayvijay/home-manager-core") {
+		t.Fatalf("agent card missing compact cwd:\n%s", card)
+	}
+	if strings.Contains(card, "/Users/tanmayvijay/home-manager-core") {
+		t.Fatalf("agent card should show at most two cwd folders:\n%s", card)
+	}
+}
+
+func TestCompactCWD(t *testing.T) {
+	cases := map[string]string{
+		"":                               "",
+		"unknown":                        "",
+		"unavailable":                    "",
+		"/":                              "/",
+		"/repo":                          "repo",
+		"/Users/tanmayvijay/project":     "tanmayvijay/project",
+		"/Users/tanmayvijay/project/sub": "project/sub",
+		"relative/path/to/project":       "to/project",
+	}
+	for input, want := range cases {
+		if got := compactCWD(input); got != want {
+			t.Fatalf("compactCWD(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
 func TestAgentCardUnreadDotStaysOnNameLine(t *testing.T) {
 	row := agentRow{Name: "coding-agent", Scope: "local"}
 	m := model{unreadRows: map[string]bool{conversationKey(row): true}}

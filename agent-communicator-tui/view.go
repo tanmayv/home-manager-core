@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -125,6 +126,9 @@ func (m model) agentCard(row agentRow, selected bool, width int) string {
 	if row.Scope == "remote" {
 		detail += " · " + fallback(row.Hostname, splitHost(row.TargetAddress))
 	}
+	if cwd := compactCWD(row.CWD); cwd != "" {
+		detail += " · " + cwd
+	}
 	nameLine := agentStyle(row.Name, true).Bold(true).Render(nameText)
 	if lipgloss.Width(nameLine) > inner {
 		nameLine = nameText
@@ -154,6 +158,31 @@ func (m model) hiddenSeparator(width int) string {
 func splitHost(target string) string {
 	host, _ := splitRemoteTarget(target)
 	return host
+}
+
+func compactCWD(cwd string) string {
+	cwd = strings.TrimSpace(cwd)
+	if cwd == "" || cwd == "unknown" || cwd == "unavailable" {
+		return ""
+	}
+	cleaned := filepath.Clean(cwd)
+	if cleaned == "." || cleaned == string(filepath.Separator) {
+		return cleaned
+	}
+	parts := strings.FieldsFunc(cleaned, func(r rune) bool { return r == '/' || r == '\\' })
+	kept := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part != "" {
+			kept = append(kept, part)
+		}
+	}
+	if len(kept) == 0 {
+		return cleaned
+	}
+	if len(kept) > 2 {
+		kept = kept[len(kept)-2:]
+	}
+	return strings.Join(kept, "/")
 }
 
 func (m model) agentList(width, height int) string {
