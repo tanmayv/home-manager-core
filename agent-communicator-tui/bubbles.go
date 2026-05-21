@@ -16,12 +16,42 @@ func (m model) messageBubbleLines(msg tracker.Message, index, width int) []strin
 		debugLogf("message_bubble duration=%s index=%d body_bytes=%d markdown=%t", time.Since(start), index, len(msg.Body), msg.ContentType == "" || msg.ContentType == "text/markdown")
 	}()
 	colorKey := m.messageColorKey(msg)
-	innerWidth := max(4, width-12)
-	lines := []string{m.messageHeader(msg, index, colorKey, innerWidth)}
 	body := msg.Body
+
+	if width < 70 {
+		innerWidth := max(4, width-4)
+		if msg.ContentType == "" || msg.ContentType == "text/markdown" {
+			body = renderMarkdown(body, innerWidth)
+		}
+
+		var out []string
+		prefix := "  "
+		if index == m.messageSelected {
+			prefix = "┃ "
+		}
+
+		headerStyle := lipgloss.NewStyle().Bold(true)
+		if index == m.messageSelected {
+			headerStyle = headerStyle.Foreground(palette.Blue)
+		} else {
+			headerStyle = headerStyle.Foreground(m.messageBorderColor(msg, colorKey))
+		}
+
+		headerText := m.messageHeader(msg, index, colorKey, innerWidth)
+		out = append(out, prefix+headerStyle.Render(headerText))
+
+		for _, line := range m.visibleBodyLines(bubbleBodyLines(body, innerWidth), index) {
+			out = append(out, prefix+line)
+		}
+		out = append(out, prefix+mutedStyle.Render(strings.Repeat("─", innerWidth)))
+		return out
+	}
+
+	innerWidth := max(4, width-12)
 	if msg.ContentType == "" || msg.ContentType == "text/markdown" {
 		body = renderMarkdown(body, innerWidth)
 	}
+	lines := []string{m.messageHeader(msg, index, colorKey, innerWidth)}
 	lines = append(lines, m.visibleBodyLines(bubbleBodyLines(body, innerWidth), index)...)
 	bubble := renderBubble(lines, innerWidth, m.messageBorderColor(msg, colorKey), isSentMessage(msg), index == m.messageSelected)
 	if !isSentMessage(msg) {

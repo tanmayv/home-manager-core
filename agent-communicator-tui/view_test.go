@@ -45,7 +45,7 @@ func TestMessageLinesWrapLongMessageBody(t *testing.T) {
 
 func TestMessageViewportScrollsIndependently(t *testing.T) {
 	m := model{height: 8, messageOffset: 3, messages: []tracker.Message{{Sender: "a", Body: "one\ntwo\nthree\nfour\nfive"}}}
-	view := m.messageView(60)
+	view := m.messageView(80)
 	if strings.Contains(view, "one") || !strings.Contains(view, "two") {
 		t.Fatalf("unexpected scrolled message view:\n%s", view)
 	}
@@ -107,7 +107,7 @@ func TestViewWideAndNarrowIncludeCoreRegions(t *testing.T) {
 	}
 	m.width = 48
 	narrow := m.View()
-	if !strings.Contains(narrow, "Conversation") || strings.Contains(narrow, "Selected") {
+	if !strings.Contains(narrow, "View: Chat") || strings.Contains(narrow, "Selected") {
 		t.Fatalf("unexpected narrow view:\n%s", narrow)
 	}
 	if got := maxRenderedLineWidth(narrow); got > m.width {

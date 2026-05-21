@@ -39,7 +39,7 @@ func TestComposerShowsCursorOnlyWhenInputFocused(t *testing.T) {
 
 func TestMessageViewMarksSelectedMessageWithWideBorder(t *testing.T) {
 	m := model{width: 80, height: 20, messageSelected: 0, messages: []tracker.Message{{Sender: "a", Body: "one"}, {Sender: "b", Body: "two"}}}
-	view := m.messageView(60)
+	view := m.messageView(80)
 	if !strings.Contains(view, "╔") || strings.Contains(view, "● b") {
 		t.Fatalf("view = %q", view)
 	}

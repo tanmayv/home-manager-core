@@ -9,7 +9,7 @@ import (
 
 func TestMessagesUseBoxesAndWideSelectionBorder(t *testing.T) {
 	m := model{messageSelected: 0, messages: []tracker.Message{{Sender: "alice", Body: "hello"}}}
-	view := strings.Join(m.messageLinesForWidth(60), "\n")
+	view := strings.Join(m.messageLinesForWidth(80), "\n")
 	for _, want := range []string{"╔", "╚", "║ alice", "hello"} {
 		if !strings.Contains(view, want) {
 			t.Fatalf("message view missing %q:\n%s", want, view)
@@ -22,7 +22,7 @@ func TestMessagesUseBoxesAndWideSelectionBorder(t *testing.T) {
 
 func TestIncomingMessagesAreIndentedFiveCells(t *testing.T) {
 	m := model{messages: []tracker.Message{{Sender: "alice", Body: "hello"}}}
-	lines := m.messageLinesForWidth(60)
+	lines := m.messageLinesForWidth(80)
 	if len(lines) == 0 || !strings.HasPrefix(lines[0], "     ") {
 		t.Fatalf("incoming bubble not indented:\n%s", strings.Join(lines, "\n"))
 	}
@@ -30,7 +30,7 @@ func TestIncomingMessagesAreIndentedFiveCells(t *testing.T) {
 
 func TestOutgoingMessagesAreLeftAligned(t *testing.T) {
 	m := model{messages: []tracker.Message{{Sender: "You", Body: "hello"}}}
-	lines := m.messageLinesForWidth(60)
+	lines := m.messageLinesForWidth(80)
 	if len(lines) == 0 || strings.HasPrefix(lines[0], "     ") {
 		t.Fatalf("outgoing bubble should not be indented:\n%s", strings.Join(lines, "\n"))
 	}

@@ -17,6 +17,7 @@ var mutedStyle = lipgloss.NewStyle().Foreground(palette.Overlay0)
 var readStatusStyle = lipgloss.NewStyle().Foreground(palette.Blue)
 var composerBoxStyle = lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(palette.Surface0).Padding(0, 1)
 var panelBoxStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(palette.Surface0).Padding(0, 1)
+var mobileComposerBoxStyle = lipgloss.NewStyle().Border(lipgloss.Border{Top: "─"}).BorderTop(true).BorderForeground(palette.Surface0).Padding(0, 0)
 
 const composerMaxLines = 5
 
@@ -36,6 +37,11 @@ func (m model) View() string {
 	}
 	if m.showingConfigMenu {
 		return m.renderConfigMenu(m.width, bodyH) + "\n" + footer
+	}
+
+	// Adaptive Mobile/Narrow View
+	if m.width < 70 {
+		return m.conversationPanel(m.width, bodyH) + "\n" + footer
 	}
 
 	leftW, midW, rightW := m.layoutWidths()
@@ -65,17 +71,54 @@ func (m model) conversationPanel(width, height int) string {
 	if m.mode == savedView {
 		titleText = "Saved Messages ⭐"
 	}
+
+	if width < 70 { // Mobile / Narrow view header overrides
+		innerW = max(1, width-2)
+		innerH = max(1, height)
+		viewName := "Chat 🤖"
+		if m.mode == advancedView {
+			viewName = "Advanced Chat 🤖"
+		} else if m.mode == savedView {
+			viewName = "Saved Messages ⭐"
+		}
+
+		if m.mode == savedView {
+			titleText = fmt.Sprintf("View: %s", viewName)
+		} else if len(m.rows) > 0 && m.selected >= 0 && m.selected < len(m.rows) {
+			row := m.rows[m.selected]
+			titleText = fmt.Sprintf("View: %s\nAgent: %s", viewName, row.Name)
+		} else {
+			titleText = fmt.Sprintf("View: %s\nAgent: None", viewName)
+		}
+	}
+
 	title := titleStyle.Render(titleText)
 	composer := m.composerBox(innerW)
 	if m.mode == savedView {
 		composer = mutedStyle.Render("ctrl+f unsave selected · ctrl+n/p saved entry")
 	}
 	messageH := max(1, innerH-lineCount(title)-lineCount(composer)-2)
+	if width < 70 {
+		messageH = max(1, innerH-lineCount(title)-lineCount(composer))
+	}
 	body := title + "\n" + composer + "\n" + m.messageViewWithHeight(innerW, messageH)
+
+	if width < 70 {
+		return lipgloss.NewStyle().
+			Width(width).
+			Height(height).
+			MaxWidth(width).
+			MaxHeight(height).
+			Padding(0, 1).
+			Render(body)
+	}
 	return box(body, width, height)
 }
 
 func (m model) composerBox(width int) string {
+	if m.width < 70 {
+		return mobileComposerBoxStyle.Width(width).MaxWidth(width).Render(m.composerView(width))
+	}
 	inner := max(1, width-4)
 	return composerBoxStyle.Width(inner).MaxWidth(max(1, width)).Render(m.composerView(inner))
 }
