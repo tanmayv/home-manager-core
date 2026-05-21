@@ -72,3 +72,54 @@ func (c *Client) listAgents(ctx context.Context, query url.Values) ([]Agent, err
 	}
 	return payload.Agents, nil
 }
+
+func (c *Client) SaveAgent(ctx context.Context, agentToSave, agentName, command, description, cwd string) error {
+	if c.BaseURL == "" {
+		return fmt.Errorf("registry URL not configured")
+	}
+	endpoint := c.BaseURL + "/save-agent"
+	payload := map[string]string{
+		"agent_to_save": agentToSave,
+	}
+	if agentName != "" {
+		payload["agent_name"] = agentName
+	}
+	if command != "" {
+		payload["command"] = command
+	}
+	if description != "" {
+		payload["description"] = description
+	}
+	if cwd != "" {
+		payload["cwd"] = cwd
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(body)))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if c.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	}
+
+	client := c.HTTPClient
+	if client == nil {
+		client = &http.Client{Timeout: 5 * time.Second}
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("registry save agent failed: HTTP %d", resp.StatusCode)
+	}
+	return nil
+}

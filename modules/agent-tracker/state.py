@@ -114,6 +114,7 @@ def init_state() -> None:
                         "recovered_at": time.time(),
                         "agent_type": agent_type,
                         "agent_cmd": agent_cmd or discovered_cmd or "unknown",
+                        "cwd": pane.get("cwd"),
                         "no_notify_with_send_keys": no_notify_with_send_keys,
                         "no_registry": no_registry,
                         "pending_notifications": []

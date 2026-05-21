@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/tanmayvijay/home-manager-core/agent-communicator-tui/internal/registry"
 	"github.com/tanmayvijay/home-manager-core/agent-communicator-tui/internal/tracker"
 )
 
@@ -48,7 +49,11 @@ func run(stdout io.Writer, args []string) error {
 		ownName = appName
 	}
 	_ = cleanupHistoryOnStart()
-	p := tea.NewProgram(newModel(tracker.New(""), nil, ownName), tea.WithOutput(stdout), tea.WithAltScreen())
+	var remote remoteClient
+	if cfg.RegistryURL != "" {
+		remote = registry.New(cfg.RegistryURL, "")
+	}
+	p := tea.NewProgram(newModel(tracker.New(""), remote, ownName), tea.WithOutput(stdout), tea.WithAltScreen())
 	_, err = p.Run()
 	return err
 }

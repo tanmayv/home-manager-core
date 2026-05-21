@@ -13,7 +13,7 @@
           pname = "agent-communicator";
           version = "0.1.0";
           src = ./.;
-          vendorHash = "sha256-uwBJAqN4sIepiiJf9lCDumLqfKJEowQO2tOiSWD3Fig=";
+          vendorHash = "sha256-TUbaUoqDZoQTkcOMtoE/FlAiqkWN+x49JeGkDguh2UU=";
           ldflags = [ "-X main.version=0.1.0" ];
         };
       });

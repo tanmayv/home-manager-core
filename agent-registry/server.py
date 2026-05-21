@@ -474,6 +474,40 @@ def make_handler(store=None, token=None, auth_required=None):
                 event = store.enqueue_tracker_event(body["target_tracker_id"], body["event_type"], body["source_tracker_id"], body["payload"])
                 LOG.info("accepted tracker event event_id=%s type=%s source=%s target=%s", event["event_id"], body["event_type"], body["source_tracker_id"], body["target_tracker_id"])
                 return self._json(202, {"ok": True, "event_id": event["event_id"]})
+            if parts == ["save-agent"]:
+                if not body.get("agent_to_save"):
+                    return self._json(400, {"error": "invalid_request", "message": "agent_to_save is required"})
+                agent_to_save = body["agent_to_save"]
+                agent_name = body.get("agent_name")
+                command = body.get("command")
+                description = body.get("description")
+                cwd = body.get("cwd")
+                
+                target = store.get_agent(agent_to_save)
+                if not target:
+                    target = next((agent for agent in store.list_agents() if agent["name"] == agent_to_save or agent_to_save in agent.get("aliases", [])), None)
+                
+                if not target:
+                    return self._json(404, {"error": "agent_not_found", "message": "no agent with that ID or name is registered globally"})
+                    
+                tracker = store.get_tracker(target["tracker_id"]) or {}
+                if tracker.get("status") != "active":
+                    return self._json(503, {"error": "tracker_offline", "message": "target tracker is stale or gone", "tracker_status": tracker.get("status", "gone")})
+                    
+                event = store.enqueue_tracker_event(
+                    target["tracker_id"],
+                    "save_request",
+                    "registry",
+                    {
+                        "agent_to_save": target["agent_id"],
+                        "agent_name": agent_name,
+                        "command": command,
+                        "description": description,
+                        "cwd": cwd
+                    }
+                )
+                return self._json(202, {"ok": True, "queued": True, "event_id": event["event_id"], "target_tracker": target["hostname"]})
+
             if parts == ["messages"]:
                 if not body.get("message") and not body.get("attachments"):
                     return self._json(400, {"error": "invalid_request", "message": "message text or attachments are required"})

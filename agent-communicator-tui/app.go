@@ -6,6 +6,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/tanmayvijay/home-manager-core/agent-communicator-tui/internal/tracker"
 )
 
@@ -54,6 +55,11 @@ type model struct {
 	prompts           []promptTemplate
 	showingPromptMenu bool
 	promptSelected    int
+
+	// Save Agent Form (Ctrl-S)
+	showingSaveForm bool
+	saveFormIndex   int // 0: Name, 1: Description, 2: Command, 3: CWD, 4: Save, 5: Cancel
+	saveFormInputs  []textinput.Model
 }
 
 func newModel(local localClient, remote remoteClient, ownName string) model {
@@ -90,6 +96,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		defer func() {
 			debugLogf("key end type=%v duration=%s composer_len=%d", msg.Type, time.Since(keyStart), len(m.composer))
 		}()
+		if m.showingSaveForm {
+			return m.updateSaveForm(msg)
+		}
 		if m.showingPromptMenu {
 			switch msg.Type {
 			case tea.KeyCtrlC, tea.KeyCtrlQ:
@@ -163,6 +172,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.showingPromptMenu = true
 			m.promptSelected = 0
 			return m, loadPromptsCmd()
+		case tea.KeyCtrlS:
+			m.initSaveForm()
+			return m, nil
 		case tea.KeyCtrlT:
 			m.toggleMode()
 			m.selectLatestMessage()
@@ -399,6 +411,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.selectLatestMessage()
 			return m, tea.Batch(unhideCmd, sendOutboxRecord(m.local, m.ownName, row, record))
 		}
+	case agentSaved:
+		m.err = msg.Err
 	case agentConfigSpun:
 		m.err = msg.Err
 	}

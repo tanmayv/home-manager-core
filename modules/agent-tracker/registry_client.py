@@ -429,6 +429,92 @@ def _handle_remote_spin(config_name):
         LOG.error("failed to execute remote spin request for %s: %s", config_name, e)
 
 
+def _handle_remote_save(agent_to_save, agent_name=None, command=None, description=None, cwd=None):
+    """Saves an active agent locally securely."""
+    LOG.info("remote save request: agent_to_save=%s agent_name=%s command=%s description=%s cwd=%s", agent_to_save, agent_name, command, description, cwd)
+    import state as local_state
+    
+    agent_id = local_state._resolve_agent_id(agent_to_save)
+    if not agent_id:
+        all_agents = local_state.get_all_agents()
+        matched_name = None
+        for name in all_agents.keys():
+            if name.startswith(f"{agent_to_save}-agent-") or name == agent_to_save:
+                matched_name = name
+                break
+        if matched_name:
+            agent_id = local_state._resolve_agent_id(matched_name)
+            
+    if not agent_id:
+        LOG.warning("remote save request failed: agent not found: %s", agent_to_save)
+        return
+        
+    agent_info = local_state.state.get(agent_id)
+    if not agent_info:
+        LOG.warning("remote save request failed: agent state not found for ID %s", agent_id)
+        return
+        
+    working_dir = cwd if cwd else agent_info.get("cwd")
+    save_command = command if command else agent_info.get("agent_cmd")
+    
+    save_name = agent_name
+    if not save_name:
+        save_name = agent_info.get("name")
+        if "-agent-" in save_name:
+            save_name = save_name.split("-agent-")[0]
+            
+    if not save_name:
+        LOG.warning("remote save request failed: could not determine save name")
+        return
+        
+    if not working_dir or not save_command:
+        pane_id = agent_info.get("tmux_pane")
+        if pane_id:
+            try:
+                from ctl_commands.save import query_tmux_path, query_tmux_option
+                if not working_dir:
+                    working_dir = query_tmux_path(pane_id)
+                if not save_command:
+                    save_command = query_tmux_option(pane_id, "@agent_cmd")
+            except Exception as e:
+                LOG.warning("failed to query tmux for remote save: %s", e)
+                
+    if not working_dir or not save_command:
+        LOG.warning("remote save request failed: working_dir or command missing for %s", save_name)
+        return
+        
+    working_dir = os.path.abspath(os.path.expanduser(working_dir))
+    
+    try:
+        parts = shlex.split(save_command)
+        agent_command = parts[0]
+        agent_args = parts[1:]
+    except Exception as e:
+        LOG.error("failed to parse command string %s: %s", save_command, e)
+        return
+        
+    save_description = description if description else f"Remote-saved configuration for agent {save_name} in {working_dir}"
+    
+    home = os.path.expanduser("~")
+    config_dir = os.path.join(home, ".config", "agent-tracker", "agents", save_name)
+    os.makedirs(config_dir, exist_ok=True)
+    config_file = os.path.join(config_dir, "config.json")
+    
+    payload = {
+        "directory": working_dir,
+        "agent-command": agent_command,
+        "agent-args": agent_args,
+        "description": save_description,
+    }
+    
+    try:
+        with open(config_file, "w") as f:
+            json.dump(payload, f, indent=2)
+        LOG.info("remote save request successfully executed for %s: saved to %s", save_name, config_file)
+    except Exception as e:
+        LOG.error("failed to write remote-saved config: %s", e)
+
+
 def _event_loop(client=None):
     while True:
         status, body = (fetch_events() if client is None else client.fetch_events())
@@ -448,6 +534,24 @@ def _event_loop(client=None):
                 config_name = payload.get("config_name")
                 if config_name:
                     threading.Thread(target=_handle_remote_spin, args=(config_name,), daemon=True).start()
+            elif event.get("event_type") == "save_request":
+                payload = event.get("payload") or {}
+                agent_to_save = payload.get("agent_to_save")
+                agent_name = payload.get("agent_name")
+                command = payload.get("command")
+                description = payload.get("description")
+                cwd = payload.get("cwd")
+                if agent_to_save:
+                    def run_save_and_register(c=client):
+                        _handle_remote_save(agent_to_save, agent_name, command, description, cwd)
+                        try:
+                            if c is None:
+                                register()
+                            else:
+                                c.register()
+                        except Exception as ex:
+                            LOG.warning("failed to re-register after remote save: %s", ex)
+                    threading.Thread(target=run_save_and_register, daemon=True).start()
             ack = ack_event(event.get("event_id")) if client is None else client.ack_event(event.get("event_id"))
             if ack != 200:
                 LOG.warning("failed to ack tracker event event_id=%s status=%s", event.get("event_id"), ack)

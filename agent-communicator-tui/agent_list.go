@@ -25,6 +25,7 @@ type ctlAgent struct {
 	Hostname      string   `json:"hostname"`
 	TargetAddress string   `json:"target_address"`
 	TmuxPane      string   `json:"tmux_pane"`
+	AgentCmd      string   `json:"agent_cmd"`
 }
 
 func loadAgents(local localClient, _ remoteClient) tea.Cmd {
@@ -83,7 +84,18 @@ func loadAgentsFromCtl(ctx context.Context) ([]agentRow, error) {
 }
 
 func rowFromCtlAgent(key string, agent ctlAgent) agentRow {
-	return rowFromTrackerAgent(key, tracker.Agent{Name: agent.Name, Aliases: agent.Aliases, AgentID: agent.AgentID, Scope: agent.Scope, Status: agent.Status, CWD: agent.CWD, Hostname: agent.Hostname, TargetAddress: agent.TargetAddress, TmuxPane: agent.TmuxPane})
+	return rowFromTrackerAgent(key, tracker.Agent{
+		Name:          agent.Name,
+		Aliases:       agent.Aliases,
+		AgentID:       agent.AgentID,
+		Scope:         agent.Scope,
+		Status:        agent.Status,
+		CWD:           agent.CWD,
+		Hostname:      agent.Hostname,
+		TargetAddress: agent.TargetAddress,
+		TmuxPane:      agent.TmuxPane,
+		AgentCmd:      agent.AgentCmd,
+	})
 }
 
 func sortRows(rows []agentRow) {
@@ -99,7 +111,17 @@ func rowFromTrackerAgent(key string, agent tracker.Agent) agentRow {
 	scope := fallback(agent.Scope, "local")
 	target := fallback(agent.TargetAddress, key)
 	if scope != "remote" {
-		return agentRow{Name: key, TargetAddress: target, AgentName: key, Scope: "local", Status: agent.Status, CWD: fallback(agent.CWD, "unknown"), TmuxPane: agent.TmuxPane}
+		return agentRow{
+			Name:          key,
+			TargetAddress: target,
+			AgentName:     key,
+			Scope:         "local",
+			Status:        agent.Status,
+			CWD:           fallback(agent.CWD, "unknown"),
+			TmuxPane:      agent.TmuxPane,
+			AgentCmd:      agent.AgentCmd,
+			AgentID:       agent.AgentID,
+		}
 	}
 	host, name := splitRemoteTarget(target)
 	if agent.Hostname != "" {
@@ -108,7 +130,18 @@ func rowFromTrackerAgent(key string, agent tracker.Agent) agentRow {
 	if name == "" {
 		name = fallback(agent.Name, key)
 	}
-	return agentRow{Name: remoteDisplayName(target, host, name), TargetAddress: target, Hostname: host, AgentName: name, Scope: "remote", Status: agent.Status, CWD: fallback(agent.CWD, "unavailable"), TmuxPane: agent.TmuxPane}
+	return agentRow{
+		Name:          remoteDisplayName(target, host, name),
+		TargetAddress: target,
+		Hostname:      host,
+		AgentName:     name,
+		Scope:         "remote",
+		Status:        agent.Status,
+		CWD:           fallback(agent.CWD, "unavailable"),
+		TmuxPane:      agent.TmuxPane,
+		AgentCmd:      agent.AgentCmd,
+		AgentID:       agent.AgentID,
+	}
 }
 
 func splitRemoteTarget(target string) (string, string) {

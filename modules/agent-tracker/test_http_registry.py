@@ -324,6 +324,104 @@ class TestHttpAndRegistry(unittest.TestCase):
                 registry_client._heartbeat_loop()
         self.assertEqual(register.call_count, 2)
 
+    def test_registry_remote_save_triggers_tracker_event(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_path = os.path.join(tmp, "registry-state.json")
+            store = registry_server.Store(state_path=state_path)
+            target = {
+                "tracker_id": "t2",
+                "hostname": "host2",
+                "address": "host2",
+                "http_port": 19876,
+                "agents": [{"agent_id": "a2", "name": "agent2", "aliases": [], "status": "idle", "agent_type": "pi", "agent_cmd": "pi"}]
+            }
+            store.put_tracker(target)
+            server, base = start(registry_server.make_handler(store, token="secret"))
+            self.addCleanup(server.shutdown)
+            self.addCleanup(server.server_close)
+
+            code, body = post(
+                f"{base}/save-agent",
+                {
+                    "agent_to_save": "agent2",
+                    "agent_name": "agent2-saved-config",
+                    "command": "pi custom --args",
+                    "description": "custom desc",
+                    "cwd": "/custom/cwd"
+                },
+                token="secret"
+            )
+            self.assertEqual(code, 202)
+            self.assertTrue(body["queued"])
+            self.assertEqual(body["target_tracker"], "host2")
+            
+            code, events = get(f"{base}/trackers/t2/events?wait=0", token="secret")
+            self.assertEqual(code, 200)
+            self.assertEqual(len(events["events"]), 1)
+            event = events["events"][0]
+            self.assertEqual(event["event_type"], "save_request")
+            self.assertEqual(event["payload"]["agent_to_save"], "a2")
+            self.assertEqual(event["payload"]["agent_name"], "agent2-saved-config")
+            self.assertEqual(event["payload"]["command"], "pi custom --args")
+            self.assertEqual(event["payload"]["description"], "custom desc")
+            self.assertEqual(event["payload"]["cwd"], "/custom/cwd")
+
+    def test_registry_client_event_loop_handles_save_request(self):
+        event = {
+            "event_id": "e1",
+            "event_type": "save_request",
+            "payload": {
+                "agent_to_save": "a2",
+                "agent_name": "agent2-saved-config",
+                "command": "pi custom --args",
+                "description": "custom desc",
+                "cwd": "/custom/cwd"
+            }
+        }
+        with mock.patch.object(registry_client, "fetch_events", side_effect=[(200, {"events": [event]}), SystemExit]), \
+             mock.patch.object(registry_client, "ack_event") as ack, \
+             mock.patch.object(registry_client, "_handle_remote_save") as handle_save, \
+             mock.patch.object(registry_client, "register") as register, \
+             mock.patch("registry_client.time.sleep") as sleep:
+            with self.assertRaises(SystemExit):
+                registry_client._event_loop()
+        
+        handle_save.assert_called_once_with("a2", "agent2-saved-config", "pi custom --args", "custom desc", "/custom/cwd")
+        register.assert_called_once()
+        ack.assert_called_once_with("e1")
+
+    def test_handle_remote_save(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            def side_effect(path):
+                if path == "~":
+                    return tmp
+                return path
+            with mock.patch("os.path.expanduser", side_effect=side_effect):
+                state.state = {
+                    "a2": {
+                        "agent_id": "a2",
+                        "name": "agent2",
+                        "aliases": [],
+                        "status": "idle",
+                        "agent_type": "pi",
+                        "agent_cmd": "pi --foo bar",
+                        "cwd": f"{tmp}/my-project"
+                    }
+                }
+                state.name_index = {"agent2": "a2"}
+                
+                registry_client._handle_remote_save("agent2", "agent2-saved-config", "pi custom --args", "custom desc", f"{tmp}/custom-cwd")
+                
+                config_path = os.path.join(tmp, ".config", "agent-tracker", "agents", "agent2-saved-config", "config.json")
+                self.assertTrue(os.path.isfile(config_path))
+                with open(config_path, "r") as f:
+                    cfg = json.load(f)
+                
+                self.assertEqual(cfg["directory"], f"{tmp}/custom-cwd")
+                self.assertEqual(cfg["agent-command"], "pi")
+                self.assertEqual(cfg["agent-args"], ["custom", "--args"])
+                self.assertEqual(cfg["description"], "custom desc")
+
 
 if __name__ == "__main__":
     unittest.main()
