@@ -60,7 +60,7 @@ def _is_uuid(value: str) -> bool:
         return False
 
 
-def _generate_unique_agent_name(name: str, session: str = None) -> str:
+def _generate_unique_agent_name(name: str, session: str = None, is_register: bool = False) -> str:
     agents = state.get_all_agents()
     if name:
         agent_name = name
@@ -70,14 +70,20 @@ def _generate_unique_agent_name(name: str, session: str = None) -> str:
         if m:
             base_name = m.group(1)
             num = int(m.group(2))
-            if not (state.get_agent_id_by_name(agent_name) and (state.get_agent(agent_name) or {}).get("status") != "spawning"):
-                return agent_name
+            has_conflict = state.get_agent_id_by_name(agent_name)
+            if has_conflict:
+                is_spawning = (state.get_agent(agent_name) or {}).get("status") == "spawning"
+                if is_spawning and is_register:
+                    return agent_name
             num += 1
             agent_name = f"{base_name}-{num}"
 
-        while state.get_agent_id_by_name(agent_name) and (state.get_agent(agent_name) or {}).get("status") != "spawning":
-            num += 1
+        while state.get_agent_id_by_name(agent_name):
+            is_spawning = (state.get_agent(agent_name) or {}).get("status") == "spawning"
+            if is_spawning and is_register:
+                break
             agent_name = f"{base_name}-{num}"
+            num += 1
         return agent_name
     else:
         num = 1
@@ -131,7 +137,7 @@ def handle_register(params: dict) -> str:
     if existing_name_for_id:
         agent_name = existing_name_for_id
     else:
-        agent_name = _generate_unique_agent_name(name, session)
+        agent_name = _generate_unique_agent_name(name, session, is_register=True)
         
     existing_info = state.get_agent(existing_name_for_id) if existing_name_for_id else None
     state.set_agent(agent_name, {
@@ -341,7 +347,7 @@ def handle_spin_agent(params: dict) -> str:
     if not (session and command and name):
         raise ValueError("Invalid params")
 
-    agent_name = _generate_unique_agent_name(name, session)
+    agent_name = _generate_unique_agent_name(name, session, is_register=False)
 
     state.set_agent(agent_name, {"status": "spawning", "timestamp": time.time(), "cwd": directory or "unknown"})
 
