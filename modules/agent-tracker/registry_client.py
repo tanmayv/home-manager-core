@@ -410,11 +410,18 @@ def _handle_remote_spin(config_name):
         command = shlex.join([agent_command] + agent_args)
 
         from rpc_handler import handle_spin_agent
+        env = {
+            "PATH": os.environ.get("PATH", ""),
+            "TERM": os.environ.get("TERM", "xterm-256color"),
+            "HOME": os.environ.get("HOME", os.path.expanduser("~")),
+            "USER": os.environ.get("USER", os.environ.get("LOGNAME", "")),
+        }
         resolved_name = handle_spin_agent({
             "session": session,
             "command": command,
             "directory": directory,
-            "name": session
+            "name": session,
+            "env": env,
         })
         LOG.info("remote spin request successfully executed for %s: spun as %s", config_name, resolved_name)
 
