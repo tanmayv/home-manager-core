@@ -190,28 +190,33 @@ def send_keys(pane_id, keys, socket_path=None):
     # 3. Send the Enter key to submit
     enqueue_tmux_cmd(cmd_base + ["send-keys", "-t", pane_id, "Enter"])
 
-def spin_agent(agent_name, command, target_pane=None, session=None, directory=None):
+def spin_agent(agent_name, command, target_pane=None, session=None, directory=None, env=None):
     import shlex
 
     tmux_base = ["tmux"]
     command_parts = shlex.split(command)
+    env_args = []
+    if env:
+        for k, v in env.items():
+            env_args.extend(["-e", f"{k}={v}"])
 
     try:
         logging.info(
-            "spin_agent request agent_name=%s session=%s directory=%s target_pane=%s command=%s parsed_command=%s debug_create_only=true",
+            "spin_agent request agent_name=%s session=%s directory=%s target_pane=%s command=%s parsed_command=%s env=%s",
             agent_name,
             session,
             directory,
             target_pane,
             command,
             command_parts,
+            list(env.keys()) if env else None,
         )
         if session and directory:
             has_session = subprocess.run(tmux_base + ["has-session", "-t", session], capture_output=True).returncode == 0
             if has_session:
-                cmd = tmux_base + ["new-window", "-P", "-F", "#{pane_id}", "-t", session, "-c", directory]
+                cmd = tmux_base + ["new-window", "-P", "-F", "#{pane_id}", "-t", session, "-c", directory] + env_args + [command]
             else:
-                cmd = tmux_base + ["new-session", "-d", "-P", "-F", "#{pane_id}", "-s", session, "-c", directory]
+                cmd = tmux_base + ["new-session", "-d", "-P", "-F", "#{pane_id}", "-s", session, "-c", directory] + env_args + [command]
             logging.info("spin_agent tmux_cmd=%s", cmd)
             result = subprocess.run(cmd, check=True, capture_output=True, text=True)
             pane_id = result.stdout.strip() or None
@@ -225,7 +230,7 @@ def spin_agent(agent_name, command, target_pane=None, session=None, directory=No
         else:
             tmux_cmd.extend(["split-window", "-P", "-F", "#{pane_id}"])
         tmux_cmd.extend(env_args)
-        tmux_cmd.append(full_cmd)
+        tmux_cmd.append(command)
         logging.info("spin_agent tmux_cmd=%s", tmux_cmd)
         result = subprocess.run(tmux_cmd, check=True, capture_output=True, text=True)
         pane_id = result.stdout.strip() or None

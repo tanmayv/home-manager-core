@@ -336,16 +336,17 @@ def handle_spin_agent(params: dict) -> str:
     target_pane = params.get("target_pane")
     directory = params.get("directory")
     name = params.get("name")
-    
+    env = params.get("env") or {}
+
     if not (session and command and name):
         raise ValueError("Invalid params")
-        
+
     agent_name = _generate_unique_agent_name(name, session)
-        
+
     state.set_agent(agent_name, {"status": "spawning", "timestamp": time.time(), "cwd": directory or "unknown"})
-    
+
     try:
-        pane_id = tmux_util.spin_agent(agent_name, command, target_pane, session=session, directory=directory)
+        pane_id = tmux_util.spin_agent(agent_name, command, target_pane, session=session, directory=directory, env=env)
         placeholder_updates = {}
         if session:
             placeholder_updates["session"] = session

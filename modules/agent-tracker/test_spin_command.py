@@ -21,6 +21,7 @@ class TestSpinCommand(unittest.TestCase):
     def test_spin_subcommand_sends_directory_session_and_command(self):
         with tempfile.TemporaryDirectory() as tmp, \
              mock.patch.object(ctl, "ensure_tracker_running", return_value=True), \
+             mock.patch.dict(os.environ, {"PATH": "/mock/path"}), \
              mock.patch("ctl_commands.spin.call_rpc", return_value="proj") as call_rpc, \
              mock.patch.object(ctl.sys, "argv", ["agent-tracker-ctl", "spin", tmp, "gemini", "--model", "flash"]):
             ctl.main()
@@ -30,6 +31,17 @@ class TestSpinCommand(unittest.TestCase):
         self.assertEqual(params["directory"], tmp)
         self.assertEqual(params["session"], os.path.basename(tmp))
         self.assertEqual(params["name"], os.path.basename(tmp))
+        self.assertEqual(params["command"], "bash -c 'export PATH=/mock/path; gemini --model flash; zsh'")
+
+    def test_spin_subcommand_with_no_fallback_sends_raw_command(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+             mock.patch.object(ctl, "ensure_tracker_running", return_value=True), \
+             mock.patch("ctl_commands.spin.call_rpc", return_value="proj") as call_rpc, \
+             mock.patch.object(ctl.sys, "argv", ["agent-tracker-ctl", "spin", "--no-fallback", tmp, "gemini", "--model", "flash"]):
+            ctl.main()
+        call_rpc.assert_called_once()
+        method, params = call_rpc.call_args.args
+        self.assertEqual(method, "spin_agent")
         self.assertEqual(params["command"], "gemini --model flash")
 
     def test_tmux_spin_creates_new_session_for_missing_session(self):
@@ -50,9 +62,8 @@ class TestSpinCommand(unittest.TestCase):
 
         self.assertEqual(pane_id, "%9")
         self.assertIn(["tmux", "has-session", "-t", "proj"], calls)
-        self.assertTrue(any(cmd == ["tmux", "new-session", "-d", "-P", "-F", "#{pane_id}", "-s", "proj", "-c", "/tmp/proj"] for cmd in calls))
+        self.assertTrue(any(cmd == ["tmux", "new-session", "-d", "-P", "-F", "#{pane_id}", "-s", "proj", "-c", "/tmp/proj", "gemini --model flash"] for cmd in calls))
         self.assertTrue(any(cmd == ["tmux", "switch-client", "-t", "proj"] for cmd in calls))
-        self.assertFalse(any(any(isinstance(part, str) and part.startswith("PATH=") for part in cmd) for cmd in calls))
         self.assertFalse(any(cmd[:2] == ["tmux", "send-keys"] for cmd in calls))
 
     def test_tmux_spin_opens_window_for_existing_session(self):
@@ -72,10 +83,25 @@ class TestSpinCommand(unittest.TestCase):
             pane_id = tmux_util.spin_agent("proj", "gemini", session="proj", directory="/tmp/proj")
 
         self.assertEqual(pane_id, "%10")
-        self.assertTrue(any(cmd == ["tmux", "new-window", "-P", "-F", "#{pane_id}", "-t", "proj", "-c", "/tmp/proj"] for cmd in calls))
+        self.assertTrue(any(cmd == ["tmux", "new-window", "-P", "-F", "#{pane_id}", "-t", "proj", "-c", "/tmp/proj", "gemini"] for cmd in calls))
         self.assertTrue(any(cmd == ["tmux", "switch-client", "-t", "proj"] for cmd in calls))
-        self.assertFalse(any(any(isinstance(part, str) and part.startswith("PATH=") for part in cmd) for cmd in calls))
         self.assertFalse(any(cmd[:2] == ["tmux", "send-keys"] for cmd in calls))
+
+    def test_tmux_spin_forwards_environment_variables(self):
+        calls = []
+
+        def fake_run(cmd, **kwargs):
+            calls.append(cmd)
+            if cmd[:2] == ["tmux", "has-session"]:
+                return mock.Mock(returncode=0)
+            if cmd[:2] == ["tmux", "new-window"]:
+                return mock.Mock(returncode=0, stdout="%11\n")
+            return mock.Mock(returncode=0, stdout="")
+
+        with mock.patch.object(tmux_util.subprocess, "run", fake_run):
+            tmux_util.spin_agent("proj", "gemini", session="proj", directory="/tmp/proj", env={"PATH": "/my/custom/path"})
+
+        self.assertTrue(any(cmd == ["tmux", "new-window", "-P", "-F", "#{pane_id}", "-t", "proj", "-c", "/tmp/proj", "-e", "PATH=/my/custom/path", "gemini"] for cmd in calls))
 
 
 if __name__ == "__main__":

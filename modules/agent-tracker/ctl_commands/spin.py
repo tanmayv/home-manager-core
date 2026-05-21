@@ -8,6 +8,7 @@ from .common import call_rpc, spin_session_name
 
 def register(subparsers):
     parser = subparsers.add_parser("spin", help="Spin a new agent in a tmux session for a directory")
+    parser.add_argument("--no-fallback", "-n", action="store_true", help="Disable automatic bash shell wrapper and zsh fallback")
     parser.add_argument("directory", help="Working directory; leaf name becomes the tmux session/agent base name")
     parser.add_argument("agent_command", help="Agent command to run")
     parser.add_argument("agent_args", nargs=argparse.REMAINDER, help="Arguments for the agent command")
@@ -20,7 +21,21 @@ def handle(args):
         print(f"Error: directory does not exist: {directory}", file=sys.stderr)
         sys.exit(1)
     session = spin_session_name(directory)
-    command = shlex.join([args.agent_command] + args.agent_args)
-    resolved_name = call_rpc("spin_agent", {"session": session, "directory": directory, "command": command, "name": session})
+    
+    inner_command = shlex.join([args.agent_command] + args.agent_args)
+    if args.no_fallback:
+        command = inner_command
+    else:
+        caller_path = os.environ.get("PATH", "")
+        command = f"bash -c {shlex.quote(f'export PATH={shlex.quote(caller_path)}; {inner_command}; zsh')}"
+
+    env = {k: v for k, v in os.environ.items() if k not in {"TMUX", "TMUX_PANE"}}
+    resolved_name = call_rpc("spin_agent", {
+        "session": session,
+        "directory": directory,
+        "command": command,
+        "name": session,
+        "env": env,
+    })
     if resolved_name:
         print(f"Agent spun successfully as: {resolved_name} in session: {session}")
