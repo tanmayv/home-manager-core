@@ -671,6 +671,44 @@ class TestRpcHandler(unittest.TestCase):
         self.assertEqual(info["agent_id"], "real-uuid-123")
         self.assertEqual(info["status"], "idle")
 
+    @mock.patch("tmux_util.spin_agent")
+    @mock.patch("rpc_handler._identify_agent")
+    def test_handle_spin_agent_strips_inherited_identity(self, mock_identify, mock_spin):
+        mock_spin.return_value = "%42"
+        mock_identify.return_value = {"agent_id": "parent-id", "name": "parent-agent"}
+
+        env = {"PATH": "/bin", "AGENT_ID": "parent-id", "AGENT_NAME": "parent-agent", "AGENT_UUID": "parent-id"}
+        rpc_handler.handle_spin_agent(
+            {"session": "sess", "command": "jetski", "name": "agent1", "env": env},
+            caller_pid=999
+        )
+
+        mock_identify.assert_called_once_with(999)
+        mock_spin.assert_called_once_with("agent1", "jetski", None, session="sess", directory=None, env=env)
+        self.assertNotIn("AGENT_ID", env)
+        self.assertNotIn("AGENT_NAME", env)
+        self.assertNotIn("AGENT_UUID", env)
+        self.assertEqual(env["PATH"], "/bin")
+
+    @mock.patch("tmux_util.spin_agent")
+    @mock.patch("rpc_handler._identify_agent")
+    def test_handle_spin_agent_preserves_explicit_identity_override(self, mock_identify, mock_spin):
+        mock_spin.return_value = "%42"
+        mock_identify.return_value = {"agent_id": "parent-id", "name": "parent-agent"}
+
+        env = {"PATH": "/bin", "AGENT_ID": "custom-subagent-id", "AGENT_NAME": "custom-subagent-name", "AGENT_UUID": "custom-subagent-id"}
+        rpc_handler.handle_spin_agent(
+            {"session": "sess", "command": "jetski", "name": "agent1", "env": env},
+            caller_pid=999
+        )
+
+        mock_identify.assert_called_once_with(999)
+        mock_spin.assert_called_once_with("agent1", "jetski", None, session="sess", directory=None, env=env)
+        self.assertEqual(env["AGENT_ID"], "custom-subagent-id")
+        self.assertEqual(env["AGENT_NAME"], "custom-subagent-name")
+        self.assertEqual(env["AGENT_UUID"], "custom-subagent-id")
+        self.assertEqual(env["PATH"], "/bin")
+
     @mock.patch("registry_client.send_remote_message", return_value=(202, {"ok": True}))
     def test_send_message_routes_remote_target_address_via_registry(self, send_remote):
         state.set_agent("sender", {"agent_id": "id-s", "status": "idle"})

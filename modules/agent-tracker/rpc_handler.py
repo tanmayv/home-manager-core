@@ -335,7 +335,7 @@ def _resolve_target_agent_name(params: dict) -> str | None:
     return None
 
 
-def handle_spin_agent(params: dict) -> str:
+def handle_spin_agent(params: dict, caller_pid: int = None) -> str:
     """Spins a new agent in a new tmux pane."""
     session = params.get("session")
     command = params.get("command")
@@ -346,6 +346,17 @@ def handle_spin_agent(params: dict) -> str:
 
     if not (session and command and name):
         raise ValueError("Invalid params")
+
+    # Context-aware environment inheritance stripping
+    if caller_pid:
+        caller_agent = _identify_agent(caller_pid)
+        if caller_agent:
+            parent_id = caller_agent.get("agent_id")
+            if parent_id and env.get("AGENT_ID") == parent_id:
+                logging.info(f"Stripping inherited agent identity (AGENT_ID={parent_id}) from spun agent environment.")
+                env.pop("AGENT_ID", None)
+                env.pop("AGENT_NAME", None)
+                env.pop("AGENT_UUID", None)
 
     agent_name = _generate_unique_agent_name(name, session, is_register=False)
 
@@ -773,7 +784,7 @@ def handle_client(conn: socket.socket) -> None:
         if handler:
             try:
                 # Pass caller_pid to handlers that might need it
-                if method in ["get_inbox", "update_agent", "heartbeat", "send_message", "wait_events", "whoami", "list", "rename", "unregister"]:
+                if method in ["get_inbox", "update_agent", "heartbeat", "send_message", "wait_events", "whoami", "list", "rename", "unregister", "spin_agent"]:
                     result = handler(params, caller_pid=caller_pid)
                 else:
                     result = handler(params)
