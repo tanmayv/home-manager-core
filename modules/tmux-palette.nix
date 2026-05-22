@@ -369,6 +369,12 @@ in
     group = "AI"
 
     [[commands]]
+    name = "Agent Communicator"
+    description = "Open agent-communicator in a new tmux window"
+    command = 'tmux new-window -n "agent-communicator" "exec agent-communicator"'
+    group = "AI"
+
+    [[commands]]
     name = "Rename Agent"
     description = "Rename the agent in the current pane"
     command = 'read -p "New agent name: " new_name && [[ -n "$new_name" ]] && tmux-rename-agent "$ORIGINAL_PANE" "$new_name"'
