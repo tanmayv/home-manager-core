@@ -6,6 +6,7 @@
     ./modules/terminal
     ./modules/scripts
     ./modules/agent-tracker
+    ./modules/agent-communicator-web.nix
     ./modules/git
   ] ++ (if userSettings.enable_bash_over_zsh or false then [ ./modules/bash ] else [ ./modules/zsh ])
     ++ (if userSettings.enable-ai-workflow or false then [ ./modules/ai-workflow ] else [])
@@ -30,4 +31,6 @@
     bat
     pure-prompt
   ];
+
+  services.agent-communicator-web.enable = lib.mkDefault true;
 }
