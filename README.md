@@ -44,6 +44,19 @@ This configuration acts as a hub for AI capabilities that can be selectively ena
 The configuration includes a built-in **Agent Tracker** that monitors active agents across all sessions.
 - **Color Coding**: The status bar displays agents with color codes representing their status (Green for Idle, Cyan for Working, Red for Waiting Approval).
 - **Pane Management**: Easily focus on an agent's pane or send messages.
+- **Agent Communicator**: The `agent-communicator` TUI is installed by default and runs through `agent-wrapper`, giving it its own inbox without injecting notifications into its tmux pane.
+
+To enable or disable it explicitly, set this in your `setup.nix`:
+
+```nix
+enable-agent-communicator = true; # default: true
+```
+
+Then apply Home Manager:
+
+```bash
+build-and-switch
+```
 
 <!-- [Screencast Placeholder: Agent Tracker and Status Bar Demo] -->
 <!-- Suggested: Show the status bar with color-coded agents and focusing a pane -->

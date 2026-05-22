@@ -27,6 +27,7 @@ const indexHTML = `
             padding: 0;
         }
         body, html {
+            width: 100%;
             height: 100%;
             background-color: var(--color-canvas);
             color: var(--color-body);

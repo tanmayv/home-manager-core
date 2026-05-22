@@ -84,11 +84,24 @@ func handleListAgents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	agents, err := client.List(r.Context())
+	agents, err := client.List(r.Context(), true)
 	if err != nil {
 		log.Printf("List error: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// agent-tracker returns local agents as a map keyed by name/address, but
+	// local agent payloads do not currently include their own name field. The UI
+	// consumes agent.name, so normalize it here from the map key.
+	for key, agent := range agents {
+		if agent.Name == "" {
+			agent.Name = key
+		}
+		if agent.TargetAddress == "" {
+			agent.TargetAddress = key
+		}
+		agents[key] = agent
 	}
 
 	w.Header().Set("Content-Type", "application/json")

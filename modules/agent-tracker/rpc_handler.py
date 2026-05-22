@@ -165,9 +165,62 @@ def handle_register(params: dict) -> str:
     
     return agent_name
 
+def _fetch_registry_agents_for_list() -> dict:
+    """Best-effort fetch of remote agents from configured registries."""
+    remote_agents = {}
+    for client in registry_client.load_registry_clients():
+        status, body = client.fetch_agents()
+        if status != 200:
+            continue
+        registry_name = client.name or "default"
+        for agent in (body or {}).get("agents") or []:
+            hostname = agent.get("hostname")
+            name = agent.get("name")
+            if not hostname or not name:
+                continue
+            base_key = f"{hostname}/{name}"
+            key = base_key
+            if base_key in remote_agents and remote_agents[base_key].get("agent_id") != agent.get("agent_id"):
+                existing = remote_agents.pop(base_key)
+                existing_registry = existing.get("registry_name") or "default"
+                existing_key = f"{existing_registry}:{base_key}"
+                remote_agents[existing_key] = {**existing, "name": existing_key, "target_address": existing_key}
+                key = f"{registry_name}:{base_key}"
+            elif base_key not in remote_agents and any(k.endswith(f":{base_key}") for k in remote_agents):
+                key = f"{registry_name}:{base_key}"
+            remote_agents[key] = {**agent, "name": key, "scope": "remote", "target_address": key, "registry_name": registry_name}
+    return remote_agents
+
+
+def _merge_registry_agents_for_list(local_agents: dict, remote_agents: dict) -> dict:
+    merged = {name: {**info, "name": info.get("name") or name, "scope": info.get("scope", "local"), "target_address": info.get("target_address") or name} for name, info in (local_agents or {}).items()}
+    local_agent_ids = {info.get("agent_id") for info in (local_agents or {}).values() if info.get("agent_id")}
+    for name, info in (remote_agents or {}).items():
+        if info.get("agent_id") in local_agent_ids:
+            continue
+        merged[name] = info
+    return merged
+
+
 def handle_list(params: dict, caller_pid: int = None) -> dict:
-    """Returns all agents in state, marking the caller if identified."""
+    """Returns agents in state, marking the caller if identified.
+
+    Remote registry agents are opt-in so status-bar callers keep rendering only
+    local active agents.
+    """
     agents = state.get_all_agents()
+    if params.get("include_remote"):
+        agents = _merge_registry_agents_for_list(agents, _fetch_registry_agents_for_list())
+    else:
+        agents = {
+            name: {
+                **info,
+                "name": info.get("name") or name,
+                "scope": info.get("scope", "local"),
+                "target_address": info.get("target_address") or name,
+            }
+            for name, info in (agents or {}).items()
+        }
     caller_name = _identify_agent(params, caller_pid)
     
     if caller_name and caller_name in agents:

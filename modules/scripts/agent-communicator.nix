@@ -1,37 +1,46 @@
-{ pkgs, config, userSettings ? {}, ... }:
+{ pkgs, config, lib, userSettings ? {}, ... }:
 
 let
+  aiFeatures = userSettings.ai_features or {};
+  defaultEnable =
+    if userSettings ? enable-agent-communicator then userSettings.enable-agent-communicator
+    else if aiFeatures ? enable_agent_communicator then aiFeatures.enable_agent_communicator
+    else true;
+
+  cfg = config.programs.agent-communicator;
   agentWrapperPackage = import ./agent-wrapper-package.nix { inherit pkgs config; };
-  agentTrackerSettings = userSettings.agent-tracker or {};
-  registryUrl = agentTrackerSettings.registry-url or null;
   agentCommunicatorTui = pkgs.buildGoModule {
     pname = "agent-communicator";
     version = "0.1.0";
     src = ../../agent-communicator-tui;
-    vendorHash = "sha256-uwBJAqN4sIepiiJf9lCDumLqfKJEowQO2tOiSWD3Fig=";
+    vendorHash = "sha256-TUbaUoqDZoQTkcOMtoE/FlAiqkWN+x49JeGkDguh2UU=";
     ldflags = [ "-X main.version=0.1.0" ];
   };
-  registryEnv = if registryUrl == null then "" else ''
-    export AGENT_REGISTRY_URL=${pkgs.lib.escapeShellArg registryUrl}
-  '';
 in
 {
-  xdg.configFile."agent-communicator/prompts/test.md".text = ''
-    Please summarize the current status and list any next actions.
-  '';
+  options.programs.agent-communicator.enable = lib.mkOption {
+    type = lib.types.bool;
+    default = defaultEnable;
+    description = "Whether to install the agent-communicator TUI and wrapper launcher.";
+  };
 
-  home.packages = [
-    agentCommunicatorTui
-    (pkgs.writeShellApplication {
-      name = "agent-communicator";
-      runtimeInputs = [ agentWrapperPackage ];
-      text = ''
-        ${registryEnv}
-        export SUGGESTED_AGENT_NAME="''${SUGGESTED_AGENT_NAME:-agent-communicator}"
-        export AGENT_ID="''${AGENT_ID:-00000000-0000-5000-8000-000000000001}"
-        mkdir -p "''${XDG_CONFIG_HOME:-$HOME/.config}/agent-communicator/prompts"
-        exec agent-wrapper ${agentCommunicatorTui}/bin/agent-communicator-tui --no-notify-with-send-keys "$@"
-      '';
-    })
-  ];
+  config = lib.mkIf cfg.enable {
+    xdg.configFile."agent-communicator/prompts/test.md".text = ''
+      Please summarize the current status and list any next actions.
+    '';
+
+    home.packages = [
+      agentCommunicatorTui
+      (pkgs.writeShellApplication {
+        name = "agent-communicator";
+        runtimeInputs = [ agentWrapperPackage ];
+        text = ''
+          export SUGGESTED_AGENT_NAME="''${SUGGESTED_AGENT_NAME:-agent-communicator}"
+          export AGENT_ID="''${AGENT_ID:-00000000-0000-5000-8000-000000000001}"
+          mkdir -p "''${XDG_CONFIG_HOME:-$HOME/.config}/agent-communicator/prompts"
+          exec agent-wrapper ${agentCommunicatorTui}/bin/agent-communicator-tui --no-notify-with-send-keys "$@"
+        '';
+      })
+    ];
+  };
 }

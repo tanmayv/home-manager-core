@@ -108,6 +108,15 @@ func (c *Client) call(ctx context.Context, method string, params any, out any) e
 		return fmt.Errorf("failed to encode RPC request: %w", err)
 	}
 
+	// The Python agent-tracker daemon reads until EOF before handling a request.
+	// Half-close the write side so the daemon can finish reading while this
+	// client keeps the read side open for the response.
+	if writeCloser, ok := conn.(interface{ CloseWrite() error }); ok {
+		if err := writeCloser.CloseWrite(); err != nil {
+			return fmt.Errorf("failed to close RPC write side: %w", err)
+		}
+	}
+
 	var resp jsonRPCResponse
 	if err := json.NewDecoder(conn).Decode(&resp); err != nil {
 		return fmt.Errorf("failed to decode RPC response: %w", err)
@@ -131,9 +140,14 @@ func (c *Client) call(ctx context.Context, method string, params any, out any) e
 }
 
 // List queries active registered agent registry structures
-func (c *Client) List(ctx context.Context) (map[string]Agent, error) {
+func (c *Client) List(ctx context.Context, includeRemote bool) (map[string]Agent, error) {
+	params := map[string]any{}
+	if includeRemote {
+		params["include_remote"] = true
+	}
+
 	var res map[string]Agent
-	if err := c.call(ctx, "list", nil, &res); err != nil {
+	if err := c.call(ctx, "list", params, &res); err != nil {
 		return nil, err
 	}
 	return res, nil

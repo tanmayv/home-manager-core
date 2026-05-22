@@ -23,8 +23,8 @@
   sessionizerSearchPaths = [ "~" "~/projects/nix" ];
 
   enable-agent-tracker = true;
+  enable-agent-communicator = true;
   agent-tracker = {
-    registry-url = null; # e.g. "https://agents.mundus.in"
     registries = []; # e.g. [{ name = "corp"; url = "https://agents.example"; token-file = null; }]
     registry-auth = false;
     registry-token-file = null; # required when registry-auth = true
@@ -46,6 +46,5 @@
     enable_agent_knowledge = true;
     enable_ai_ssa_creator_skill = true;
     enable_tmux_based_agent_comms = true;
-    enable_agent_communicator = false;
   };
 }

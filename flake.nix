@@ -14,7 +14,25 @@
     };
   };
 
-  outputs = inputs@{ nixpkgs, ... }: {
+  outputs = inputs@{ nixpkgs, ... }:
+    let
+      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
+      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system nixpkgs.legacyPackages.${system});
+    in {
+      packages = forAllSystems (system: pkgs:
+        let
+          agentCommunicator = pkgs.buildGoModule {
+            pname = "agent-communicator";
+            version = "0.1.0";
+            src = ./agent-communicator-tui;
+            vendorHash = "sha256-TUbaUoqDZoQTkcOMtoE/FlAiqkWN+x49JeGkDguh2UU=";
+            ldflags = [ "-X main.version=0.1.0" ];
+          };
+        in {
+          agent-communicator = agentCommunicator;
+          default = agentCommunicator;
+        });
+
       homeManagerModules.default = {
         imports = [ ./home.nix ];
         _module.args.inputs = inputs;
