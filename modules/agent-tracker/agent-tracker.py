@@ -71,6 +71,7 @@ def main():
     
     # Start background threads
     threading.Thread(target=monitor.background_monitor, daemon=True).start()
+    threading.Thread(target=monitor.background_inbox_reminder, daemon=True).start()
     threading.Thread(target=http_sidecar.serve_forever, daemon=True).start()
     threading.Thread(target=registry_client.background_sync, daemon=True).start()
 

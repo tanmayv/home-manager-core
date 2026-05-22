@@ -1,5 +1,9 @@
 import unittest
 from unittest import mock
+import tempfile
+import shutil
+import json
+import os
 
 import monitor
 import state
@@ -10,6 +14,14 @@ class TestMonitor(unittest.TestCase):
         state.state = {}
         state.name_index = {}
         state.pane_index = {}
+        self.test_dir = tempfile.mkdtemp()
+        self.original_inbox_dir = state.INBOX_DIR
+        state.INBOX_DIR = self.test_dir
+
+    def tearDown(self):
+        state.INBOX_DIR = self.original_inbox_dir
+        shutil.rmtree(self.test_dir)
+
 
     def test_get_liveness_phase_from_heartbeat(self):
         now = 100.0
@@ -87,6 +99,79 @@ class TestMonitor(unittest.TestCase):
 
         self.assertIsNone(state.get_agent("agent1"))
 
+    @mock.patch("tmux_util.send_keys")
+    @mock.patch("tmux_util.list_panes", return_value=[{"pane_id": "%1", "pane_active": False}])
+    def test_check_unread_messages_reminds_alive_agent(self, _list_panes, mock_send_keys):
+        state.set_agent(
+            "agent1",
+            {
+                "agent_id": "id-1",
+                "status": "idle",
+                "tmux_pane": "%1",
+                "tmux_socket": "/tmp/tmux.sock",
+            },
+        )
+
+        inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
+        messages = [
+            {"sender": "alice", "read": False, "message": "hello"},
+            {"sender": "bob", "read": False, "message": "world"},
+            {"sender": "alice", "read": True, "message": "old message"},
+        ]
+        with open(inbox_path, "w") as f:
+            for msg in messages:
+                f.write(json.dumps(msg) + "\n")
+
+        monitor.check_unread_messages_and_remind()
+
+        calls = [
+            mock.call("%1", "New message in inbox from alice", "/tmp/tmux.sock"),
+            mock.call("%1", "New message in inbox from bob", "/tmp/tmux.sock"),
+        ]
+        mock_send_keys.assert_has_calls(calls, any_order=True)
+        self.assertEqual(mock_send_keys.call_count, 2)
+
+        with open(inbox_path, "r") as f:
+            remaining_msgs = [json.loads(line) for line in f if line.strip()]
+        self.assertEqual(remaining_msgs, messages)
+
+    @mock.patch("tmux_util.send_keys")
+    @mock.patch("tmux_util.list_panes", return_value=[])
+    def test_check_unread_messages_cleans_up_gone_agent(self, _list_panes, mock_send_keys):
+        state.set_agent(
+            "agent1",
+            {
+                "agent_id": "id-1",
+                "status": "idle",
+                "tmux_pane": "%1",
+            },
+        )
+
+        inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
+        messages = [
+            {"sender": "alice", "read": False, "message": "hello"},
+            {"sender": "bob", "read": False, "message": "world"},
+            {"sender": "alice", "read": True, "message": "old message"},
+        ]
+        with open(inbox_path, "w") as f:
+            for msg in messages:
+                f.write(json.dumps(msg) + "\n")
+
+        monitor.check_unread_messages_and_remind()
+
+        mock_send_keys.assert_not_called()
+
+        with open(inbox_path, "r") as f:
+            updated_msgs = [json.loads(line) for line in f if line.strip()]
+
+        expected_messages = [
+            {"sender": "alice", "read": True, "message": "hello", "status": "no-receiver"},
+            {"sender": "bob", "read": True, "message": "world", "status": "no-receiver"},
+            {"sender": "alice", "read": True, "message": "old message"},
+        ]
+        self.assertEqual(updated_msgs, expected_messages)
+
 
 if __name__ == "__main__":
     unittest.main()
+

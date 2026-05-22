@@ -182,3 +182,78 @@ def background_monitor():
     while True:
         time.sleep(POLL_INTERVAL)
         monitor_once()
+
+
+def check_unread_messages_and_remind():
+    """Checks all inboxes for unread messages, sends reminders to live agents, and resolves gone ones."""
+    import glob
+    import rpc_handler
+
+    inbox_pattern = os.path.join(state.INBOX_DIR, "*.inbox")
+    inbox_files = glob.glob(inbox_pattern)
+    if not inbox_files:
+        return
+
+    logging.debug(f"Checking {len(inbox_files)} inbox files for unread messages...")
+
+    active_panes = tmux_util.list_panes()
+    active_pane_ids = {pane["pane_id"] for pane in active_panes} if active_panes is not None else set()
+
+    for inbox_file in inbox_files:
+        basename = os.path.basename(inbox_file)
+        target_id_or_name = basename[:-6] # remove ".inbox"
+
+        try:
+            with rpc_handler._locked_inbox(inbox_file):
+                messages = []
+                if os.path.exists(inbox_file):
+                    with open(inbox_file, "r") as f:
+                        for line in f:
+                            if line.strip():
+                                try:
+                                    messages.append(json.loads(line))
+                                except json.JSONDecodeError:
+                                    pass
+
+                unread_msgs = [m for m in messages if not m.get("read", False)]
+                if not unread_msgs:
+                    continue
+
+                info = state.get_agent(target_id_or_name)
+                pane_id = info.get("tmux_pane") if info else None
+                pane_exists = (pane_id in active_pane_ids) if pane_id else False
+
+                agent_is_alive = (info is not None) and pane_exists
+
+                if agent_is_alive:
+                    if info.get("no_notify_with_send_keys", False):
+                        logging.info(f"Skipping periodic reminder send-keys for agent {target_id_or_name} (no_notify_with_send_keys is enabled)")
+                        continue
+
+                    senders = {m.get("sender", "unknown") for m in unread_msgs}
+                    logging.info(f"Agent {target_id_or_name} is alive in pane {pane_id}. Sending inbox reminders from: {senders}")
+                    for sender in senders:
+                        notify_msg = f"New message in inbox from {sender}"
+                        tmux_util.send_keys(pane_id, notify_msg, info.get("tmux_socket"))
+                else:
+                    logging.info(f"Agent {target_id_or_name} is gone. Marking {len(unread_msgs)} unread messages as no-receiver.")
+                    for msg in unread_msgs:
+                        msg["read"] = True
+                        msg["status"] = "no-receiver"
+
+                    rpc_handler._atomic_write_inbox(inbox_file, messages)
+        except Exception as e:
+            logging.error(f"Failed to process inbox {inbox_file} for reminder/cleanup: {e}")
+
+
+def background_inbox_reminder():
+    """Periodically checks for unread inbox messages to remind active agents or resolve gone ones."""
+    logging.info("Starting background inbox reminder...")
+    interval = int(os.environ.get("REMINDER_INTERVAL_SECONDS", 900))
+    while True:
+        time.sleep(interval)
+        try:
+            check_unread_messages_and_remind()
+        except Exception as e:
+            logging.error(f"Error in background inbox reminder pass: {e}")
+

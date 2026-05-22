@@ -8,6 +8,8 @@ import os
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', stream=sys.stderr)
 
 task_queue = queue.Queue()
+last_send_keys_time = 0.0
+send_keys_lock = threading.Lock()
 
 def tmux_worker():
     """Worker thread for executing tmux commands sequentially."""
@@ -178,18 +180,30 @@ def unset_pane_title(pane_id, socket_path=None):
 
 def send_keys(pane_id, keys, socket_path=None):
     """Sends keys followed by a short delay and Enter to ensure submission."""
+    global last_send_keys_time
     cmd_base = ["tmux"]
     if socket_path:
         cmd_base.extend(["-S", socket_path])
     
-    # 1. Send the actual message keys
-    enqueue_tmux_cmd(cmd_base + ["send-keys", "-t", pane_id, keys])
-    
-    # 2. Enqueue a short sleep to allow the terminal/app to process the input buffer
-    enqueue_tmux_cmd(["sleep", "0.5"])
-    
-    # 3. Send the Enter key to submit
-    enqueue_tmux_cmd(cmd_base + ["send-keys", "-t", pane_id, "Enter"])
+    import time
+    with send_keys_lock:
+        now = time.time()
+        delay = 3.0 - (now - last_send_keys_time)
+        if delay > 0:
+            enqueue_tmux_cmd(["sleep", f"{delay:.2f}"])
+            last_send_keys_time = now + delay
+        else:
+            last_send_keys_time = now
+
+        # 1. Send the actual message keys
+        enqueue_tmux_cmd(cmd_base + ["send-keys", "-t", pane_id, keys])
+        
+        # 2. Enqueue a short sleep to allow the terminal/app to process the input buffer
+        enqueue_tmux_cmd(["sleep", "0.5"])
+        last_send_keys_time += 0.5
+        
+        # 3. Send the Enter key to submit
+        enqueue_tmux_cmd(cmd_base + ["send-keys", "-t", pane_id, "Enter"])
 
 def spin_agent(agent_name, command, target_pane=None, session=None, directory=None, env=None):
     import shlex
