@@ -806,6 +806,38 @@ class TestRpcHandler(unittest.TestCase):
             if os.path.exists(inbox_path):
                 os.remove(inbox_path)
 
+    def test_get_inbox_clear_keeps_last_25_messages(self):
+        inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
+        try:
+            state.set_agent("agent1", {"agent_id": "id-1", "uuid": "id-1"})
+            os.makedirs(state.INBOX_DIR, exist_ok=True)
+            
+            with open(inbox_path, "w") as f:
+                for i in range(1, 31):
+                    msg = {"sender": f"agent-{i}", "message": f"msg-{i}", "read": False, "message_id": f"m{i}"}
+                    f.write(json.dumps(msg) + "\n")
+
+            result = rpc_handler.handle_get_inbox({"agent_name": "agent1", "clear": True})
+            
+            self.assertEqual(result["mode"], "unread")
+            self.assertEqual(len(result["messages"]), 30)
+
+            self.assertTrue(os.path.exists(inbox_path))
+            remaining_messages = []
+            with open(inbox_path, "r") as f:
+                for line in f:
+                    if line.strip():
+                        remaining_messages.append(json.loads(line))
+
+            self.assertEqual(len(remaining_messages), 25)
+            self.assertEqual(remaining_messages[0]["sender"], "agent-6")
+            self.assertEqual(remaining_messages[-1]["sender"], "agent-30")
+            self.assertTrue(all(msg["read"] for msg in remaining_messages))
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
 
 if __name__ == "__main__":
     unittest.main()
+

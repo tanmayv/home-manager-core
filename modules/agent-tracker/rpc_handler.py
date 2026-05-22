@@ -580,7 +580,8 @@ def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None
                     msg["read"] = True
 
             if clear:
-                os.remove(inbox_file)
+                remaining = all_messages[-25:] if len(all_messages) > 25 else all_messages
+                _atomic_write_inbox(inbox_file, remaining)
             else:
                 _atomic_write_inbox(inbox_file, all_messages)
 
