@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -392,5 +393,24 @@ func spinRemoteAgentCmd(local localClient, targetTrackerID, configName string) t
 
 		err := local.PublishTrackerEvent(ctx, targetTrackerID, "spin_request", payload)
 		return agentConfigSpun{Name: configName, Err: err}
+	}
+}
+
+type paneCaptured struct {
+	Target string
+	Err    error
+}
+
+type clearPaneCaptureStatusTick struct{}
+
+func requestPaneCaptureCmd(targetAddress string) tea.Cmd {
+	return func() tea.Msg {
+		args := []string{"send-pane", "agent-communicator", "--source", targetAddress, "--note", "Requested from agent-communicator"}
+		cmd := exec.Command("agent-tracker-ctl", args...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return paneCaptured{Target: targetAddress, Err: fmt.Errorf("%s: %s", err, string(out))}
+		}
+		return paneCaptured{Target: targetAddress}
 	}
 }

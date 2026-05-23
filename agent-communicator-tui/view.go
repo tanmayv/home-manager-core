@@ -126,9 +126,11 @@ func (m model) composerBox(width int) string {
 func (m model) footer(width int) string {
 	lines := []string{
 		"c-t view · tab section · c-n/p agent · c-a read · c-o prompts · c-h hide · c-f save · c-s save agent",
-		"↑/↓ select msg · c-u/d scroll · c-e open · c-r config · enter send · c-q quit",
+		"↑/↓ select msg · c-u/d scroll · c-e open · c-r config · enter send · c-q quit · c-x debug capture",
 	}
-	if m.err != nil {
+	if m.paneCaptureStatus != "" {
+		lines = []string{m.paneCaptureStatus}
+	} else if m.err != nil {
 		lines = []string{m.err.Error()}
 	}
 	for i, text := range lines {

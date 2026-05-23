@@ -421,3 +421,46 @@ func TestAgentConfigMenuInteraction(t *testing.T) {
 		t.Fatalf("expected showingConfigMenu to be false after Esc")
 	}
 }
+
+func TestCtrlXPaneCaptureTriggersAsyncCaptureAndClears(t *testing.T) {
+	m := model{
+		rows: []agentRow{
+			{Name: "alice", Scope: "local", TargetAddress: "alice"},
+		},
+		selected: 0,
+		local:    &fakeLocal{},
+	}
+
+	// 1. Send Ctrl+X KeyMsg
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlX})
+	m = updated.(model)
+
+	if m.paneCaptureStatus != "Capturing pane snapshot for alice..." {
+		t.Fatalf("unexpected paneCaptureStatus: %q", m.paneCaptureStatus)
+	}
+	if cmd == nil {
+		t.Fatal("ctrl+x should return a non-nil request command")
+	}
+
+	// 2. Send successful paneCaptured Msg
+	updated, cmd = m.Update(paneCaptured{Target: "alice"})
+	m = updated.(model)
+
+	if m.paneCaptureStatus != "Pane snapshot for alice delivered successfully!" {
+		t.Fatalf("unexpected paneCaptureStatus on success: %q", m.paneCaptureStatus)
+	}
+	if cmd == nil {
+		t.Fatal("paneCaptured success should return a tick command to clear status")
+	}
+
+	// 3. Send clearPaneCaptureStatusTick Msg
+	updated, cmd = m.Update(clearPaneCaptureStatusTick{})
+	m = updated.(model)
+
+	if m.paneCaptureStatus != "" {
+		t.Fatalf("paneCaptureStatus was not cleared, got: %q", m.paneCaptureStatus)
+	}
+	if cmd != nil {
+		t.Fatal("clearPaneCaptureStatusTick should return nil command")
+	}
+}

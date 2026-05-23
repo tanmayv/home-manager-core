@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -59,6 +60,9 @@ type model struct {
 	showingSaveForm bool
 	saveFormIndex   int // 0: Name, 1: Description, 2: Command, 3: CWD, 4: Save, 5: Cancel
 	saveFormInputs  []textinput.Model
+
+	// Pane Debug Capture Status (Ctrl-X)
+	paneCaptureStatus string
 }
 
 func newModel(local localClient, ownName string) model {
@@ -177,6 +181,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.toggleMode()
 			m.selectLatestMessage()
 			return m, m.reloadMessages()
+		case tea.KeyCtrlX:
+			if len(m.rows) > 0 && m.selected >= 0 && m.selected < len(m.rows) {
+				row := m.rows[m.selected]
+				targetAddress := rowTarget(row)
+				m.paneCaptureStatus = fmt.Sprintf("Capturing pane snapshot for %s...", row.Name)
+				return m, requestPaneCaptureCmd(targetAddress)
+			}
 		case tea.KeyCtrlF:
 			return m, m.toggleSaveSelectedMessage()
 		case tea.KeyCtrlP:
@@ -274,6 +285,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.composer = append(m.composer, ' ')
 			m.messageOffset = 0
 		}
+	case paneCaptured:
+		if msg.Err != nil {
+			m.paneCaptureStatus = fmt.Sprintf("Failed to capture %s: %s", msg.Target, msg.Err.Error())
+		} else {
+			m.paneCaptureStatus = fmt.Sprintf("Pane snapshot for %s delivered successfully!", msg.Target)
+		}
+		return m, tea.Tick(4*time.Second, func(time.Time) tea.Msg {
+			return clearPaneCaptureStatusTick{}
+		})
+	case clearPaneCaptureStatusTick:
+		m.paneCaptureStatus = ""
+		return m, nil
 	case refreshTick:
 		m.agentListLoading = true
 		return m, tea.Batch(loadAgents(m.local), loadOutboxCmd(), tickRefresh(), tickAgentListSpinner())
