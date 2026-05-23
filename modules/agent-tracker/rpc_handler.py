@@ -763,6 +763,13 @@ def handle_capture_pane(params: dict, caller_pid: int = None) -> dict:
             last_lines = int(last_lines)
         except ValueError:
             raise ValueError("last_lines must be an integer")
+        
+        # Enforce safety bounds: cap last_lines at 1000 and set floor at 1
+        if last_lines > 1000:
+            logging.info(f"Capping requested last_lines={last_lines} to 1000 for safety.")
+            last_lines = 1000
+        elif last_lines <= 0:
+            last_lines = 1
             
     include_ansi = bool(params.get("include_ansi", False))
 
@@ -818,13 +825,16 @@ def handle_capture_pane(params: dict, caller_pid: int = None) -> dict:
     # Query copy-mode status
     copy_mode = tmux_util.is_pane_in_copy_mode(tmux_pane, tmux_socket)
 
-    # Capture visible text
-    content = tmux_util.capture_pane_visible_text(
-        tmux_pane,
-        last_lines=last_lines,
-        socket_path=tmux_socket,
-        include_ansi=include_ansi
-    )
+    # Capture visible text with graceful failure handling
+    try:
+        content = tmux_util.capture_pane_visible_text(
+            tmux_pane,
+            last_lines=last_lines,
+            socket_path=tmux_socket,
+            include_ansi=include_ansi
+        )
+    except Exception as e:
+        raise RuntimeError(f"Failed to capture pane visible text buffer: {e}")
 
     captured_at = _utc_now_isoformat()
 

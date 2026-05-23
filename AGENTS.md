@@ -2,7 +2,7 @@
 
 ## Overview
 - **Workspace ID**: `4ecccc12-2991-4ff5-a088-fd2e4bce5a16`
-- **Last Updated**: `2026-05-23T15:27:00Z`
+- **Last Updated**: `2026-05-23T15:50:00Z`
 - **Goal**: Build pane capture debug snapshots and integrate them into agent-communicator TUI.
 - **Links**: [Pane Capture Plan](file:///usr/local/google/home/tanmayvijay/.gemini/jetski/brain/4ecccc12-2991-4ff5-a088-fd2e4bce5a16/pane_capture_snapshots_plan.md)
 
@@ -24,7 +24,7 @@
 | task-06 | Phase 2: Add ctl send-pane CLI command | 916458af-be0c-4b7f-8f03-59dfb7ad8fad | Completed | P0 | task-05 | Messaging integration |
 | task-07 | Phase 3: Add remote capture event loops | 916458af-be0c-4b7f-8f03-59dfb7ad8fad | Completed | P0 | task-06 | Registry event handoffs |
 | task-08 | Phase 4: Go keybindings in agent-communicator | 916458af-be0c-4b7f-8f03-59dfb7ad8fad | Completed | P0 | task-07 | TUI integrations |
-| task-09 | Phase 5: Set boundaries and write final tests | 916458af-be0c-4b7f-8f03-59dfb7ad8fad | In Progress | P1 | task-08 | Hardening & Docs |
+| task-09 | Phase 5: Set boundaries and write final tests | 916458af-be0c-4b7f-8f03-59dfb7ad8fad | Completed | P1 | task-08 | Hardening & Docs |
 
 ## Active Blockers & Dependencies
 | Blocked Agent ID | Blocked Task ID | Blocking Task ID | Blocking Agent ID | Reason |

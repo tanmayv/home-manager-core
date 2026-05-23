@@ -992,6 +992,45 @@ class TestRpcHandler(unittest.TestCase):
                 "agent_name": "non-existent"
             })
 
+    @mock.patch("tmux_util.capture_pane_visible_text")
+    @mock.patch("tmux_util.is_pane_in_copy_mode")
+    def test_handle_capture_pane_safety_bounds_cap(self, mock_copy_mode, mock_capture):
+        state.set_agent("agent1", {
+            "agent_id": "id-1",
+            "tmux_pane": "%1",
+            "tmux_socket": "sock",
+            "session": "sess-1"
+        })
+        mock_copy_mode.return_value = False
+        mock_capture.return_value = "Screen Text capped"
+
+        res = rpc_handler.handle_capture_pane({
+            "agent_id": "id-1",
+            "last_lines": 5000
+        })
+
+        self.assertEqual(res["lines_requested"], 1000) # capped!
+        mock_capture.assert_called_once_with("%1", last_lines=1000, socket_path="sock", include_ansi=False)
+
+    @mock.patch("tmux_util.capture_pane_visible_text")
+    @mock.patch("tmux_util.is_pane_in_copy_mode")
+    def test_handle_capture_pane_graceful_exception(self, mock_copy_mode, mock_capture):
+        state.set_agent("agent1", {
+            "agent_id": "id-1",
+            "tmux_pane": "%1",
+            "tmux_socket": "sock",
+            "session": "sess-1"
+        })
+        mock_copy_mode.return_value = False
+        mock_capture.side_effect = RuntimeError("tmux command failed or zero-column")
+
+        with self.assertRaises(RuntimeError) as ctx:
+            rpc_handler.handle_capture_pane({
+                "agent_id": "id-1",
+                "last_lines": 100
+            })
+        self.assertIn("Failed to capture pane visible text buffer", str(ctx.exception))
+
 
 
 
