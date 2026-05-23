@@ -74,6 +74,41 @@ class TestTmuxUtil(unittest.TestCase):
         self.assertFalse(tmux_util.is_pane_in_copy_mode("%0"))
         mock_run.assert_called_once_with(["display-message", "-p", "-t", "%0", "#{pane_in_mode}"])
 
+    @mock.patch("tmux_util.subprocess.run")
+    def test_spin_agent_clears_inherited_agent_identity(self, run):
+        inherited_env = {
+            "AGENT_ID": "parent-id",
+            "AGENT_NAME": "parent-name",
+            "AGENT_UUID": "parent-uuid",
+            "PATH": "/bin",
+        }
+        run.return_value = mock.Mock(returncode=0, stdout="%1\n")
+        with mock.patch.dict("os.environ", inherited_env, clear=True):
+            tmux_util.spin_agent("child-agent", "pi", target_pane="%1", tmux_socket="/tmp/tmux.sock")
+
+        cmd = run.call_args_list[0].args[0]
+        self.assertEqual(cmd[:4], ["tmux", "-S", "/tmp/tmux.sock", "split-window"])
+        self.assertIn("-e", cmd)
+        self.assertIn("SUGGESTED_AGENT_NAME=child-agent", cmd)
+        self.assertEqual(cmd[-1], "unset AGENT_ID AGENT_NAME AGENT_UUID; export SUGGESTED_AGENT_NAME=child-agent; exec pi")
+        child_env = run.call_args_list[0].kwargs["env"]
+        self.assertNotIn("AGENT_ID", child_env)
+        self.assertNotIn("AGENT_NAME", child_env)
+        self.assertNotIn("AGENT_UUID", child_env)
+        self.assertEqual(child_env["SUGGESTED_AGENT_NAME"], "child-agent")
+
+    @mock.patch("tmux_util.subprocess.run")
+    def test_spin_agent_preserves_command_args(self, run):
+        run.return_value = mock.Mock(returncode=0, stdout="%1\n")
+        with mock.patch.dict("os.environ", {}, clear=True):
+            tmux_util.spin_agent("child-agent", "pi --some-flag 'two words'")
+
+        cmd = run.call_args.args[0]
+        self.assertEqual(
+            cmd[-1],
+            "unset AGENT_ID AGENT_NAME AGENT_UUID; export SUGGESTED_AGENT_NAME=child-agent; exec pi --some-flag 'two words'",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

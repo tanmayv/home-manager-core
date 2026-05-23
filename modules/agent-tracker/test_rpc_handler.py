@@ -674,10 +674,10 @@ class TestRpcHandler(unittest.TestCase):
         self.assertEqual(info["status"], "idle")
 
     @mock.patch("tmux_util.spin_agent")
-    @mock.patch("rpc_handler._identify_agent")
+    @mock.patch("rpc_handler._identify_agent", return_value="parent-agent")
     def test_handle_spin_agent_strips_inherited_identity(self, mock_identify, mock_spin):
         mock_spin.return_value = "%42"
-        mock_identify.return_value = {"agent_id": "parent-id", "name": "parent-agent"}
+        state.set_agent("parent-agent", {"agent_id": "parent-id", "session": "sess", "tmux_pane": "%1", "tmux_socket": "sock"})
 
         env = {"PATH": "/bin", "AGENT_ID": "parent-id", "AGENT_NAME": "parent-agent", "AGENT_UUID": "parent-id"}
         rpc_handler.handle_spin_agent(
@@ -685,18 +685,19 @@ class TestRpcHandler(unittest.TestCase):
             caller_pid=999
         )
 
-        mock_identify.assert_called_once_with(999)
-        mock_spin.assert_called_once_with("agent1", "jetski", None, session="sess", directory=None, env=env)
+        mock_identify.assert_called_once_with({}, 999)
+        mock_spin.assert_called_once_with("agent1", "jetski", "%1", session="sess", directory=None, env=env, tmux_socket="sock")
         self.assertNotIn("AGENT_ID", env)
         self.assertNotIn("AGENT_NAME", env)
         self.assertNotIn("AGENT_UUID", env)
+        self.assertEqual(env["SUGGESTED_AGENT_NAME"], "agent1")
         self.assertEqual(env["PATH"], "/bin")
 
     @mock.patch("tmux_util.spin_agent")
-    @mock.patch("rpc_handler._identify_agent")
+    @mock.patch("rpc_handler._identify_agent", return_value="parent-agent")
     def test_handle_spin_agent_preserves_explicit_identity_override(self, mock_identify, mock_spin):
         mock_spin.return_value = "%42"
-        mock_identify.return_value = {"agent_id": "parent-id", "name": "parent-agent"}
+        state.set_agent("parent-agent", {"agent_id": "parent-id", "session": "sess", "tmux_pane": "%1", "tmux_socket": "sock"})
 
         env = {"PATH": "/bin", "AGENT_ID": "custom-subagent-id", "AGENT_NAME": "custom-subagent-name", "AGENT_UUID": "custom-subagent-id"}
         rpc_handler.handle_spin_agent(
@@ -704,12 +705,26 @@ class TestRpcHandler(unittest.TestCase):
             caller_pid=999
         )
 
-        mock_identify.assert_called_once_with(999)
-        mock_spin.assert_called_once_with("agent1", "jetski", None, session="sess", directory=None, env=env)
+        mock_identify.assert_called_once_with({}, 999)
+        mock_spin.assert_called_once_with("agent1", "jetski", "%1", session="sess", directory=None, env=env, tmux_socket="sock")
         self.assertEqual(env["AGENT_ID"], "custom-subagent-id")
         self.assertEqual(env["AGENT_NAME"], "custom-subagent-name")
         self.assertEqual(env["AGENT_UUID"], "custom-subagent-id")
+        self.assertEqual(env["SUGGESTED_AGENT_NAME"], "agent1")
         self.assertEqual(env["PATH"], "/bin")
+
+    @mock.patch("tmux_util.spin_agent")
+    @mock.patch("rpc_handler._identify_agent", return_value="caller")
+    def test_spin_uses_caller_tmux_context_and_placeholder_name(self, mock_identify, mock_spin):
+        mock_spin.return_value = "%42"
+        state.set_agent("caller", {"agent_id": "caller-id", "session": "sess", "tmux_pane": "%5", "tmux_socket": "sock"})
+
+        assigned_name = rpc_handler.handle_spin_agent({"command": "pi", "name": "child", "env": {}}, caller_pid=222)
+
+        self.assertEqual(assigned_name, "child")
+        mock_identify.assert_called_once_with({}, 222)
+        mock_spin.assert_called_once_with("child", "pi", "%5", session="sess", directory=None, env={"SUGGESTED_AGENT_NAME": "child"}, tmux_socket="sock")
+        self.assertEqual(state.get_agent("child")["status"], "spawning")
 
     @mock.patch("registry_client.send_remote_message", return_value=(202, {"ok": True}))
     def test_send_message_routes_remote_target_address_via_registry(self, send_remote):

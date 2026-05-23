@@ -62,7 +62,8 @@ class TestSpinCommand(unittest.TestCase):
 
         self.assertEqual(pane_id, "%9")
         self.assertIn(["tmux", "has-session", "-t", "proj"], calls)
-        self.assertTrue(any(cmd == ["tmux", "new-session", "-d", "-P", "-F", "#{pane_id}", "-s", "proj", "-c", "/tmp/proj", "gemini --model flash"] for cmd in calls))
+        wrapped = "unset AGENT_ID AGENT_NAME AGENT_UUID; export SUGGESTED_AGENT_NAME=proj; exec gemini --model flash"
+        self.assertTrue(any(cmd == ["tmux", "new-session", "-d", "-P", "-F", "#{pane_id}", "-s", "proj", "-c", "/tmp/proj", "-e", "SUGGESTED_AGENT_NAME=proj", wrapped] for cmd in calls))
         self.assertTrue(any(cmd == ["tmux", "switch-client", "-t", "proj"] for cmd in calls))
         self.assertFalse(any(cmd[:2] == ["tmux", "send-keys"] for cmd in calls))
 
@@ -83,7 +84,8 @@ class TestSpinCommand(unittest.TestCase):
             pane_id = tmux_util.spin_agent("proj", "gemini", session="proj", directory="/tmp/proj")
 
         self.assertEqual(pane_id, "%10")
-        self.assertTrue(any(cmd == ["tmux", "new-window", "-P", "-F", "#{pane_id}", "-t", "proj", "-c", "/tmp/proj", "gemini"] for cmd in calls))
+        wrapped = "unset AGENT_ID AGENT_NAME AGENT_UUID; export SUGGESTED_AGENT_NAME=proj; exec gemini"
+        self.assertTrue(any(cmd == ["tmux", "new-window", "-P", "-F", "#{pane_id}", "-t", "proj", "-c", "/tmp/proj", "-e", "SUGGESTED_AGENT_NAME=proj", wrapped] for cmd in calls))
         self.assertTrue(any(cmd == ["tmux", "switch-client", "-t", "proj"] for cmd in calls))
         self.assertFalse(any(cmd[:2] == ["tmux", "send-keys"] for cmd in calls))
 
@@ -101,9 +103,10 @@ class TestSpinCommand(unittest.TestCase):
         with mock.patch.object(tmux_util.subprocess, "run", fake_run):
             tmux_util.spin_agent("proj", "gemini", session="proj", directory="/tmp/proj", env={"PATH": "/my/custom/path"})
 
-        self.assertTrue(any(cmd == ["tmux", "new-window", "-P", "-F", "#{pane_id}", "-t", "proj", "-c", "/tmp/proj", "-e", "PATH=/my/custom/path", "gemini"] for cmd in calls))
+        wrapped = "unset AGENT_ID AGENT_NAME AGENT_UUID; export SUGGESTED_AGENT_NAME=proj; exec gemini"
+        self.assertTrue(any(cmd == ["tmux", "new-window", "-P", "-F", "#{pane_id}", "-t", "proj", "-c", "/tmp/proj", "-e", "PATH=/my/custom/path", "-e", "SUGGESTED_AGENT_NAME=proj", wrapped] for cmd in calls))
 
-    def test_spin_command_forwards_identity_environment_variables(self):
+    def test_spin_command_strips_identity_environment_variables(self):
         with tempfile.TemporaryDirectory() as tmp, \
              mock.patch.object(ctl, "ensure_tracker_running", return_value=True), \
              mock.patch.dict(os.environ, {"PATH": "/mock/path", "AGENT_ID": "a1", "AGENT_NAME": "agent1", "AGENT_UUID": "u1", "TMUX": "1", "TMUX_PANE": "%1"}), \
@@ -116,9 +119,9 @@ class TestSpinCommand(unittest.TestCase):
         env = params["env"]
         self.assertNotIn("TMUX", env)
         self.assertNotIn("TMUX_PANE", env)
-        self.assertEqual(env["AGENT_ID"], "a1")
-        self.assertEqual(env["AGENT_NAME"], "agent1")
-        self.assertEqual(env["AGENT_UUID"], "u1")
+        self.assertNotIn("AGENT_ID", env)
+        self.assertNotIn("AGENT_NAME", env)
+        self.assertNotIn("AGENT_UUID", env)
         self.assertEqual(env["PATH"], "/mock/path")
 
 

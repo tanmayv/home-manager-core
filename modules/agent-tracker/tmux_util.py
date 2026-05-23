@@ -207,15 +207,37 @@ def send_keys(pane_id, keys, socket_path=None):
         # 3. Send the Enter key to submit
         enqueue_tmux_cmd(cmd_base + ["send-keys", "-t", pane_id, "Enter"])
 
-def spin_agent(agent_name, command, target_pane=None, session=None, directory=None, env=None):
+def spin_agent(agent_name, command, target_pane=None, session=None, directory=None, env=None, tmux_socket=None):
+    import os
     import shlex
 
+    identity_keys = ("AGENT_ID", "AGENT_NAME", "AGENT_UUID")
     tmux_base = ["tmux"]
+    if tmux_socket:
+        tmux_base.extend(["-S", tmux_socket])
+
     command_parts = shlex.split(command)
+    spawn_env = dict(env or {})
+    for key in identity_keys:
+        if spawn_env.get(key) == "":
+            spawn_env.pop(key, None)
+    spawn_env["SUGGESTED_AGENT_NAME"] = agent_name
+
     env_args = []
-    if env:
-        for k, v in env.items():
-            env_args.extend(["-e", f"{k}={v}"])
+    for k, v in spawn_env.items():
+        env_args.extend(["-e", f"{k}={v}"])
+
+    should_unset_identity = not any(key in spawn_env for key in identity_keys)
+    command_prefix = []
+    if should_unset_identity:
+        command_prefix.append("unset AGENT_ID AGENT_NAME AGENT_UUID")
+    command_prefix.append(f"export SUGGESTED_AGENT_NAME={shlex.quote(agent_name)}")
+    wrapped_command = "; ".join(command_prefix) + f"; exec {command}"
+
+    run_env = os.environ.copy()
+    for key in identity_keys:
+        run_env.pop(key, None)
+    run_env["SUGGESTED_AGENT_NAME"] = agent_name
 
     try:
         logging.info(
@@ -226,19 +248,19 @@ def spin_agent(agent_name, command, target_pane=None, session=None, directory=No
             target_pane,
             command,
             command_parts,
-            list(env.keys()) if env else None,
+            list(spawn_env.keys()) if spawn_env else None,
         )
         if session and directory:
-            has_session = subprocess.run(tmux_base + ["has-session", "-t", session], capture_output=True).returncode == 0
+            has_session = subprocess.run(tmux_base + ["has-session", "-t", session], capture_output=True, env=run_env).returncode == 0
             if has_session:
-                cmd = tmux_base + ["new-window", "-P", "-F", "#{pane_id}", "-t", session, "-c", directory] + env_args + [command]
+                cmd = tmux_base + ["new-window", "-P", "-F", "#{pane_id}", "-t", session, "-c", directory] + env_args + [wrapped_command]
             else:
-                cmd = tmux_base + ["new-session", "-d", "-P", "-F", "#{pane_id}", "-s", session, "-c", directory] + env_args + [command]
+                cmd = tmux_base + ["new-session", "-d", "-P", "-F", "#{pane_id}", "-s", session, "-c", directory] + env_args + [wrapped_command]
             logging.info("spin_agent tmux_cmd=%s", cmd)
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True, env=run_env)
             pane_id = result.stdout.strip() or None
             logging.info("spin_agent tmux_result pane_id=%s has_session=%s", pane_id, has_session)
-            subprocess.run(tmux_base + ["switch-client", "-t", session], check=False, capture_output=True)
+            subprocess.run(tmux_base + ["switch-client", "-t", session], check=False, capture_output=True, env=run_env)
             return pane_id
 
         tmux_cmd = tmux_base[:]
@@ -247,9 +269,9 @@ def spin_agent(agent_name, command, target_pane=None, session=None, directory=No
         else:
             tmux_cmd.extend(["split-window", "-P", "-F", "#{pane_id}"])
         tmux_cmd.extend(env_args)
-        tmux_cmd.append(command)
+        tmux_cmd.append(wrapped_command)
         logging.info("spin_agent tmux_cmd=%s", tmux_cmd)
-        result = subprocess.run(tmux_cmd, check=True, capture_output=True, text=True)
+        result = subprocess.run(tmux_cmd, check=True, capture_output=True, text=True, env=run_env)
         pane_id = result.stdout.strip() or None
         logging.info("spin_agent tmux_result pane_id=%s", pane_id)
         return pane_id

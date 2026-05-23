@@ -368,33 +368,38 @@ def _resolve_target_agent_name(params: dict) -> str | None:
 
 def handle_spin_agent(params: dict, caller_pid: int = None) -> str:
     """Spins a new agent in a new tmux pane."""
-    session = params.get("session")
     command = params.get("command")
-    target_pane = params.get("target_pane")
     directory = params.get("directory")
     name = params.get("name")
     env = params.get("env") or {}
 
+    caller_name = _identify_agent({}, caller_pid) if caller_pid else None
+    caller_info = state.get_agent(caller_name) if caller_name else None
+
+    session = params.get("session") or (caller_info or {}).get("session")
+    target_pane = params.get("target_pane") or (caller_info or {}).get("tmux_pane")
+    tmux_socket = params.get("tmux_socket") or (caller_info or {}).get("tmux_socket")
+
     if not (session and command and name):
         raise ValueError("Invalid params")
 
-    # Context-aware environment inheritance stripping
-    if caller_pid:
-        caller_agent = _identify_agent(caller_pid)
-        if caller_agent:
-            parent_id = caller_agent.get("agent_id")
-            if parent_id and env.get("AGENT_ID") == parent_id:
-                logging.info(f"Stripping inherited agent identity (AGENT_ID={parent_id}) from spun agent environment.")
-                env.pop("AGENT_ID", None)
-                env.pop("AGENT_NAME", None)
-                env.pop("AGENT_UUID", None)
+    parent_id = (caller_info or {}).get("agent_id") or (caller_info or {}).get("uuid")
+    if parent_id and (env.get("AGENT_ID") == parent_id or env.get("AGENT_UUID") == parent_id or env.get("AGENT_NAME") == caller_name):
+        logging.info("Stripping inherited agent identity from spun agent environment for caller %s", caller_name)
+        env.pop("AGENT_ID", None)
+        env.pop("AGENT_NAME", None)
+        env.pop("AGENT_UUID", None)
+    for key in ("AGENT_ID", "AGENT_NAME", "AGENT_UUID"):
+        if env.get(key) == "":
+            env.pop(key, None)
 
     agent_name = _generate_unique_agent_name(name, session, is_register=False)
+    env["SUGGESTED_AGENT_NAME"] = agent_name
 
     state.set_agent(agent_name, {"status": "spawning", "timestamp": time.time(), "cwd": directory or "unknown"})
 
     try:
-        pane_id = tmux_util.spin_agent(agent_name, command, target_pane, session=session, directory=directory, env=env)
+        pane_id = tmux_util.spin_agent(agent_name, command, target_pane, session=session, directory=directory, env=env, tmux_socket=tmux_socket)
         placeholder_updates = {}
         if session:
             placeholder_updates["session"] = session

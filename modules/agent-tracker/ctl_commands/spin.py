@@ -29,7 +29,10 @@ def handle(args):
         caller_path = os.environ.get("PATH", "")
         command = f"bash -c {shlex.quote(f'export PATH={shlex.quote(caller_path)}; {inner_command}; zsh')}"
 
-    env = {k: v for k, v in os.environ.items() if k not in {"TMUX", "TMUX_PANE"}}
+    # Do not forward the caller agent's identity to the spun agent.  The
+    # tracker/RPC side assigns a fresh placeholder name and passes it as
+    # SUGGESTED_AGENT_NAME after resolving conflicts.
+    env = {k: v for k, v in os.environ.items() if k not in {"TMUX", "TMUX_PANE", "AGENT_ID", "AGENT_NAME", "AGENT_UUID"}}
     resolved_name = call_rpc("spin_agent", {
         "session": session,
         "directory": directory,
