@@ -74,6 +74,7 @@ To update, simply run `nix flake update` in your personal repository.
 | `preferred-scripting-language` | The preferred language for new CLI tools (NuShell, Python, Bash). | `"NuShell"` |
 | `sessionizerMaxDirLength` | Maximum directory name length (basename) to include in tmux-sessionizer search. | `25` |
 | `sessionizerSearchPaths` | Paths to search for sessions in tmux-sessionizer. Use `:depth` suffix (e.g., `:0` for exact path). | `[ "~" ]` |
+| `tmuxShortcut` / `tmux-prefix` | Tmux prefix key suffix. Use `"b"` for `Ctrl-b`, `"a"` for `Ctrl-a`, etc. `tmuxShortcut` takes precedence if both are set. | `"b"` |
 
 ### Feature Toggles
 

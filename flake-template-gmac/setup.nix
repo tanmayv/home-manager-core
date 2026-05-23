@@ -22,6 +22,7 @@
   enable-auto-codesearch-with-cd = false;
   sessionizerMaxDirLength = 25;
   sessionizerSearchPaths = [ "~" "~/projects" ];
+  tmuxShortcut = "b"; # tmux prefix key: "b" means Ctrl-b, "a" means Ctrl-a
 
   enable-agent-tracker = true;
   enable-agent-communicator = true;

@@ -5,6 +5,7 @@ let
     theme = userSettings.tmuxTheme;
   };
   palette = import ../palette.nix { userSettings = tmuxUserSettings; };
+  tmuxShortcut = userSettings.tmuxShortcut or (userSettings."tmux-prefix" or "b");
   
   # Check if AI features are enabled
   enableAiWorkflow = userSettings.enable-ai-workflow or false;
@@ -202,7 +203,7 @@ in
 
     programs.tmux = {
       enable = true;
-      shortcut = "b";
+      shortcut = tmuxShortcut;
       baseIndex = 1;
       newSession = false;
       escapeTime = 0;
