@@ -218,6 +218,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selectLatestMessage()
 				return m, tea.Batch(cmd, m.reloadMessages())
 			}
+		case tea.KeyCtrlA:
+			if m.mode != savedView && len(m.rows) > 0 {
+				m.clearUnread(m.rows[m.selected])
+				return m, nil
+			}
 		case tea.KeyUp:
 			m.messageFocused = true
 			if m.messageSelected > 0 {

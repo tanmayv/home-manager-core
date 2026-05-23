@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tanmayvijay/home-manager-core/agent-communicator-tui/internal/tracker"
 )
 
@@ -24,6 +25,18 @@ func TestSendingMessageClearsUnreadForRow(t *testing.T) {
 	m.clearUnread(row)
 	if m.hasUnread(row) {
 		t.Fatal("send should clear unread highlight")
+	}
+}
+
+func TestCtrlAClearsUnreadForSelectedConversation(t *testing.T) {
+	row := agentRow{Name: "alice", Scope: "local"}
+	m := model{rows: []agentRow{row}, unreadRows: map[string]bool{conversationKey(row): true}}
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlA})
+	if cmd != nil {
+		t.Fatal("ack should not send or reload")
+	}
+	if updated.(model).hasUnread(row) {
+		t.Fatal("ctrl-a should clear unread highlight")
 	}
 }
 
