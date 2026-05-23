@@ -164,7 +164,7 @@ When `auth = false`:
 
 ## 6. Tracker-side configuration
 
-Trackers do **not** talk to the registry unless `registryUrl` is set.
+Trackers do **not** talk to registries unless `registries` is non-empty.
 
 **Delivery model:** cross-tracker messages are now queued at the registry and pulled by each tracker via authenticated long-polling. That means the registry does **not** need to open inbound HTTP connections back to tracker hosts for normal message delivery. Tracker-side inbound reachability is therefore no longer required for registry messaging.
 
@@ -178,7 +178,9 @@ services.agent-tracker = {
   httpPort = 19876;
 
   # Enable registry integration
-  registryUrl = "http://agent-registry.example:8080";
+  registries = [
+    { name = "default"; url = "http://agent-registry.example:8080"; }
+  ];
 
   # Auth defaults to false so existing local-only setups keep working.
   registryAuth = true;
@@ -230,7 +232,9 @@ For local/dev testing against a registry with auth disabled:
 ```nix
 services.agent-tracker = {
   enable = true;
-  registryUrl = "http://127.0.0.1:8080";
+  registries = [
+    { name = "default"; url = "http://127.0.0.1:8080"; }
+  ];
   registryAuth = false;
 };
 ```
@@ -254,7 +258,9 @@ Tracker host:
 ```nix
 services.agent-tracker = {
   enable = true;
-  registryUrl = "http://registry-host:8080";
+  registries = [
+    { name = "default"; url = "http://registry-host:8080"; }
+  ];
   registryAuth = false;
 };
 ```
@@ -276,7 +282,7 @@ Those can be provided either through the target user's normal PATH or by using a
 **Important:** `managedAgents` by itself only ensures an agent process exists in tmux. If you also want that managed agent to appear in the global registry (`/agents` on `agents.mundus.in` or another registry), the same machine/user must also be running a local `agent-tracker` with registry integration enabled. In other words:
 
 - `services.agent-registry` + `managedAgents` => starts and keeps the local tmux agent alive
-- `services.agent-tracker` + `registryUrl` => discovers that local agent and publishes it to the registry
+- `services.agent-tracker` + `registries` => discovers that local agent and publishes it to the registry
 
 Without `agent-tracker`, the managed agent is just a local tmux process and will not be reported upstream.
 

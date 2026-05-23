@@ -3,7 +3,6 @@ import state
 
 LOG = logging.getLogger("agent-tracker.registry")
 
-REGISTRY_URL = os.environ.get("AGENT_REGISTRY_URL", "").rstrip("/")
 TOKEN = os.environ.get("AGENT_REGISTRY_TOKEN", "")
 HOSTNAME = os.environ.get("AGENT_TRACKER_HOSTNAME", socket.gethostname())
 TRACKER_ID = os.environ.get("AGENT_TRACKER_ID", str(uuid.uuid5(uuid.NAMESPACE_DNS, HOSTNAME)))
@@ -114,8 +113,6 @@ def load_registry_clients():
         except json.JSONDecodeError:
             LOG.warning("invalid AGENT_REGISTRIES_JSON; registry sync disabled")
             configs = []
-    elif os.environ.get("AGENT_REGISTRY_URL", "").strip():
-        configs = [{"name": "default", "url": os.environ.get("AGENT_REGISTRY_URL"), "token": os.environ.get("AGENT_REGISTRY_TOKEN", "")}]
     clients = []
     for config in configs or []:
         if not isinstance(config, dict) or not config.get("url"):
@@ -124,68 +121,48 @@ def load_registry_clients():
     return clients
 
 
-def _request(method, path, payload=None, timeout=3):
-    if not REGISTRY_URL:
-        return None, None
-    req = urllib.request.Request(
-        f"{REGISTRY_URL}{path}",
-        data=None if payload is None else json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json", **({"Authorization": f"Bearer {TOKEN}"} if TOKEN else {})},
-        method=method,
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            body = resp.read().decode()
-            return resp.status, json.loads(body) if body else None
-    except urllib.error.HTTPError as e:
-        try:
-            body = json.loads(e.read().decode())
-        except Exception:
-            body = None
-        LOG.warning("registry request %s %s returned HTTP %s body=%s", method, path, e.code, body)
-        return e.code, body
-    except Exception as e:
-        LOG.warning("registry request %s %s failed: %s", method, path, e)
-        return None, None
+def _default_client():
+    clients = load_registry_clients()
+    return clients[0] if clients else None
 
 
 def register():
-    status = _request(
-        "POST",
-        "/trackers",
-        {
-            "tracker_id": TRACKER_ID,
-            "hostname": HOSTNAME,
-            "address": os.environ.get("AGENT_TRACKER_ADDRESS", HOSTNAME),
-            "http_port": HTTP_PORT,
-            "agents": state.get_agents_for_registry(),
-            "agent_configs": state.get_local_configs_for_registry(),
-        },
-    )[0]
-    if status in (200, 201):
-        LOG.info("registered tracker_id=%s hostname=%s http_port=%s status=%s", TRACKER_ID, HOSTNAME, HTTP_PORT, status)
-    else:
-        LOG.warning("failed to register tracker_id=%s hostname=%s status=%s", TRACKER_ID, HOSTNAME, status)
-    return status
+    client = _default_client()
+    return None if client is None else client.register()
 
 
 def heartbeat():
-    return _request("POST", f"/trackers/{TRACKER_ID}/heartbeat", {
-        "agents": state.get_agents_for_registry(),
-        "agent_configs": state.get_local_configs_for_registry(),
-    })[0]
+    client = _default_client()
+    return None if client is None else client.heartbeat()
 
+
+def fetch_deliveries():
+    client = _default_client()
+    return (None, None) if client is None else client.fetch_deliveries()
+
+
+def fetch_events():
+    client = _default_client()
+    return (None, None) if client is None else client.fetch_events()
+
+
+def ack_event(event_id):
+    client = _default_client()
+    return None if client is None else client.ack_event(event_id)
+
+
+def ack_delivery(message_id):
+    client = _default_client()
+    if client is None:
+        return None
+    status = client.ack_delivery(message_id)
+    if status != 200:
+        LOG.warning("failed to ack registry delivery message_id=%s tracker_id=%s status=%s", message_id, client.tracker_id, status)
+    return status
 
 def push_agent_update(agent_id, status):
-    clients = load_registry_clients()
-    if clients:
-        for client in clients:
-            threading.Thread(target=lambda c=client: c.push_agent_update(agent_id, status), daemon=True).start()
-    elif REGISTRY_URL:
-        threading.Thread(
-            target=lambda: _request("POST", f"/trackers/{TRACKER_ID}/agent-update", {"agent_id": agent_id, "status": status}),
-            daemon=True,
-        ).start()
+    for client in load_registry_clients():
+        threading.Thread(target=lambda c=client: c.push_agent_update(agent_id, status), daemon=True).start()
 
 
 def _remote_message_payload(sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, message=None, attachments=None, message_id=None):
@@ -226,7 +203,7 @@ def send_remote_message(sender_name, sender_agent_id, sender_tracker_id, target_
             return 409, {"message": f"Ambiguous remote target; use one of: {choices}"}
         client = matches[0] if matches else clients[0]
         return client.send_remote_message(sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, message, attachments, message_id)
-    return _request("POST", "/messages", _remote_message_payload(sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, message, attachments, message_id))
+    return 404, {"message": "registry not configured"}
 
 
 def send_remote_message_to_registry(registry_name, sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, message=None, attachments=None, message_id=None):
@@ -234,14 +211,6 @@ def send_remote_message_to_registry(registry_name, sender_name, sender_agent_id,
         if client.name == registry_name:
             return client.request("POST", "/messages", _remote_message_payload(sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, message, attachments, message_id))
     return 404, {"message": f"registry not configured: {registry_name}"}
-
-
-def fetch_deliveries():
-    return _request("GET", f"/trackers/{TRACKER_ID}/deliveries?wait={DELIVERY_WAIT_SECONDS}", timeout=DELIVERY_WAIT_SECONDS + 5)
-
-
-def fetch_events():
-    return _request("GET", f"/trackers/{TRACKER_ID}/events?wait={DELIVERY_WAIT_SECONDS}", timeout=DELIVERY_WAIT_SECONDS + 5)
 
 
 def fetch_trackers():
@@ -259,25 +228,14 @@ def fetch_trackers():
         if trackers:
             return 200, {"trackers": trackers}
         return last_status, last_body
-    return _request("GET", "/trackers")
-
-
-def ack_event(event_id):
-    return _request("POST", f"/trackers/{TRACKER_ID}/events/{event_id}/ack", {})[0]
-
-
-def ack_delivery(message_id):
-    status = _request("POST", f"/trackers/{TRACKER_ID}/deliveries/{message_id}/ack", {})[0]
-    if status != 200:
-        LOG.warning("failed to ack registry delivery message_id=%s tracker_id=%s status=%s", message_id, TRACKER_ID, status)
-    return status
+    return 404, {"message": "registry not configured"}
 
 
 def _registry_status_payload(status_code, operation, existing, client=None):
     now = time.time()
     connected = isinstance(status_code, int) and 200 <= status_code < 300
     name = "default" if client is None else client.name
-    registry_url = REGISTRY_URL or None if client is None else client.url
+    registry_url = None if client is None else client.url
     tracker_id = TRACKER_ID if client is None else client.tracker_id
     hostname = HOSTNAME if client is None else client.hostname
     entry = {
@@ -328,9 +286,9 @@ def _record_sync_result(status_code, operation, client=None):
 
 
 def _heartbeat_loop(client=None):
+    tracker_id = TRACKER_ID if client is None else client.tracker_id
     do_register = register if client is None else client.register
     do_heartbeat = heartbeat if client is None else client.heartbeat
-    tracker_id = TRACKER_ID if client is None else client.tracker_id
     _record_sync_result(do_register(), "register", client)
     while True:
         status = do_heartbeat()
@@ -375,8 +333,6 @@ def publish_tracker_event(target_tracker_id, event_type, payload):
         status = client.publish_event(target_tracker_id, event_type, payload)
         if status in (200, 202):
             return status
-    if REGISTRY_URL:
-        return _request("POST", "/tracker-events", {"event_type": event_type, "source_tracker_id": TRACKER_ID, "target_tracker_id": target_tracker_id, "payload": payload})[0]
     return None
 
 
@@ -517,13 +473,14 @@ def _handle_remote_save(agent_to_save, agent_name=None, command=None, descriptio
 
 def _event_loop(client=None):
     while True:
-        status, body = (fetch_events() if client is None else client.fetch_events())
+        status, body = fetch_events() if client is None else client.fetch_events()
+        client_name = None if client is None else client.name
         if status != 200:
-            LOG.debug("tracker event poll status=%s body=%s client=%s", status, body, None if client is None else client.name)
+            LOG.debug("tracker event poll status=%s body=%s client=%s", status, body, client_name)
             time.sleep(2)
             continue
         for event in (body or {}).get("events") or []:
-            LOG.info("tracker event received client=%s event=%s", None if client is None else client.name, event)
+            LOG.info("tracker event received client=%s event=%s", client_name, event)
             if event.get("event_type") in {"message_delivered", "message_notified", "message_read"}:
                 payload = event.get("payload") or {}
                 sender_name, local_payload = _local_tracker_event_payload(event.get("event_type"), payload)
@@ -638,20 +595,7 @@ def _delivery_loop(client=None):
 def background_sync():
     clients = load_registry_clients()
     if not clients:
-        LOG.info("registry sync disabled: no registry configured")
-        return
-    if len(clients) == 1 and clients[0].url == REGISTRY_URL:
-        LOG.info(
-            "starting registry sync tracker_id=%s hostname=%s registry_url=%s heartbeat_interval=%ss delivery_wait=%ss",
-            TRACKER_ID,
-            HOSTNAME,
-            REGISTRY_URL,
-            HEARTBEAT_INTERVAL,
-            DELIVERY_WAIT_SECONDS,
-        )
-        threading.Thread(target=_heartbeat_loop, daemon=True).start()
-        threading.Thread(target=_event_loop, daemon=True).start()
-        _delivery_loop()
+        LOG.info("registry sync disabled: no registries configured")
         return
     LOG.info("starting registry sync for %s registries tracker_id=%s hostname=%s", len(clients), TRACKER_ID, HOSTNAME)
     for client in clients:

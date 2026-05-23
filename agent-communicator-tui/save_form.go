@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -74,13 +75,24 @@ func (m model) updateSaveForm(msg tea.Msg) (model, tea.Cmd) {
 			m.saveFormIndex = (m.saveFormIndex - 1 + 6) % 6
 			m.focusSaveFormInput()
 			return m, nil
+		case tea.KeyCtrlS:
+			row := m.rows[m.selected]
+			m.showingSaveForm = false
+			return m, saveAgentCmd(
+				m.local,
+				row,
+				m.saveFormInputs[0].Value(),
+				m.saveFormInputs[2].Value(),
+				m.saveFormInputs[1].Value(),
+				m.saveFormInputs[3].Value(),
+			)
 		case tea.KeyEnter:
 			if m.saveFormIndex == 4 { // Save Button
-				m.showingSaveForm = false
 				row := m.rows[m.selected]
+				m.showingSaveForm = false
 				return m, saveAgentCmd(
-					m.remote,
-					row.AgentID,
+					m.local,
+					row,
 					m.saveFormInputs[0].Value(),
 					m.saveFormInputs[2].Value(),
 					m.saveFormInputs[1].Value(),
@@ -168,15 +180,72 @@ func (m model) renderSaveForm() string {
 	return boxStyle.Render(b.String())
 }
 
-func saveAgentCmd(remote remoteClient, agentToSave, agentName, command, description, cwd string) tea.Cmd {
+func saveAgentCmd(local localClient, row agentRow, agentName, command, description, cwd string) tea.Cmd {
 	return func() tea.Msg {
-		if remote == nil {
-			return agentSaved{Err: fmt.Errorf("registry connection unavailable")}
+		if row.Scope != "remote" {
+			return saveLocalAgentCmd(agentName, command, description, cwd)()
 		}
+		if local == nil {
+			return agentSaved{Name: agentName, Err: fmt.Errorf("local tracker client unavailable")}
+		}
+		if row.TrackerID == "" {
+			return agentSaved{Name: agentName, Err: fmt.Errorf("remote tracker ID unavailable")}
+		}
+		return publishRemoteSaveRequestCmd(local, row, agentName, command, description, cwd)()
+	}
+}
+
+func saveTargetID(row agentRow) string {
+	if strings.TrimSpace(row.AgentID) != "" {
+		return strings.TrimSpace(row.AgentID)
+	}
+	if strings.TrimSpace(row.AgentName) != "" {
+		return strings.TrimSpace(row.AgentName)
+	}
+	return strings.TrimSpace(row.Name)
+}
+
+func saveLocalAgentCmd(agentName, command, description, cwd string) tea.Cmd {
+	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		err := remote.SaveAgent(ctx, agentToSave, agentName, command, description, cwd)
+		args := []string{"save", "-a", agentName, "-w", cwd, "-c", command}
+		if description != "" {
+			args = append(args, "-d", description)
+		}
+		cmd := exec.CommandContext(ctx, "agent-tracker-ctl", args...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			trimmed := strings.TrimSpace(string(out))
+			if trimmed != "" {
+				err = fmt.Errorf("%w: %s", err, trimmed)
+			}
+		}
+		return agentSaved{Name: agentName, Err: err}
+	}
+}
+
+func publishRemoteSaveRequestCmd(local localClient, row agentRow, agentName, command, description, cwd string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		payload := map[string]any{"agent_to_save": saveTargetID(row)}
+		if agentName != "" {
+			payload["agent_name"] = agentName
+		}
+		if command != "" {
+			payload["command"] = command
+		}
+		if description != "" {
+			payload["description"] = description
+		}
+		if cwd != "" {
+			payload["cwd"] = cwd
+		}
+
+		err := local.PublishTrackerEvent(ctx, row.TrackerID, "save_request", payload)
 		return agentSaved{Name: agentName, Err: err}
 	}
 }

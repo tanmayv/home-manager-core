@@ -24,11 +24,12 @@ type ctlAgent struct {
 	CWD           string   `json:"cwd"`
 	Hostname      string   `json:"hostname"`
 	TargetAddress string   `json:"target_address"`
+	TrackerID     string   `json:"tracker_id"`
 	TmuxPane      string   `json:"tmux_pane"`
 	AgentCmd      string   `json:"agent_cmd"`
 }
 
-func loadAgents(local localClient, _ remoteClient) tea.Cmd {
+func loadAgents(local localClient) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
@@ -93,6 +94,7 @@ func rowFromCtlAgent(key string, agent ctlAgent) agentRow {
 		CWD:           agent.CWD,
 		Hostname:      agent.Hostname,
 		TargetAddress: agent.TargetAddress,
+		TrackerID:     agent.TrackerID,
 		TmuxPane:      agent.TmuxPane,
 		AgentCmd:      agent.AgentCmd,
 	})
@@ -121,6 +123,7 @@ func rowFromTrackerAgent(key string, agent tracker.Agent) agentRow {
 			TmuxPane:      agent.TmuxPane,
 			AgentCmd:      agent.AgentCmd,
 			AgentID:       agent.AgentID,
+			TrackerID:     agent.TrackerID,
 		}
 	}
 	host, name := splitRemoteTarget(target)
@@ -141,6 +144,7 @@ func rowFromTrackerAgent(key string, agent tracker.Agent) agentRow {
 		TmuxPane:      agent.TmuxPane,
 		AgentCmd:      agent.AgentCmd,
 		AgentID:       agent.AgentID,
+		TrackerID:     agent.TrackerID,
 	}
 }
 

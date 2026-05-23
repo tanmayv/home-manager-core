@@ -18,6 +18,7 @@ type Agent struct {
 	Scope           string   `json:"scope,omitempty"`
 	Hostname        string   `json:"hostname,omitempty"`
 	TargetAddress   string   `json:"target_address,omitempty"`
+	TrackerID       string   `json:"tracker_id,omitempty"`
 }
 
 type Attachment struct {

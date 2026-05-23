@@ -61,7 +61,8 @@ class TestAgentTrackerCtl(unittest.TestCase):
             seen["auth"] = req.headers.get("Authorization")
             return FakeResponse()
 
-        with mock.patch.dict(os.environ, {"AGENT_REGISTRY_URL": "https://registry.example/", "AGENT_REGISTRY_TOKEN": "secret"}, clear=False), \
+        registries = json.dumps([{"name": "default", "url": "https://registry.example/", "token": "secret"}])
+        with mock.patch.dict(os.environ, {"AGENT_REGISTRIES_JSON": registries}, clear=True), \
              mock.patch.object(ctl.urllib.request, "urlopen", fake_urlopen):
             agents = ctl.fetch_registry_agents()
 
@@ -162,9 +163,9 @@ class TestAgentTrackerCtl(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             status_path = os.path.join(tmp, "registry-status.json")
             with open(status_path, "w") as f:
-                json.dump({"connected": True, "last_success": 100.0}, f)
+                json.dump({"registries": {"mundus": {"connected": True, "last_success": 100.0}}}, f)
             with mock.patch.object(ctl, "REGISTRY_STATUS_PATH", status_path), \
-                 mock.patch.dict(os.environ, {"AGENT_REGISTRY_URL": "https://agents.mundus.in", "AGENT_REGISTRY_HEARTBEAT_SECONDS": "30"}, clear=False):
+                 mock.patch.dict(os.environ, {"AGENT_REGISTRIES_JSON": '[{"name":"mundus","url":"https://agents.mundus.in"}]', "AGENT_REGISTRY_HEARTBEAT_SECONDS": "30"}, clear=True):
                 self.assertTrue(ctl.is_registry_connected(now=120.0))
                 self.assertFalse(ctl.is_registry_connected(now=200.0))
 

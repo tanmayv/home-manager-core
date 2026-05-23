@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/tanmayvijay/home-manager-core/agent-communicator-tui/internal/tracker"
 )
 
@@ -44,7 +44,6 @@ type model struct {
 	eventSeq                int64
 	ownName                 string
 	local                   localClient
-	remote                  remoteClient
 
 	// Custom Agent Configurations (Ctrl-L)
 	configItems       []ConfigSelectionItem
@@ -62,10 +61,9 @@ type model struct {
 	saveFormInputs  []textinput.Model
 }
 
-func newModel(local localClient, remote remoteClient, ownName string) model {
+func newModel(local localClient, ownName string) model {
 	return model{
 		local:             local,
-		remote:            remote,
 		ownName:           ownName,
 		sentMessages:      map[string][]tracker.Message{},
 		unreadRows:        map[string]bool{},
@@ -75,7 +73,7 @@ func newModel(local localClient, remote remoteClient, ownName string) model {
 }
 func (m model) Init() tea.Cmd {
 	return tea.Batch(
-		loadAgents(m.local, m.remote),
+		loadAgents(m.local),
 		loadOutboxCmd(),
 		loadSavedMessagesCmd(),
 		loadHiddenAgentsCmd(),
@@ -278,7 +276,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case refreshTick:
 		m.agentListLoading = true
-		return m, tea.Batch(loadAgents(m.local, m.remote), loadOutboxCmd(), tickRefresh(), tickAgentListSpinner())
+		return m, tea.Batch(loadAgents(m.local), loadOutboxCmd(), tickRefresh(), tickAgentListSpinner())
 	case agentListSpinnerTick:
 		if m.agentListLoading {
 			m.agentListFrame++

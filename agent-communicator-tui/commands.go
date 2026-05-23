@@ -28,11 +28,7 @@ type messageIDSender interface {
 	SendMessageWithID(context.Context, string, string, string, string, []tracker.Attachment) error
 }
 
-type remoteClient interface {
-	SaveAgent(ctx context.Context, agentToSave, agentName, command, description, cwd string) error
-}
-
-type agentRow struct{ Name, Scope, Status, CWD, TargetAddress, Hostname, AgentName, TmuxPane, AgentCmd, AgentID string }
+type agentRow struct{ Name, Scope, Status, CWD, TargetAddress, Hostname, AgentName, TmuxPane, AgentCmd, AgentID, TrackerID string }
 type agentsLoaded struct {
 	Rows []agentRow
 	Err  error

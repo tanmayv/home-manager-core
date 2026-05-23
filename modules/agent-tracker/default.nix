@@ -55,8 +55,6 @@ let
     # Python, so provide an explicit cross-platform tool PATH instead of
     # relying on the interactive shell environment.
     PATH = "${userNixPaths}:${agentTrackerToolPath}:${platformFallbackPath}";
-  } // lib.optionalAttrs (cfg.registryUrl != null && cfg.registries == []) {
-    AGENT_REGISTRY_URL = cfg.registryUrl;
   } // lib.optionalAttrs (cfg.registries != []) {
     AGENT_REGISTRIES_JSON = builtins.toJSON cfg.registries;
   };
@@ -70,7 +68,6 @@ in
   config = mkMerge [
     {
       services.agent-tracker.enable = mkDefault (userSettings.enable-agent-tracker or false);
-      services.agent-tracker.registryUrl = mkDefault (agentTrackerSettings.registry-url or null);
       services.agent-tracker.registries = mkDefault (agentTrackerSettings.registries or []);
       services.agent-tracker.registryAuth = mkDefault (agentTrackerSettings.registry-auth or false);
       services.agent-tracker.registryTokenFile = mkDefault registryTokenFileFromSettings;
@@ -150,6 +147,18 @@ in
     })
 
     (mkIf (cfg.enable && pkgs.stdenv.isLinux) {
+      home.activation.restartAgentTracker = lib.hm.dag.entryAfter [ "reloadSystemd" ] ''
+        echo "Force restarting agent-tracker.service"
+        if ${config.systemd.user.systemctlPath} --user show-environment >/dev/null 2>&1; then
+          ${config.systemd.user.systemctlPath} --user daemon-reload >/dev/null 2>&1 || true
+          ${config.systemd.user.systemctlPath} --user reset-failed agent-tracker.service >/dev/null 2>&1 || true
+          ${config.systemd.user.systemctlPath} --user stop agent-tracker.service >/dev/null 2>&1 || true
+          ${config.systemd.user.systemctlPath} --user start agent-tracker.service >/dev/null 2>&1 || true
+        else
+          echo "User systemd is not available; skipping agent-tracker restart"
+        fi
+      '';
+
       systemd.user.services.agent-tracker = {
         Unit = {
           Description = "Agent Tracker Daemon";
@@ -169,6 +178,32 @@ in
     })
 
     (mkIf (cfg.enable && pkgs.stdenv.isDarwin) {
+      home.activation.restartAgentTracker = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
+        label="org.nix-community.home.agent-tracker"
+        domain="gui/$(id -u)"
+        service="$domain/$label"
+        plist="$HOME/Library/LaunchAgents/$label.plist"
+
+        echo "Force restarting $label"
+        if [ -f "$plist" ]; then
+          /bin/launchctl bootout "$service" >/dev/null 2>&1 || true
+          for _ in 1 2 3 4 5; do
+            if ! /bin/launchctl print "$service" >/dev/null 2>&1; then
+              break
+            fi
+            /bin/sleep 1
+          done
+          if ! /bin/launchctl bootstrap "$domain" "$plist" >/dev/null 2>&1; then
+            echo "launchctl bootstrap failed for $service; trying kickstart"
+          fi
+          if ! /bin/launchctl kickstart -k "$service" >/dev/null 2>&1; then
+            echo "launchctl kickstart failed for $service"
+          fi
+        else
+          echo "LaunchAgent plist not found: $plist"
+        fi
+      '';
+
       launchd.agents.agent-tracker = {
         enable = true;
         config = {

@@ -20,7 +20,7 @@ func TestLoadAgentsUsesTrackerRPCRows(t *testing.T) {
 		return []agentRow{{Name: "coding-agent", Scope: "local", TargetAddress: "coding-agent"}, {Name: "tanma/remote-agent", Scope: "remote", TargetAddress: "tanmayvijay.c.googlers.com/remote-agent"}}, nil
 	}
 	t.Cleanup(func() { agentListProvider = old })
-	loaded := loadAgents(&fakeLocal{}, nil)().(agentsLoaded)
+	loaded := loadAgents(&fakeLocal{})().(agentsLoaded)
 	if loaded.Err != nil || len(loaded.Rows) != 2 {
 		t.Fatalf("loaded = %+v", loaded)
 	}

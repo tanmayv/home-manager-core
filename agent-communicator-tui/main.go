@@ -8,7 +8,6 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/tanmayvijay/home-manager-core/agent-communicator-tui/internal/registry"
 	"github.com/tanmayvijay/home-manager-core/agent-communicator-tui/internal/tracker"
 )
 
@@ -18,16 +17,14 @@ var version = "dev"
 var refreshInterval = 30 * time.Second
 
 type config struct {
-	Version     bool
-	RegistryURL string
+	Version bool
 }
 
 func parseArgs(args []string) (config, error) {
 	fs := flag.NewFlagSet(appName, flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
-	cfg := config{RegistryURL: os.Getenv("AGENT_REGISTRY_URL")}
+	cfg := config{}
 	fs.BoolVar(&cfg.Version, "version", false, "print version and exit")
-	fs.StringVar(&cfg.RegistryURL, "registry-url", cfg.RegistryURL, "agent-registry base URL")
 	if err := fs.Parse(args); err != nil {
 		return config{}, err
 	}
@@ -49,11 +46,7 @@ func run(stdout io.Writer, args []string) error {
 		ownName = appName
 	}
 	_ = cleanupHistoryOnStart()
-	var remote remoteClient
-	if cfg.RegistryURL != "" {
-		remote = registry.New(cfg.RegistryURL, "")
-	}
-	p := tea.NewProgram(newModel(tracker.New(""), remote, ownName), tea.WithOutput(stdout), tea.WithAltScreen())
+	p := tea.NewProgram(newModel(tracker.New(""), ownName), tea.WithOutput(stdout), tea.WithAltScreen())
 	_, err = p.Run()
 	return err
 }

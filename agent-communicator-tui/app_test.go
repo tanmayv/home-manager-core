@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/tanmayvijay/home-manager-core/agent-communicator-tui/internal/registry"
 	"github.com/tanmayvijay/home-manager-core/agent-communicator-tui/internal/tracker"
 )
 
@@ -53,9 +52,6 @@ func (f *fakeLocal) PublishTrackerEvent(context.Context, string, string, any) er
 	return nil
 }
 
-type fakeRemote struct{ agents []registry.Agent }
-
-func (f fakeRemote) ListAgents(context.Context) ([]registry.Agent, error) { return f.agents, nil }
 func TestRunPrintsVersion(t *testing.T) {
 	var out bytes.Buffer
 	if err := run(&out, []string{"--version"}); err != nil {

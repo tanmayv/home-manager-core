@@ -46,12 +46,6 @@ with lib;
       description = "HTTP sidecar port for observer/registry access.";
     };
 
-    registryUrl = mkOption {
-      type = types.nullOr types.str;
-      default = null;
-      description = "Optional agent-registry base URL.";
-    };
-
     registries = mkOption {
       type = types.listOf (types.submodule {
         options = {
@@ -71,19 +65,19 @@ with lib;
         };
       });
       default = [];
-      description = "Optional list of agent registries. When non-empty, this supersedes registryUrl for registry discovery/sync.";
+      description = "Optional list of agent registries used for discovery, sync, and remote delivery.";
     };
 
     registryAuth = mkOption {
       type = types.bool;
       default = false;
-      description = "Require Bearer auth for registry/sidecar integration.";
+      description = "Require shared Bearer auth for registry/sidecar integration.";
     };
 
     registryTokenFile = mkOption {
       type = types.nullOr types.path;
       default = null;
-      description = "File containing the shared Bearer token for registry/sidecar auth.";
+      description = "File containing the shared Bearer token for registry/sidecar auth and as the default token for registry entries without token-file.";
     };
 
     registryHeartbeatSeconds = mkOption {

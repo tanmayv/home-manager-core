@@ -132,23 +132,20 @@ def _read_token_config(config: dict) -> str:
                 return f.read().strip()
         except Exception:
             return ""
-    return ""
+    return os.environ.get("AGENT_REGISTRY_TOKEN", "")
 
 
 def registry_configs() -> list[dict]:
     raw = os.environ.get("AGENT_REGISTRIES_JSON", "").strip()
-    if raw:
-        try:
-            configs = json.loads(raw)
-        except json.JSONDecodeError:
-            return []
-        if isinstance(configs, dict):
-            configs = configs.get("registries") or []
-        return [{**c, "token": _read_token_config(c)} for c in configs if isinstance(c, dict) and c.get("url")]
-    registry_url = os.environ.get("AGENT_REGISTRY_URL", "").strip()
-    if not registry_url:
+    if not raw:
         return []
-    return [{"name": "default", "url": registry_url, "token": os.environ.get("AGENT_REGISTRY_TOKEN", "")}]
+    try:
+        configs = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if isinstance(configs, dict):
+        configs = configs.get("registries") or []
+    return [{**c, "token": _read_token_config(c)} for c in configs if isinstance(c, dict) and c.get("url")]
 
 
 def fetch_registry_agents(timeout: float = 3.0) -> dict:

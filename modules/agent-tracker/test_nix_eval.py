@@ -29,7 +29,7 @@ in builtins.toJSON cfg.config.services.agent-tracker.registryAuth
         out = subprocess.check_output(["nix", "eval", "--impure", "--raw", "--expr", expr], text=True).strip()
         self.assertEqual(out, "false")
 
-    def test_agent_tracker_user_settings_registry_defaults_evaluate(self):
+    def test_agent_tracker_user_settings_single_registry_list_evaluates(self):
         repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         expr = f'''
 let
@@ -50,7 +50,9 @@ let
       userSettings = {{
         enable-agent-tracker = true;
         agent-tracker = {{
-          registry-url = "https://agents.mundus.in";
+          registries = [
+            {{ name = "mundus"; url = "https://agents.mundus.in"; }}
+          ];
           registry-auth = false;
           http-port = 29876;
           registry-heartbeat-seconds = 45;
@@ -60,7 +62,7 @@ let
   }};
 in builtins.toJSON {{
   enable = cfg.config.services.agent-tracker.enable;
-  registryUrl = cfg.config.services.agent-tracker.registryUrl;
+  registries = cfg.config.services.agent-tracker.registries;
   registryAuth = cfg.config.services.agent-tracker.registryAuth;
   httpPort = cfg.config.services.agent-tracker.httpPort;
   registryHeartbeatSeconds = cfg.config.services.agent-tracker.registryHeartbeatSeconds;
@@ -69,7 +71,9 @@ in builtins.toJSON {{
         out = subprocess.check_output(["nix", "eval", "--impure", "--raw", "--expr", expr], text=True).strip()
         data = json.loads(out)
         self.assertTrue(data["enable"])
-        self.assertEqual(data["registryUrl"], "https://agents.mundus.in")
+        self.assertEqual(data["registries"], [
+            {"name": "mundus", "token-file": None, "url": "https://agents.mundus.in"},
+        ])
         self.assertFalse(data["registryAuth"])
         self.assertEqual(data["httpPort"], 29876)
         self.assertEqual(data["registryHeartbeatSeconds"], 45)
@@ -95,7 +99,6 @@ let
       userSettings = {{
         enable-agent-tracker = true;
         agent-tracker = {{
-          registry-url = "https://legacy.example";
           registries = [
             {{ name = "corp"; url = "https://corp.example"; token-file = "/tmp/corp-token"; }}
             {{ name = "lab"; url = "https://lab.example"; }}
@@ -105,13 +108,11 @@ let
     }};
   }};
 in builtins.toJSON {{
-  registryUrl = cfg.config.services.agent-tracker.registryUrl;
   registries = cfg.config.services.agent-tracker.registries;
 }}
 '''
         out = subprocess.check_output(["nix", "eval", "--impure", "--raw", "--expr", expr], text=True).strip()
         data = json.loads(out)
-        self.assertEqual(data["registryUrl"], "https://legacy.example")
         self.assertEqual(data["registries"], [
             {"name": "corp", "token-file": "/tmp/corp-token", "url": "https://corp.example"},
             {"name": "lab", "token-file": None, "url": "https://lab.example"},

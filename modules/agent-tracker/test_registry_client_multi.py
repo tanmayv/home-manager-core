@@ -1,6 +1,4 @@
-import importlib
 import json
-import os
 import unittest
 from unittest import mock
 
@@ -8,20 +6,17 @@ import registry_client
 
 
 class TestRegistryClientMulti(unittest.TestCase):
-    def test_load_registry_clients_from_legacy_url(self):
-        with mock.patch.dict(os.environ, {"AGENT_REGISTRY_URL": "https://registry.example/", "AGENT_REGISTRY_TOKEN": "secret"}, clear=True):
+    def test_load_registry_clients_requires_registries_json(self):
+        with mock.patch.dict("os.environ", {}, clear=True):
             clients = registry_client.load_registry_clients()
-        self.assertEqual(len(clients), 1)
-        self.assertEqual(clients[0].name, "default")
-        self.assertEqual(clients[0].url, "https://registry.example")
-        self.assertEqual(clients[0].token, "secret")
+        self.assertEqual(clients, [])
 
     def test_load_registry_clients_from_json(self):
         payload = json.dumps([
             {"name": "corp", "url": "https://corp.example/", "token": "one"},
             {"name": "lab", "url": "https://lab.example", "token": "two"},
         ])
-        with mock.patch.dict(os.environ, {"AGENT_REGISTRIES_JSON": payload}, clear=True):
+        with mock.patch.dict("os.environ", {"AGENT_REGISTRIES_JSON": payload}, clear=True):
             clients = registry_client.load_registry_clients()
         self.assertEqual([(c.name, c.url, c.token) for c in clients], [
             ("corp", "https://corp.example", "one"),
@@ -30,14 +25,14 @@ class TestRegistryClientMulti(unittest.TestCase):
 
     def test_load_registry_clients_ignores_entries_without_url(self):
         payload = json.dumps([{"name": "missing"}, {"name": "ok", "url": "https://ok.example"}])
-        with mock.patch.dict(os.environ, {"AGENT_REGISTRIES_JSON": payload}, clear=True):
+        with mock.patch.dict("os.environ", {"AGENT_REGISTRIES_JSON": payload}, clear=True):
             clients = registry_client.load_registry_clients()
         self.assertEqual([(c.name, c.url) for c in clients], [("ok", "https://ok.example")])
 
     def test_load_registry_clients_reads_token_file(self):
         with mock.patch("builtins.open", mock.mock_open(read_data="secret\n")):
             payload = json.dumps([{"name": "secure", "url": "https://secure.example", "token-file": "/tmp/token"}])
-            with mock.patch.dict(os.environ, {"AGENT_REGISTRIES_JSON": payload}, clear=True):
+            with mock.patch.dict("os.environ", {"AGENT_REGISTRIES_JSON": payload}, clear=True):
                 clients = registry_client.load_registry_clients()
         self.assertEqual(clients[0].token, "secret")
 
