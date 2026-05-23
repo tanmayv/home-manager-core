@@ -471,6 +471,97 @@ def _handle_remote_save(agent_to_save, agent_name=None, command=None, descriptio
         LOG.error("failed to write remote-saved config: %s", e)
 
 
+def _handle_remote_pane_capture(payload: dict):
+    """Handles a remote request to capture a local pane and send the snapshot to a target."""
+    source = payload.get("source")
+    target = payload.get("target")
+    last = payload.get("last", 200)
+    fmt = payload.get("format", "markdown")
+    note = payload.get("note")
+    include_ansi = bool(payload.get("include_ansi", False))
+    request_id = payload.get("request_id")
+
+    LOG.info("remote pane capture request: source=%s target=%s last=%s format=%s note=%s request_id=%s", source, target, last, fmt, note, request_id)
+    if not source or not target:
+        LOG.warning("remote pane capture request failed: source or target missing")
+        return
+
+    try:
+        # 1. Trigger handle_capture_pane internally to query local state and tmux pane
+        from rpc_handler import handle_capture_pane
+        
+        capture_params = {
+            "last_lines": last,
+            "include_ansi": include_ansi
+        }
+        
+        from ctl_commands.common import is_uuid
+        if is_uuid(source):
+            capture_params["agent_id"] = source
+        elif source.startswith("%") and source[1:].isdigit():
+            capture_params["tmux_pane"] = source
+        else:
+            capture_params["agent_name"] = source
+
+        # Capture the pane snapshot locally
+        snapshot = handle_capture_pane(capture_params)
+        
+        # 2. Format snapshot output
+        if fmt == "json":
+            msg_payload = {
+                "type": "pane_snapshot",
+                "source_agent_name": snapshot.get("agent_name"),
+                "source_agent_id": snapshot.get("agent_id"),
+                "tmux_pane": snapshot.get("tmux_pane"),
+                "session": snapshot.get("session"),
+                "copy_mode": snapshot.get("copy_mode"),
+                "captured_at": snapshot.get("captured_at"),
+                "lines_requested": snapshot.get("lines_requested"),
+                "note": note,
+                "request_id": request_id,
+                "content": snapshot.get("content", "")
+            }
+            message_text = json.dumps(msg_payload)
+        else: # markdown
+            note_block = ""
+            if note:
+                note_block = f"- **User Note:** {note}\n"
+                
+            source_display = snapshot.get("agent_name") or "Unnamed Agent"
+            if snapshot.get("agent_id"):
+                source_display += f" ({snapshot.get('agent_id')})"
+                
+            message_text = (
+                f"### Pane Capture Snapshot from {source_display}\n"
+                f"- **Pane:** {snapshot.get('tmux_pane') or 'unknown'}\n"
+                f"- **Session:** {snapshot.get('session') or 'unknown'}\n"
+                f"- **Copy Mode:** {'Active' if snapshot.get('copy_mode') else 'Inactive'}\n"
+                f"- **Captured At:** {snapshot.get('captured_at')}\n"
+                f"{note_block}"
+                f"\n```\n"
+                f"{snapshot.get('content', '')}\n"
+                f"```\n"
+            )
+
+        # 3. Deliver formatted snapshot to the target address via handle_send_message
+        from rpc_handler import handle_send_message
+        send_params = {
+            "target_address": target,
+            "message": message_text,
+            "sender_id": snapshot.get("agent_id"),
+            "sender_name": snapshot.get("agent_name")
+        }
+        
+        success = handle_send_message(send_params)
+        if success:
+            LOG.info("remote pane capture request successfully processed and snapshot sent to %s", target)
+        else:
+            LOG.warning("failed to deliver snapshot message to %s", target)
+            
+    except Exception as e:
+        LOG.error("failed to execute remote pane capture request: %s", e)
+
+
 def _event_loop(client=None):
     while True:
         status, body = fetch_events() if client is None else client.fetch_events()
@@ -509,6 +600,9 @@ def _event_loop(client=None):
                         except Exception as ex:
                             LOG.warning("failed to re-register after remote save: %s", ex)
                     threading.Thread(target=run_save_and_register, daemon=True).start()
+            elif event.get("event_type") == "pane_capture_request":
+                payload = event.get("payload") or {}
+                threading.Thread(target=_handle_remote_pane_capture, args=(payload,), daemon=True).start()
             ack = ack_event(event.get("event_id")) if client is None else client.ack_event(event.get("event_id"))
             if ack != 200:
                 LOG.warning("failed to ack tracker event event_id=%s status=%s", event.get("event_id"), ack)

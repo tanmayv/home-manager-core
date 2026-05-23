@@ -1,6 +1,8 @@
 import os
 import sys
 import json
+import socket
+import uuid
 from .common import call_rpc
 
 def register(subparsers):
@@ -33,6 +35,63 @@ def handle(args):
         capture_params["agent_id"] = args.id
     if args.pane:
         capture_params["tmux_pane"] = args.pane
+
+    # If the source agent is remote (contains /), publish a pane_capture_request tracker event instead of capturing locally
+    source_agent = args.source
+    if source_agent and "/" in source_agent:
+        remote_host, remote_name = source_agent.split("/", 1)
+        try:
+            # Retrieve all agents to look up the remote tracker ID
+            agents = call_rpc("list", {"include_remote": True})
+            if not agents:
+                print("Error: Failed to retrieve agent list from agent-tracker.", file=sys.stderr)
+                sys.exit(1)
+                
+            remote_info = agents.get(source_agent)
+            if not remote_info:
+                print(f"Error: Remote source agent '{source_agent}' not found in tracker registries.", file=sys.stderr)
+                sys.exit(1)
+                
+            target_tracker_id = remote_info.get("tracker_id")
+            if not target_tracker_id:
+                print(f"Error: Could not determine tracker ID for remote host '{remote_host}'.", file=sys.stderr)
+                sys.exit(1)
+                
+            local_hostname = os.environ.get("AGENT_TRACKER_HOSTNAME", socket.gethostname())
+            target_delivery_address = args.target_address
+            if "/" not in target_delivery_address:
+                target_delivery_address = f"{local_hostname}/{target_delivery_address}"
+
+            requester = os.environ.get("AGENT_ID") or os.environ.get("AGENT_NAME") or "cli-user"
+            request_id = str(uuid.uuid4())
+            
+            event_payload = {
+                "request_id": request_id,
+                "source": remote_name,
+                "target": target_delivery_address,
+                "requester": requester,
+                "format": args.format,
+                "last": args.last,
+                "include_ansi": False,
+                "note": args.note
+            }
+            
+            publish_params = {
+                "target_tracker_id": target_tracker_id,
+                "event_type": "pane_capture_request",
+                "payload": event_payload
+            }
+            
+            res = call_rpc("publish_tracker_event", publish_params)
+            if res:
+                print(f"Remote capture request successfully dispatched to host '{remote_host}' (Request ID: {request_id}).")
+                return
+            else:
+                print(f"Error: Failed to dispatch remote capture request to host '{remote_host}'.", file=sys.stderr)
+                sys.exit(1)
+        except Exception as e:
+            print(f"Error dispatching remote capture request: {e}", file=sys.stderr)
+            sys.exit(1)
 
     # If no source parameters are specified, capture_pane RPC will default to self-capture (caller_pid lookup)
     
