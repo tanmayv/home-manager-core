@@ -4,6 +4,7 @@ import threading
 import queue
 import sys
 import os
+import re
 import tmux_reliability
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', stream=sys.stderr)
@@ -263,3 +264,44 @@ def send_keys_reliable(pane_id, keys, socket_path=None, timeout=10):
 def execute_command_reliable(pane_id, command, socket_path=None, timeout=30):
     """Executes a command in a pane reliably, waiting for execution and returning the exit code."""
     return tmux_reliability.execute_command_reliable(pane_id, command, socket_path, timeout)
+
+ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+
+def capture_pane_visible_text(pane_id, last_lines=200, socket_path=None, include_ansi=False) -> str:
+    """Captures the visible text of a pane and its scrollback history.
+    
+    Args:
+        pane_id: The tmux pane ID (e.g., %0).
+        last_lines: The number of scrollback/history lines to retrieve.
+        socket_path: Optional path to tmux socket.
+        include_ansi: If False, strips ANSI color and formatting escape sequences.
+    """
+    cmd = []
+    if socket_path:
+        cmd.extend(["-S", socket_path])
+    
+    cmd.extend(["capture-pane", "-p", "-J", "-t", pane_id])
+    if last_lines is not None and last_lines > 0:
+        cmd.extend(["-S", f"-{last_lines}"])
+    
+    try:
+        out = run_tmux_cmd(cmd)
+        if not include_ansi:
+            out = ANSI_ESCAPE.sub('', out)
+        return out
+    except Exception as e:
+        logging.error(f"Failed to capture visible text for pane {pane_id}: {e}")
+        raise
+
+def is_pane_in_copy_mode(pane_id, socket_path=None) -> bool:
+    """Queries tmux to see if the pane is currently in copy-mode."""
+    cmd = []
+    if socket_path:
+        cmd.extend(["-S", socket_path])
+    cmd.extend(["display-message", "-p", "-t", pane_id, "#{pane_in_mode}"])
+    try:
+        out = run_tmux_cmd(cmd)
+        return out.strip() == "1"
+    except Exception as e:
+        logging.error(f"Failed to check copy mode for {pane_id}: {e}")
+        return False

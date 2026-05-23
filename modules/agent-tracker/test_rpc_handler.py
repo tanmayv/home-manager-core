@@ -914,6 +914,84 @@ class TestRpcHandler(unittest.TestCase):
             if os.path.exists(inbox_path):
                 os.remove(inbox_path)
 
+    @mock.patch("tmux_util.capture_pane_visible_text")
+    @mock.patch("tmux_util.is_pane_in_copy_mode")
+    def test_handle_capture_pane_by_agent_name(self, mock_copy_mode, mock_capture):
+        state.set_agent("agent1", {
+            "agent_id": "id-1",
+            "tmux_pane": "%1",
+            "tmux_socket": "sock",
+            "session": "sess-1",
+            "status": "idle"
+        })
+        mock_copy_mode.return_value = False
+        mock_capture.return_value = "Screen Text"
+
+        res = rpc_handler.handle_capture_pane({
+            "agent_name": "agent1",
+            "last_lines": 100,
+            "include_ansi": True
+        })
+
+        self.assertEqual(res["agent_name"], "agent1")
+        self.assertEqual(res["agent_id"], "id-1")
+        self.assertEqual(res["tmux_pane"], "%1")
+        self.assertEqual(res["session"], "sess-1")
+        self.assertFalse(res["copy_mode"])
+        self.assertEqual(res["content"], "Screen Text")
+        self.assertEqual(res["lines_requested"], 100)
+        mock_copy_mode.assert_called_once_with("%1", "sock")
+        mock_capture.assert_called_once_with("%1", last_lines=100, socket_path="sock", include_ansi=True)
+
+    @mock.patch("tmux_util.capture_pane_visible_text")
+    @mock.patch("tmux_util.is_pane_in_copy_mode")
+    def test_handle_capture_pane_by_agent_id(self, mock_copy_mode, mock_capture):
+        state.set_agent("agent1", {
+            "agent_id": "id-1",
+            "tmux_pane": "%1",
+            "tmux_socket": "sock",
+            "session": "sess-1"
+        })
+        mock_copy_mode.return_value = True
+        mock_capture.return_value = "Screen Text Copy"
+
+        res = rpc_handler.handle_capture_pane({
+            "agent_id": "id-1",
+            "last_lines": 200
+        })
+
+        self.assertEqual(res["agent_name"], "agent1")
+        self.assertEqual(res["agent_id"], "id-1")
+        self.assertTrue(res["copy_mode"])
+        self.assertEqual(res["content"], "Screen Text Copy")
+        mock_capture.assert_called_once_with("%1", last_lines=200, socket_path="sock", include_ansi=False)
+
+    @mock.patch("tmux_util.capture_pane_visible_text")
+    @mock.patch("tmux_util.is_pane_in_copy_mode")
+    @mock.patch("tmux_util.get_pane_info")
+    def test_handle_capture_pane_by_pane_directly(self, mock_pane_info, mock_copy_mode, mock_capture):
+        mock_copy_mode.return_value = False
+        mock_capture.return_value = "Direct Pane Text"
+        mock_pane_info.return_value = {"tty": "/dev/pts/1", "session": "sess-direct", "pid": 123}
+
+        res = rpc_handler.handle_capture_pane({
+            "pane": "%5",
+            "last_lines": 50
+        })
+
+        self.assertIsNone(res["agent_name"])
+        self.assertIsNone(res["agent_id"])
+        self.assertEqual(res["tmux_pane"], "%5")
+        self.assertEqual(res["session"], "sess-direct")
+        self.assertEqual(res["content"], "Direct Pane Text")
+        mock_capture.assert_called_once_with("%5", last_lines=50, socket_path=None, include_ansi=False)
+
+    def test_handle_capture_pane_invalid_target_raises(self):
+        with self.assertRaises(ValueError):
+            rpc_handler.handle_capture_pane({
+                "agent_name": "non-existent"
+            })
+
 
 
 

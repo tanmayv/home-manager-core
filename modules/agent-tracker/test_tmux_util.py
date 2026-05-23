@@ -44,6 +44,36 @@ class TestTmuxUtil(unittest.TestCase):
         mock_enqueue.assert_any_call(["sleep", "0.5"])
         mock_enqueue.assert_any_call(["tmux", "send-keys", "-t", "%1", "Enter"])
 
+    @mock.patch("tmux_util.run_tmux_cmd")
+    def test_capture_pane_visible_text_strip_ansi(self, mock_run):
+        # Test capturing visible text with ANSI sequence stripping
+        mock_run.return_value = "Hello \x1b[31mWorld\x1b[0m!"
+        res = tmux_util.capture_pane_visible_text("%0", last_lines=100)
+        
+        mock_run.assert_called_once_with(["capture-pane", "-p", "-J", "-t", "%0", "-S", "-100"])
+        self.assertEqual(res, "Hello World!")
+
+    @mock.patch("tmux_util.run_tmux_cmd")
+    def test_capture_pane_visible_text_include_ansi(self, mock_run):
+        # Test capturing visible text including ANSI sequences
+        mock_run.return_value = "Hello \x1b[31mWorld\x1b[0m!"
+        res = tmux_util.capture_pane_visible_text("%0", last_lines=100, include_ansi=True)
+        
+        mock_run.assert_called_once_with(["capture-pane", "-p", "-J", "-t", "%0", "-S", "-100"])
+        self.assertEqual(res, "Hello \x1b[31mWorld\x1b[0m!")
+
+    @mock.patch("tmux_util.run_tmux_cmd")
+    def test_is_pane_in_copy_mode_true(self, mock_run):
+        mock_run.return_value = "1"
+        self.assertTrue(tmux_util.is_pane_in_copy_mode("%0"))
+        mock_run.assert_called_once_with(["display-message", "-p", "-t", "%0", "#{pane_in_mode}"])
+
+    @mock.patch("tmux_util.run_tmux_cmd")
+    def test_is_pane_in_copy_mode_false(self, mock_run):
+        mock_run.return_value = "0"
+        self.assertFalse(tmux_util.is_pane_in_copy_mode("%0"))
+        mock_run.assert_called_once_with(["display-message", "-p", "-t", "%0", "#{pane_in_mode}"])
+
 
 if __name__ == "__main__":
     unittest.main()

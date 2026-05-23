@@ -755,6 +755,91 @@ def handle_whoami(params: dict, caller_pid: int = None) -> dict:
     }
 
 
+def handle_capture_pane(params: dict, caller_pid: int = None) -> dict:
+    """Captures visible text and details for a specified agent or tmux pane."""
+    last_lines = params.get("last_lines", 200)
+    if last_lines is not None:
+        try:
+            last_lines = int(last_lines)
+        except ValueError:
+            raise ValueError("last_lines must be an integer")
+            
+    include_ansi = bool(params.get("include_ansi", False))
+
+    agent_name = None
+    agent_id = None
+    tmux_pane = params.get("tmux_pane") or params.get("pane")
+    tmux_socket = params.get("tmux_socket")
+    session = None
+
+    # Try to resolve via agent_name or agent_id
+    resolved_agent_name = _resolve_target_agent_name(params)
+    if resolved_agent_name:
+        agent_name = resolved_agent_name
+        info = state.get_agent(agent_name)
+        if info:
+            agent_id = info.get("agent_id")
+            tmux_pane = tmux_pane or info.get("tmux_pane")
+            tmux_socket = tmux_socket or info.get("tmux_socket")
+            session = info.get("session")
+    
+    # If no agent was resolved but we have a tmux_pane, look up if there is a matching agent.
+    if not agent_name and tmux_pane:
+        resolved_agent_name = state.get_agent_name_by_pane(tmux_pane)
+        if resolved_agent_name:
+            agent_name = resolved_agent_name
+            info = state.get_agent(agent_name)
+            if info:
+                agent_id = info.get("agent_id")
+                tmux_socket = tmux_socket or info.get("tmux_socket")
+                session = info.get("session")
+
+    # If we still don't have a tmux_pane, identify the caller agent (self-capture)
+    if not tmux_pane:
+        caller_name = _identify_agent(params, caller_pid)
+        if caller_name:
+            agent_name = caller_name
+            info = state.get_agent(agent_name)
+            if info:
+                agent_id = info.get("agent_id")
+                tmux_pane = info.get("tmux_pane")
+                tmux_socket = tmux_socket or info.get("tmux_socket")
+                session = info.get("session")
+
+    if not tmux_pane:
+        raise ValueError("Target agent or tmux pane could not be resolved")
+
+    # Query session info if not already retrieved
+    if not session:
+        pane_info = tmux_util.get_pane_info(tmux_pane)
+        if pane_info:
+            session = pane_info.get("session")
+
+    # Query copy-mode status
+    copy_mode = tmux_util.is_pane_in_copy_mode(tmux_pane, tmux_socket)
+
+    # Capture visible text
+    content = tmux_util.capture_pane_visible_text(
+        tmux_pane,
+        last_lines=last_lines,
+        socket_path=tmux_socket,
+        include_ansi=include_ansi
+    )
+
+    captured_at = _utc_now_isoformat()
+
+    return {
+        "agent_name": agent_name,
+        "agent_id": agent_id,
+        "tmux_pane": tmux_pane,
+        "session": session,
+        "copy_mode": copy_mode,
+        "captured_at": captured_at,
+        "lines_requested": last_lines,
+        "content": content
+    }
+
+
 def handle_publish_tracker_event(params: dict) -> dict:
     target_tracker_id = params.get("target_tracker_id")
     event_type = params.get("event_type")
@@ -789,7 +874,8 @@ dispatcher = {
     "whoami": handle_whoami,
     "unregister": handle_unregister,
     "publish_tracker_event": handle_publish_tracker_event,
-    "list_trackers": handle_list_trackers
+    "list_trackers": handle_list_trackers,
+    "capture_pane": handle_capture_pane
 }
 
 def handle_client(conn: socket.socket) -> None:
@@ -832,7 +918,7 @@ def handle_client(conn: socket.socket) -> None:
         if handler:
             try:
                 # Pass caller_pid to handlers that might need it
-                if method in ["get_inbox", "update_agent", "heartbeat", "send_message", "wait_events", "whoami", "list", "rename", "unregister", "spin_agent"]:
+                if method in ["get_inbox", "update_agent", "heartbeat", "send_message", "wait_events", "whoami", "list", "rename", "unregister", "spin_agent", "capture_pane"]:
                     result = handler(params, caller_pid=caller_pid)
                 else:
                     result = handler(params)

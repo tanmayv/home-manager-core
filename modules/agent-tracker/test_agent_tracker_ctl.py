@@ -190,6 +190,102 @@ class TestAgentTrackerCtl(unittest.TestCase):
         self.assertIn("lab: disconnected, last_success=never", out)
         self.assertIn("heartbeat:unreachable", out)
 
+    def test_capture_pane_parser_registration(self):
+        parser = ctl.build_parser()
+        # Test parsing typical capture-pane subcommand arguments
+        parsed = parser.parse_args(["capture-pane", "agent1", "--last", "100", "--format", "markdown", "--include-ansi"])
+        self.assertEqual(parsed.subcommand, "capture-pane")
+        self.assertEqual(parsed.target, "agent1")
+        self.assertEqual(parsed.last, 100)
+        self.assertEqual(parsed.format, "markdown")
+        self.assertTrue(parsed.include_ansi)
+        
+        # Test with explicit id and pane options
+        parsed2 = parser.parse_args(["capture-pane", "--id", "some-uuid", "--pane", "%5"])
+        self.assertIsNone(parsed2.target)
+        self.assertEqual(parsed2.id, "some-uuid")
+        self.assertEqual(parsed2.pane, "%5")
+        self.assertEqual(parsed2.last, 200) # default
+
+    def test_send_pane_parser_registration(self):
+        parser = ctl.build_parser()
+        # Test parsing typical send-pane subcommand arguments
+        parsed = parser.parse_args(["send-pane", "alice", "--source", "bob", "--last", "100", "--note", "Custom Note", "--format", "json"])
+        self.assertEqual(parsed.subcommand, "send-pane")
+        self.assertEqual(parsed.target_address, "alice")
+        self.assertEqual(parsed.source, "bob")
+        self.assertEqual(parsed.last, 100)
+        self.assertEqual(parsed.note, "Custom Note")
+        self.assertEqual(parsed.format, "json")
+        
+        # Test default values
+        parsed2 = parser.parse_args(["send-pane", "alice"])
+        self.assertEqual(parsed2.subcommand, "send-pane")
+        self.assertEqual(parsed2.target_address, "alice")
+        self.assertIsNone(parsed2.source)
+        self.assertEqual(parsed2.last, 200)
+        self.assertIsNone(parsed2.note)
+        self.assertEqual(parsed2.format, "markdown")
+
+    @mock.patch("ctl_commands.send_pane.call_rpc")
+    def test_send_pane_handler_execution(self, mock_call_rpc):
+        # 1. Mock call_rpc("capture_pane") and send_message response
+        mock_call_rpc.side_effect = [
+            {
+                "agent_name": "bob",
+                "agent_id": "id-bob",
+                "tmux_pane": "%1",
+                "session": "sess-bob",
+                "copy_mode": False,
+                "captured_at": "2026-05-23T12:00:00Z",
+                "lines_requested": 100,
+                "content": "Bob's Screen Content"
+            },
+            True # call_rpc("send_message") success
+        ]
+        
+        # Import the send_pane command module to mock/test handler
+        from ctl_commands import send_pane
+        
+        # Build mocked args namespace
+        class MockArgs:
+            target_address = "alice"
+            source = "bob"
+            id = "id-bob"
+            pane = "%1"
+            last = 100
+            note = "Check this out"
+            format = "markdown"
+            
+        # Run handler
+        send_pane.handle(MockArgs())
+        
+        # Verify first call: call_rpc("capture_pane")
+        mock_call_rpc.assert_any_call("capture_pane", {
+            "last_lines": 100,
+            "include_ansi": False,
+            "agent_name": "bob",
+            "agent_id": "id-bob",
+            "tmux_pane": "%1"
+        })
+        
+        # Verify second call: call_rpc("send_message")
+        expected_msg = (
+            "### Pane Capture Snapshot from bob (id-bob)\n"
+            "- **Pane:** %1\n"
+            "- **Session:** sess-bob\n"
+            "- **Copy Mode:** Inactive\n"
+            "- **Captured At:** 2026-05-23T12:00:00Z\n"
+            "- **User Note:** Check this out\n"
+            "\n```\n"
+            "Bob's Screen Content\n"
+            "```\n"
+        )
+        mock_call_rpc.assert_any_call("send_message", {
+            "target_address": "alice",
+            "message": expected_msg
+        })
+
 
 if __name__ == "__main__":
     unittest.main()
