@@ -100,6 +100,7 @@ To update, simply run `nix flake update` in your personal repository.
 | `registry-token-file` | User-readable file containing the shared Bearer token used for registry/sidecar auth and as the default token for registry entries without `token-file`. | `null` |
 | `http-port` | Local HTTP sidecar port used for observer and registry delivery. | `19876` |
 | `registry-heartbeat-seconds` | How often the tracker heartbeats to the registry. | `30` |
+| `capture-pane-default-lines` | Default number of tmux pane history lines captured by `agent-tracker-ctl capture-pane` and `agent-tracker-ctl send-pane` when `--last` is omitted. | `25` |
 
 ### Skill Publishing (`skill-publishing` block)
 

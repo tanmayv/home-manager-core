@@ -97,5 +97,11 @@ with lib;
       default = true;
       description = "Enable tmux send-keys delivery verification and advisory copy-mode cancellation.";
     };
+
+    capturePaneDefaultLines = mkOption {
+      type = types.ints.positive;
+      default = 25;
+      description = "Default number of tmux pane history lines captured by agent-tracker capture-pane and send-pane commands when --last is omitted.";
+    };
   };
 }

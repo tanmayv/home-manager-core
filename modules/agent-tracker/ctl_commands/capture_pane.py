@@ -1,14 +1,14 @@
 import os
 import sys
 import json
-from .common import call_rpc
+from .common import call_rpc, default_capture_pane_lines
 
 def register(subparsers):
     parser = subparsers.add_parser("capture-pane", help="Capture visible text of a pane")
     parser.add_argument("target", nargs="?", help="Target agent display name (or ID, or pane)")
     parser.add_argument("--id", help="Target agent ID (UUID)")
     parser.add_argument("--pane", help="Target tmux pane ID (e.g., %%0)")
-    parser.add_argument("--last", type=int, default=200, help="Number of history/scrollback lines to capture")
+    parser.add_argument("--last", type=int, default=default_capture_pane_lines(), help="Number of history/scrollback lines to capture")
     parser.add_argument(
         "--format",
         choices=["text", "markdown", "json"],

@@ -475,7 +475,13 @@ def _handle_remote_pane_capture(payload: dict):
     """Handles a remote request to capture a local pane and send the snapshot to a target."""
     source = payload.get("source")
     target = payload.get("target")
-    last = payload.get("last", 200)
+    try:
+        default_capture_lines = int(os.environ.get("AGENT_TRACKER_CAPTURE_PANE_DEFAULT_LINES", "25"))
+    except (TypeError, ValueError):
+        default_capture_lines = 25
+    if default_capture_lines <= 0:
+        default_capture_lines = 25
+    last = payload.get("last", default_capture_lines)
     fmt = payload.get("format", "markdown")
     note = payload.get("note")
     include_ansi = bool(payload.get("include_ansi", False))

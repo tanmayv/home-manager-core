@@ -1001,6 +1001,24 @@ class TestRpcHandler(unittest.TestCase):
         self.assertEqual(res["content"], "Direct Pane Text")
         mock_capture.assert_called_once_with("%5", last_lines=50, socket_path=None, include_ansi=False)
 
+    @mock.patch("tmux_util.capture_pane_visible_text")
+    @mock.patch("tmux_util.is_pane_in_copy_mode")
+    def test_handle_capture_pane_default_lines_from_env(self, mock_copy_mode, mock_capture):
+        state.set_agent("agent1", {
+            "agent_id": "id-1",
+            "tmux_pane": "%1",
+            "tmux_socket": "sock",
+            "session": "sess-1"
+        })
+        mock_copy_mode.return_value = False
+        mock_capture.return_value = "Default lines text"
+
+        with mock.patch.dict(os.environ, {"AGENT_TRACKER_CAPTURE_PANE_DEFAULT_LINES": "42"}, clear=False):
+            res = rpc_handler.handle_capture_pane({"agent_id": "id-1"})
+
+        self.assertEqual(res["lines_requested"], 42)
+        mock_capture.assert_called_once_with("%1", last_lines=42, socket_path="sock", include_ansi=False)
+
     def test_handle_capture_pane_invalid_target_raises(self):
         with self.assertRaises(ValueError):
             rpc_handler.handle_capture_pane({

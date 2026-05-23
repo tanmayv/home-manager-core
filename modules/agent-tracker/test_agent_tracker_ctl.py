@@ -190,6 +190,7 @@ class TestAgentTrackerCtl(unittest.TestCase):
         self.assertIn("lab: disconnected, last_success=never", out)
         self.assertIn("heartbeat:unreachable", out)
 
+    @mock.patch.dict(os.environ, {}, clear=True)
     def test_capture_pane_parser_registration(self):
         parser = ctl.build_parser()
         # Test parsing typical capture-pane subcommand arguments
@@ -205,8 +206,9 @@ class TestAgentTrackerCtl(unittest.TestCase):
         self.assertIsNone(parsed2.target)
         self.assertEqual(parsed2.id, "some-uuid")
         self.assertEqual(parsed2.pane, "%5")
-        self.assertEqual(parsed2.last, 200) # default
+        self.assertEqual(parsed2.last, 25) # default
 
+    @mock.patch.dict(os.environ, {}, clear=True)
     def test_send_pane_parser_registration(self):
         parser = ctl.build_parser()
         # Test parsing typical send-pane subcommand arguments
@@ -223,9 +225,15 @@ class TestAgentTrackerCtl(unittest.TestCase):
         self.assertEqual(parsed2.subcommand, "send-pane")
         self.assertEqual(parsed2.target_address, "alice")
         self.assertIsNone(parsed2.source)
-        self.assertEqual(parsed2.last, 200)
+        self.assertEqual(parsed2.last, 25)
         self.assertIsNone(parsed2.note)
         self.assertEqual(parsed2.format, "markdown")
+
+    @mock.patch.dict(os.environ, {"AGENT_TRACKER_CAPTURE_PANE_DEFAULT_LINES": "42"}, clear=True)
+    def test_capture_and_send_pane_default_lines_follow_env(self):
+        parser = ctl.build_parser()
+        self.assertEqual(parser.parse_args(["capture-pane", "agent1"]).last, 42)
+        self.assertEqual(parser.parse_args(["send-pane", "alice"]).last, 42)
 
     @mock.patch("ctl_commands.send_pane.call_rpc")
     @mock.patch.dict("os.environ", {}, clear=True)

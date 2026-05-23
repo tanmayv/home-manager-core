@@ -16,6 +16,16 @@ SOCKET_PATH = os.environ.get("AGENT_TRACKER_SOCKET", os.path.join(CACHE_DIR, "ag
 LOCK_PATH = os.path.join(CACHE_DIR, "agent-tracker.lock")
 REGISTRY_STATUS_PATH = os.path.join(CACHE_DIR, "registry-status.json")
 DEFAULT_STARTUP_TIMEOUT = 5.0
+DEFAULT_CAPTURE_PANE_LINES = 25
+
+
+def default_capture_pane_lines() -> int:
+    raw = os.environ.get("AGENT_TRACKER_CAPTURE_PANE_DEFAULT_LINES", str(DEFAULT_CAPTURE_PANE_LINES))
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_CAPTURE_PANE_LINES
+    return value if value > 0 else DEFAULT_CAPTURE_PANE_LINES
 
 
 def _can_connect() -> bool:

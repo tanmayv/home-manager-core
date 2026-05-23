@@ -31,6 +31,7 @@
     registry-token-file = null; # required when registry-auth = true
     http-port = 19876;
     registry-heartbeat-seconds = 30;
+    capture-pane-default-lines = 25;
   };
   enable-skill-publishing = false;
   skill-publishing = {

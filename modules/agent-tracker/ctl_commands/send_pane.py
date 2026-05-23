@@ -3,7 +3,7 @@ import sys
 import json
 import socket
 import uuid
-from .common import call_rpc
+from .common import call_rpc, default_capture_pane_lines
 
 def register(subparsers):
     parser = subparsers.add_parser("send-pane", help="Send a tmux pane snapshot to a target agent")
@@ -11,7 +11,7 @@ def register(subparsers):
     parser.add_argument("--source", help="Display name of the source agent to capture (defaults to self)")
     parser.add_argument("--id", help="ID of the source agent to capture")
     parser.add_argument("--pane", help="tmux pane ID of the source to capture (e.g., %%0)")
-    parser.add_argument("--last", type=int, default=200, help="Number of history/scrollback lines to capture")
+    parser.add_argument("--last", type=int, default=default_capture_pane_lines(), help="Number of history/scrollback lines to capture")
     parser.add_argument("--note", help="Optional custom note to attach to the snapshot")
     parser.add_argument(
         "--format",

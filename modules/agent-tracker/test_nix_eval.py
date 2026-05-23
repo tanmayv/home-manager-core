@@ -118,6 +118,37 @@ in builtins.toJSON {{
             {"name": "lab", "token-file": None, "url": "https://lab.example"},
         ])
 
+    def test_agent_tracker_capture_pane_default_lines_user_setting_evaluates(self):
+        repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        expr = f'''
+let
+  flake = builtins.getFlake "path:{repo}";
+  system = builtins.currentSystem;
+  pkgs = import flake.inputs.nixpkgs {{ inherit system; }};
+  hm = flake.inputs.home-manager;
+  cfg = hm.lib.homeManagerConfiguration {{
+    inherit pkgs;
+    modules = [
+      ({{ lib, ... }}: {{
+        options.programs.tmux.statusBar.extraLines = lib.mkOption {{ type = lib.types.listOf lib.types.anything; default = []; }};
+      }})
+      {repo}/modules/agent-tracker/default.nix
+      {{ home.username = "u"; home.homeDirectory = "/tmp/u"; home.stateVersion = "24.05"; }}
+    ];
+    extraSpecialArgs = {{
+      userSettings = {{
+        enable-agent-tracker = true;
+        agent-tracker = {{
+          capture-pane-default-lines = 42;
+        }};
+      }};
+    }};
+  }};
+in builtins.toJSON cfg.config.services.agent-tracker.capturePaneDefaultLines
+'''
+        out = subprocess.check_output(["nix", "eval", "--impure", "--raw", "--expr", expr], text=True).strip()
+        self.assertEqual(out, "42")
+
     def test_darwin_launchd_agent_is_run_at_load_without_keepalive_loop(self):
         repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         expr = f'''

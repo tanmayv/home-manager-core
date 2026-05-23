@@ -50,6 +50,7 @@ let
     AGENT_REGISTRY_HEARTBEAT_SECONDS = toString cfg.registryHeartbeatSeconds;
     AGENT_REGISTRY_AUTH = if cfg.registryAuth then "true" else "false";
     ENABLE_RELIABLE_SEND_KEYS = if cfg.enableReliableSendKeys then "true" else "false";
+    AGENT_TRACKER_CAPTURE_PANE_DEFAULT_LINES = toString cfg.capturePaneDefaultLines;
     # systemd user services and launchd agents both start with a minimal PATH.
     # agent-tracker intentionally invokes `tmux` and `sleep` by name from
     # Python, so provide an explicit cross-platform tool PATH instead of
@@ -74,6 +75,7 @@ in
       services.agent-tracker.httpPort = mkDefault (agentTrackerSettings.http-port or 19876);
       services.agent-tracker.registryHeartbeatSeconds = mkDefault (agentTrackerSettings.registry-heartbeat-seconds or 30);
       services.agent-tracker.enableReliableSendKeys = mkDefault (agentTrackerSettings.enable-reliable-send-keys or true);
+      services.agent-tracker.capturePaneDefaultLines = mkDefault (agentTrackerSettings.capture-pane-default-lines or 25);
     }
 
     (mkIf cfg.enable {
@@ -112,6 +114,7 @@ in
           os.environ.setdefault("AGENT_REGISTRY_HEARTBEAT_SECONDS", "${toString cfg.registryHeartbeatSeconds}")
           os.environ.setdefault("AGENT_REGISTRY_AUTH", "${if cfg.registryAuth then "true" else "false"}")
           os.environ.setdefault("ENABLE_RELIABLE_SEND_KEYS", "${if cfg.enableReliableSendKeys then "true" else "false"}")
+          os.environ.setdefault("AGENT_TRACKER_CAPTURE_PANE_DEFAULT_LINES", "${toString cfg.capturePaneDefaultLines}")
           ${lib.optionalString (cfg.registries != []) ''os.environ.setdefault("AGENT_REGISTRIES_JSON", ${builtins.toJSON (builtins.toJSON cfg.registries)})''}
           os.environ.setdefault("PALETTE_COLOR8", "${palette.color8}")
           os.environ.setdefault("PALETTE_COLOR1", "${palette.color1}")

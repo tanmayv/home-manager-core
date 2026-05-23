@@ -18,6 +18,16 @@ from contextlib import contextmanager
 
 BUFFER_SIZE = 4096
 LOCAL_HOSTNAME = os.environ.get("AGENT_TRACKER_HOSTNAME", socket.gethostname())
+DEFAULT_CAPTURE_PANE_LINES = 25
+
+
+def _default_capture_pane_lines() -> int:
+    raw = os.environ.get("AGENT_TRACKER_CAPTURE_PANE_DEFAULT_LINES", str(DEFAULT_CAPTURE_PANE_LINES))
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_CAPTURE_PANE_LINES
+    return value if value > 0 else DEFAULT_CAPTURE_PANE_LINES
 
 
 @contextmanager
@@ -762,7 +772,7 @@ def handle_whoami(params: dict, caller_pid: int = None) -> dict:
 
 def handle_capture_pane(params: dict, caller_pid: int = None) -> dict:
     """Captures visible text and details for a specified agent or tmux pane."""
-    last_lines = params.get("last_lines", 200)
+    last_lines = params.get("last_lines", _default_capture_pane_lines())
     if last_lines is not None:
         try:
             last_lines = int(last_lines)
