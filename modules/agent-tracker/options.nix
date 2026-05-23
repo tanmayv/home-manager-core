@@ -49,7 +49,7 @@ with lib;
     registryUrl = mkOption {
       type = types.nullOr types.str;
       default = null;
-      description = "Optional agent-registry base URL.";
+      description = "DEPRECATED: Optional agent-registry base URL. Please use services.agent-tracker.registries instead.";
     };
 
     registries = mkOption {

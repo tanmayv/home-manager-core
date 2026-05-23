@@ -58,7 +58,7 @@ let
   } // lib.optionalAttrs (cfg.registries != []) {
     AGENT_REGISTRIES_JSON = builtins.toJSON cfg.registries;
   };
-  monitorEnv = lib.mapAttrsToList (name: value: "${name}=${value}") monitorEnvVars;
+  monitorEnv = lib.mapAttrsToList (name: value: "${name}=\"${builtins.replaceStrings ["\""] ["\\\""] value}\"") monitorEnvVars;
 in
 {
   imports = [
@@ -86,6 +86,10 @@ in
           assertion = !cfg.registryAuth || cfg.registryTokenFile != null;
           message = "services.agent-tracker.registryTokenFile is required when registryAuth is enabled.";
         }
+        {
+          assertion = cfg.registryUrl == null;
+          message = "services.agent-tracker.registryUrl is deprecated. Please use services.agent-tracker.registries instead.";
+        }
       ];
 
       home.activation.ensureAgentTrackerCacheDir = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
@@ -108,8 +112,6 @@ in
           os.environ.setdefault("AGENT_REGISTRY_HEARTBEAT_SECONDS", "${toString cfg.registryHeartbeatSeconds}")
           os.environ.setdefault("AGENT_REGISTRY_AUTH", "${if cfg.registryAuth then "true" else "false"}")
           os.environ.setdefault("ENABLE_RELIABLE_SEND_KEYS", "${if cfg.enableReliableSendKeys then "true" else "false"}")
-          ${lib.optionalString (cfg.registryUrl != null && cfg.registries == []) ''os.environ.setdefault("AGENT_REGISTRY_URL", "${cfg.registryUrl}")''}
-          ${lib.optionalString (cfg.registryTokenFile != null && cfg.registries == []) ''os.environ.setdefault("AGENT_REGISTRY_TOKEN", open(${builtins.toJSON (toString cfg.registryTokenFile)}).read().strip())''}
           ${lib.optionalString (cfg.registries != []) ''os.environ.setdefault("AGENT_REGISTRIES_JSON", ${builtins.toJSON (builtins.toJSON cfg.registries)})''}
           os.environ.setdefault("PALETTE_COLOR8", "${palette.color8}")
           os.environ.setdefault("PALETTE_COLOR1", "${palette.color1}")
