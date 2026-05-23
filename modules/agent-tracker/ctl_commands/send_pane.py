@@ -149,11 +149,19 @@ def handle(args):
         else:
             send_params["agent_name"] = args.target_address
         
-        # Expose our own sender name if possible
-        if "AGENT_ID" in os.environ:
-            send_params["sender_id"] = os.environ["AGENT_ID"]
-        elif "AGENT_NAME" in os.environ:
-            send_params["sender_name"] = os.environ["AGENT_NAME"]
+        # Make the snapshot appear in the conversation with the captured source
+        # agent.  Remote pane captures already deliver with the remote source as
+        # sender; local captures should do the same instead of sending the
+        # message as agent-communicator/cli-user.
+        if snapshot.get("agent_id"):
+            send_params["sender_id"] = snapshot.get("agent_id")
+        if snapshot.get("agent_name"):
+            send_params["sender_name"] = snapshot.get("agent_name")
+        if "sender_id" not in send_params and "sender_name" not in send_params:
+            if "AGENT_ID" in os.environ:
+                send_params["sender_id"] = os.environ["AGENT_ID"]
+            elif "AGENT_NAME" in os.environ:
+                send_params["sender_name"] = os.environ["AGENT_NAME"]
 
         # 5. Deliver the message via send_message RPC
         res = call_rpc("send_message", send_params)

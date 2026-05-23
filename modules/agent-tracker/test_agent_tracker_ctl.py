@@ -285,7 +285,9 @@ class TestAgentTrackerCtl(unittest.TestCase):
         )
         mock_call_rpc.assert_any_call("send_message", {
             "agent_name": "alice",
-            "message": expected_msg
+            "message": expected_msg,
+            "sender_id": "id-bob",
+            "sender_name": "bob",
         })
 
 
