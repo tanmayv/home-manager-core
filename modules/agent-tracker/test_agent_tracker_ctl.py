@@ -228,6 +228,7 @@ class TestAgentTrackerCtl(unittest.TestCase):
         self.assertEqual(parsed2.format, "markdown")
 
     @mock.patch("ctl_commands.send_pane.call_rpc")
+    @mock.patch.dict("os.environ", {}, clear=True)
     def test_send_pane_handler_execution(self, mock_call_rpc):
         # 1. Mock call_rpc("capture_pane") and send_message response
         mock_call_rpc.side_effect = [
@@ -257,8 +258,9 @@ class TestAgentTrackerCtl(unittest.TestCase):
             note = "Check this out"
             format = "markdown"
             
-        # Run handler
-        send_pane.handle(MockArgs())
+        # Run handler in a clean environment
+        with mock.patch.dict(os.environ, {}, clear=True):
+            send_pane.handle(MockArgs())
         
         # Verify first call: call_rpc("capture_pane")
         mock_call_rpc.assert_any_call("capture_pane", {
@@ -282,7 +284,7 @@ class TestAgentTrackerCtl(unittest.TestCase):
             "```\n"
         )
         mock_call_rpc.assert_any_call("send_message", {
-            "target_address": "alice",
+            "agent_name": "alice",
             "message": expected_msg
         })
 

@@ -46,6 +46,12 @@ with lib;
       description = "HTTP sidecar port for observer/registry access.";
     };
 
+    registryUrl = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = "Optional agent-registry base URL.";
+    };
+
     registries = mkOption {
       type = types.listOf (types.submodule {
         options = {
