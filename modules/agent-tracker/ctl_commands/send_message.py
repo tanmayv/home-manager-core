@@ -21,6 +21,7 @@ def register(subparsers):
     parser.add_argument("target", nargs="?", metavar="TARGET", help="Local agent name/UUID or remote HOST/NAME_OR_UUID")
     parser.add_argument("message", help="Message text")
     parser.add_argument("--id", dest="agent_id", help="Target local agent ID (legacy local-only form)")
+    parser.add_argument("--verify", action="store_true", help="Wait for delivery confirmation in target pane")
     parser.set_defaults(handler=handle)
 
 
@@ -41,7 +42,16 @@ def handle(args):
         params["agent_id"] = args.target
     else:
         params["agent_name"] = args.target
+    
+    if args.verify:
+        params["verify"] = True
+
     res = call_rpc("send_message", params)
     if isinstance(res, dict) and res.get("warning"):
         print(res["warning"], file=sys.stderr)
+        
+    if isinstance(res, dict) and not res.get("success", True):
+        print(f"Error: {res.get('error', 'Notification delivery failed')}", file=sys.stderr)
+        sys.exit(1)
+
     print("Message sent.")

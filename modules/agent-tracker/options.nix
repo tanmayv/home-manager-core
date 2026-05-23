@@ -91,5 +91,11 @@ with lib;
       default = 30;
       description = "Registry heartbeat interval in seconds.";
     };
+
+    enableReliableSendKeys = mkOption {
+      type = types.bool;
+      default = true;
+      description = "Enable tmux send-keys delivery verification and advisory copy-mode cancellation.";
+    };
   };
 }

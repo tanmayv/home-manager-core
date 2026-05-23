@@ -4,6 +4,7 @@ import threading
 import queue
 import sys
 import os
+import tmux_reliability
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', stream=sys.stderr)
 
@@ -254,3 +255,11 @@ def spin_agent(agent_name, command, target_pane=None, session=None, directory=No
     except subprocess.CalledProcessError as e:
         logging.error("Tmux spin failed cmd=%s stderr=%s", cmd if 'cmd' in locals() else tmux_cmd, e.stderr.decode())
         raise
+
+def send_keys_reliable(pane_id, keys, socket_path=None, timeout=10):
+    """Sends keys to a pane reliably, verifying they appeared on screen."""
+    return tmux_reliability.send_keys_reliable(pane_id, keys, socket_path, timeout)
+
+def execute_command_reliable(pane_id, command, socket_path=None, timeout=30):
+    """Executes a command in a pane reliably, waiting for execution and returning the exit code."""
+    return tmux_reliability.execute_command_reliable(pane_id, command, socket_path, timeout)

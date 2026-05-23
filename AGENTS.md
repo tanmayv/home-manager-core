@@ -1,98 +1,46 @@
-# AI Agents & Skills Guidelines
+# Workspace Tracking (AGENTS.md)
+
+## Overview
+- **Workspace ID**: `4ecccc12-2991-4ff5-a088-fd2e4bce5a16`
+- **Last Updated**: `2026-05-23T15:03:50Z`
+- **Goal**: Implement and package a reusable Tmux send-keys reliability Python library, and integrate it into `agent-tracker-ctl`.
+- **Links**: [Implementation Plan](file:///usr/local/google/home/tanmayvijay/.gemini/jetski/brain/4ecccc12-2991-4ff5-a088-fd2e4bce5a16/tmux_send_keys_reliability_plan.md)
+
+## Active Agents
+| Agent ID | Agent Name | Role / Purpose | Process Info | Status | Last Active |
+|---|---|---|---|---|---|
+| jetski-hm-core | jetski-hm-core | Orchestrator & Coordinator | PID: 25711 (Pane %1) | Working | 2026-05-23T15:03:50Z |
+| 3ea18b27-13e5-4a4c-9376-72922ae9e616 | jetski-coder-agent | Software Engineer | Subagent | Working | 2026-05-23T15:03:50Z |
+| 1e08a973-9b35-45bc-b451-d2527c1782a9 | jetski-review-agent | Test & Review Engineer | Subagent | Working | 2026-05-23T15:03:50Z |
+
+## Task Allocation & Progress
+| Task ID | Description | Assigned Agent ID | Status | Priority | Dependencies | Notes / Artifacts |
+|---|---|---|---|---|---|---|
+| task-01 | Design and draft implementation blueprint | jetski-hm-core | Completed | P0 | | [Plan](file:///usr/local/google/home/tanmayvijay/.gemini/jetski/brain/4ecccc12-2991-4ff5-a088-fd2e4bce5a16/tmux_send_keys_reliability_plan.md) |
+| task-02 | Scaffold `tmux_reliability.py` library | 774e6b0e-2a0f-41b2-8e7a-7984bc549c8d | Completed | P0 | task-01 | Phase 1 Scaffolding |
+| task-03 | Expose safe methods in `tmux_util.py` | 774e6b0e-2a0f-41b2-8e7a-7984bc549c8d | Completed | P0 | task-02 | Phase 1 Exposing |
+| task-04 | Review and validate Phase 1 changes | 688d3c84-35ee-4d0c-8f74-c351717fed78 | Completed | P0 | task-03 | Phase 1 Code Review |
+| task-05 | Phase 2 Shadow daemon integration | 774e6b0e-2a0f-41b2-8e7a-7984bc549c8d | Completed | P0 | task-04 | Shadow implementation & daemon fallbacks |
+| task-06 | Phase 3 CLI `--verify` command integration | 774e6b0e-2a0f-41b2-8e7a-7984bc549c8d | Completed | P0 | task-05 | `agent-tracker-ctl` client commands |
+| task-07 | Phase 4 Graduation and safe feature flags | jetski-hm-core | Completed | P1 | task-06 | Default behaviors and setup.nix switches |
+| task-08 | Remove deferred notification queuing and flushing logic | 3ea18b27-13e5-4a4c-9376-72922ae9e616 | Completed | P0 | task-07 | Daemon refactoring |
+| task-09 | Review and validate removal of queuing logic | 1e08a973-9b35-45bc-b451-d2527c1782a9 | Completed | P0 | task-08 | Integration validation |
+
+## Active Blockers & Dependencies
+| Blocked Agent ID | Blocked Task ID | Blocking Task ID | Blocking Agent ID | Reason |
+|---|---|---|---|---|
+| None | | | | |
+
+## Decisions & Design Notes Log
+- **2026-05-23T08:06:00Z** [jetski-hm-core]: DECISION: Implement concatenated sentinel echoing (`echo RESULT_""__SENTINEL__""_EXIT=$?`) to completely avoid race conditions in stdout matching.
+- **2026-05-23T08:52:00Z** [jetski-hm-core]: DECISION: Spawned jetski-coder-agent and jetski-review-agent as subagents to execute Phase 1 implementation and review.
+- **2026-05-23T14:24:30Z** [jetski-review-agent]: DECISION: Formal Phase 1 approval granted. Integration tests passed successfully on both Bash and Zsh, validating copy-mode recovery and Zsh globbing safety.
+- **2026-05-23T14:26:40Z** [jetski-review-agent]: DECISION: Formal Phase 2 approval granted. Shadow integration and unit tests verified successfully. Fallback safety matches 100% zero-message-loss specification.
+- **2026-05-23T14:30:00Z** [jetski-review-agent]: DECISION: Formal Phase 3 approval granted. CLI integration and synchronous blocking verify path tested successfully. Dead-pane exits 1 and active-pane exits 0 as specified.
+- **2026-05-23T14:31:00Z** [jetski-hm-core]: DECISION: Formal Phase 4 graduation completed. Introduced enableReliableSendKeys Nix configurations, environment mappings, and daemon flags to allow fully togglable reliability integrations.
+- **2026-05-23T15:06:00Z** [jetski-review-agent]: DECISION: Formal approval granted for removal of deferred notification queuing and flushing logic. Verified clean deletion of queuing/flushing helpers, immediately dispatched local notifications, and 100% pass rate on 117 unit tests and CLI integration tests.
 
 
-## Setup & Installation
-
-To enable the AI Agent ecosystem in your Home Manager configuration, follow these steps:
-
-### 1. Bootstrap Your Configuration
-If you are setting this up for the first time, you can bootstrap your configuration by cloning this repository and using the provided flake template:
-
-1. **Clone the Repository**:
-   ```bash
-   git clone sso://user/tanmayvijay/home-manager-minimal-ai ~/minimal-cloudtop
-   ```
-
-2. **Initialize Home Manager Config**:
-   Create the default Home Manager directory and copy the template files:
-   ```bash
-   mkdir -p ~/.config/home-manager
-   cp -r ~/minimal-cloudtop/flake-template/* ~/.config/home-manager/
-   ```
-
-3. **Configure Your Username/LDAP**:
-   Open `~/.config/home-manager/flake.nix` and replace `"your-username"` with your actual LDAP/username (lines 51-52):
-   ```nix
-   home.username = "your-ldap";
-   home.homeDirectory = "/usr/local/google/home/your-ldap";
-   ```
-   Also edit `~/.config/home-manager/setup.nix` to set `username = "your-ldap";`.
-
-4. **Initial Build**:
-   Apply the configuration for the first time:
-   ```bash
-   nix run home-manager -- switch -b backup --flake "~/.config/home-manager#cloudtop"
-   ```
-
-### 2. Configure AI Agent Features
-Once bootstrapped, you can customize and enable the AI Agent features in `~/.config/home-manager/setup.nix`:
-
-1. **Enable AI Workflow**: In your `setup.nix` file, ensure the `enable-ai-workflow` flag is set to `true`:
-   ```nix
-   enable-ai-workflow = true;
-   ```
-
-2. **Configure AI Features**: You can selectively enable specific AI capabilities within the `ai_features` block in `setup.nix`:
-   ```nix
-   ai_features = {
-     enable_agent_knowledge = true;        # Enables persistent markdown knowledge base in ~/agent_knowledge
-     enable_ai_ssa_creator_skill = true;   # Enables skill creator agent
-     enable_tmux_based_agent_comms = true; # Enables inter-agent communication (inbox, wrapper scripts)
-   };
-   ```
-
-3. **Enable Agent Tracker**: The Agent Tracker daemon monitors active agents across sessions and updates your tmux status bar.
-   * In `setup.nix`, ensure the tracker is enabled:
-     ```nix
-     enable-agent-tracker = true;
-     ```
-   * The tracker runs as a systemd user service (`agent-tracker.service`) and starts automatically upon successful build.
-
-4. **Rebuild**: Apply the changes by running:
-   ```bash
-   build-and-switch
-   ```
-
----
-
-## 1. The Independent Agent Model
-Unlike traditional AI workflows that use hidden sub-agents, this configuration treats agents as independent peers.
-- **Visibility**: Agents should execute their tasks in visible tmux panes, allowing the user to monitor progress and intervene if necessary.
-- **Communication**: Agents communicate across sessions using the established inter-agent protocol (`send-message-to-agent`, `waiting`, `iamdone`).
-- **Identity**: Agents MUST announce their identity in their tmux pane border using the custom `@agent_name` option (`tmux set-option -p @agent_name "YourName"`). This enables other agents to reliably discover and target them.
-
-## 2. Managing Configuration Options
-All user-facing feature toggles and settings are centralized in `setup.nix`.
-- **Modularity**: If an agent creates a new feature or skill, it should be wrapped in an appropriate `enable_` flag within the `ai_features` block of `setup.nix`.
-- **Documentation Obligation**: **CRITICAL:** Whenever a new configuration flag or core setting is added to `setup.nix`, the agent MUST update `docs/Customization.md` to document the new flag, its default state, and its behavior when toggled `true` or `false`.
-
-## 3. Agent Knowledge Base
-Agents have access to a persistent, user-visible knowledge base located at `~/agent_knowledge` (configurable via `local_agent_knowledge_dir` in `setup.nix`).
-- **User Control**: Agents should not modify or create notes autonomously without prompting or explicit instruction from the user.
-- **Format**: All knowledge notes must be in standard Markdown (`.md`) format.
-
-## 4. Agent vs. Skill
-When extending capabilities, always prefer creating a **Skill** first. Only create a full **Agent** if the task requires:
-- High autonomy and long-running, complex state management.
-- Specialized, agent-specific configuration (`agent.json`, `config.yaml`).
-- Orchestration of multiple other skills or peer agents.
-
-## 5. VM-Based Testing
-If the reusable local test VM project exists at `~/projects/nix/test-vm`, agents may use it for NixOS testing when appropriate instead of applying risky system changes directly on the host machine.
-
-- **Condition**: Only use this workflow if `~/projects/nix/test-vm` exists.
-- **Preferred Use**: Use it for NixOS module/service validation, remote `nixos-rebuild test`, closure pushing, and SSH/journal inspection.
-- **Safety Preference**: Prefer `nixos-rebuild test` before `switch` when targeting the VM.
-- **Scope**: Keep host changes minimal; use the VM especially for changes that could disrupt local services, SSH, or agent workflows.
-- **Shared Resource**: Treat the VM as a reusable shared environment; avoid casually breaking SSH access, the `dev` user, or the base VM behavior.
-- **Instructions**: Follow `~/projects/nix/test-vm/AGENTS.md` for the exact workflow and safety guidance.
+## Key Artifacts & Links
+- Reference Tool: [tmux_safe_send.py](file:///usr/local/google/home/tanmayvijay/.gemini/jetski/brain/4ecccc12-2991-4ff5-a088-fd2e4bce5a16/scratch/tmux_safe_send.py)
+- Rollout Blueprint: [tmux_send_keys_reliability_plan.md](file:///usr/local/google/home/tanmayvijay/.gemini/jetski/brain/4ecccc12-2991-4ff5-a088-fd2e4bce5a16/tmux_send_keys_reliability_plan.md)

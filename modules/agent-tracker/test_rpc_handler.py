@@ -302,7 +302,8 @@ class TestRpcHandler(unittest.TestCase):
         self.assertEqual(info["agent_id"], "id-1")
         self.assertEqual(info["tmux_pane"], "%2")
 
-    def test_send_message_targets_agent_id(self):
+    @mock.patch("tmux_util.send_keys")
+    def test_send_message_targets_agent_id(self, send_keys):
         inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
         try:
             if os.path.exists(inbox_path):
@@ -322,7 +323,8 @@ class TestRpcHandler(unittest.TestCase):
                 rpc_handler.handle_send_message({"agent_id": "id-1", "message": "hello", "sender_name": "tester"})
             )
             info = state.get_agent("agent1")
-            self.assertEqual(info["pending_notifications"], [{"sender": "tester", "message_id": None, "sender_agent_id": None, "sender_tracker_id": registry_client.TRACKER_ID}])
+            self.assertEqual(info.get("pending_notifications", []), [])
+            send_keys.assert_called_once_with("%1", "New message in inbox from tester", "sock")
             with open(inbox_path, "r") as f:
                 message = json.loads(f.readline())
             timestamp = datetime.datetime.fromisoformat(message["timestamp"])
@@ -764,7 +766,7 @@ class TestRpcHandler(unittest.TestCase):
                 os.remove(inbox_path)
 
     @mock.patch("tmux_util.send_keys")
-    def test_busy_agent_pending_notification_flush(self, send_keys):
+    def test_busy_agent_notifies_immediately(self, send_keys):
         inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
         try:
             if os.path.exists(inbox_path):
@@ -789,16 +791,7 @@ class TestRpcHandler(unittest.TestCase):
             )
 
             info = state.get_agent("agent1")
-            self.assertEqual(info["pending_notifications"], [
-                {"sender": "alice", "message_id": None, "sender_agent_id": None, "sender_tracker_id": registry_client.TRACKER_ID},
-                {"sender": "bob", "message_id": None, "sender_agent_id": None, "sender_tracker_id": registry_client.TRACKER_ID},
-            ])
-            send_keys.assert_not_called()
-
-            rpc_handler.handle_update_agent({"agent_name": "agent1", "status": "idle"})
-
-            info = state.get_agent("agent1")
-            self.assertEqual(info["pending_notifications"], [])
+            self.assertEqual(info.get("pending_notifications", []), [])
             self.assertEqual(send_keys.call_count, 2)
             send_keys.assert_any_call("%1", "New message in inbox from alice", "sock")
             send_keys.assert_any_call("%1", "New message in inbox from bob", "sock")
@@ -836,6 +829,92 @@ class TestRpcHandler(unittest.TestCase):
         finally:
             if os.path.exists(inbox_path):
                 os.remove(inbox_path)
+
+    @mock.patch("tmux_util.send_keys")
+    @mock.patch("tmux_util.send_keys_reliable")
+    def test_deliver_local_message_reliable_success(self, mock_send_keys_reliable, mock_send_keys):
+        mock_send_keys_reliable.return_value = True
+        inbox_path = os.path.join(state.INBOX_DIR, "receiver-id.inbox")
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent("receiver", {
+                "agent_id": "receiver-id",
+                "uuid": "receiver-id",
+                "tmux_pane": "%1",
+                "tmux_socket": "sock",
+                "status": "idle",
+            })
+
+            rpc_handler.deliver_local_message("receiver", {
+                "sender": "sender-agent",
+                "message": "hello",
+                "message_id": "msg-1",
+            })
+
+            mock_send_keys_reliable.assert_called_once_with("%1", "New message in inbox from sender-agent", "sock", timeout=5)
+            mock_send_keys.assert_not_called()
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
+    @mock.patch("tmux_util.send_keys")
+    @mock.patch("tmux_util.send_keys_reliable")
+    def test_deliver_local_message_reliable_failure_fallback(self, mock_send_keys_reliable, mock_send_keys):
+        mock_send_keys_reliable.return_value = False
+        inbox_path = os.path.join(state.INBOX_DIR, "receiver-id.inbox")
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent("receiver", {
+                "agent_id": "receiver-id",
+                "uuid": "receiver-id",
+                "tmux_pane": "%1",
+                "tmux_socket": "sock",
+                "status": "idle",
+            })
+
+            rpc_handler.deliver_local_message("receiver", {
+                "sender": "sender-agent",
+                "message": "hello",
+                "message_id": "msg-1",
+            })
+
+            mock_send_keys_reliable.assert_called_once_with("%1", "New message in inbox from sender-agent", "sock", timeout=5)
+            mock_send_keys.assert_called_once_with("%1", "New message in inbox from sender-agent", "sock")
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
+    @mock.patch("tmux_util.send_keys")
+    @mock.patch("tmux_util.send_keys_reliable")
+    def test_deliver_local_message_reliable_exception_fallback(self, mock_send_keys_reliable, mock_send_keys):
+        mock_send_keys_reliable.side_effect = Exception("tmux error")
+        inbox_path = os.path.join(state.INBOX_DIR, "receiver-id.inbox")
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent("receiver", {
+                "agent_id": "receiver-id",
+                "uuid": "receiver-id",
+                "tmux_pane": "%1",
+                "tmux_socket": "sock",
+                "status": "idle",
+            })
+
+            rpc_handler.deliver_local_message("receiver", {
+                "sender": "sender-agent",
+                "message": "hello",
+                "message_id": "msg-1",
+            })
+
+            mock_send_keys_reliable.assert_called_once_with("%1", "New message in inbox from sender-agent", "sock", timeout=5)
+            mock_send_keys.assert_called_once_with("%1", "New message in inbox from sender-agent", "sock")
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
+
 
 
 if __name__ == "__main__":

@@ -228,10 +228,7 @@ def handle_list(params: dict, caller_pid: int = None) -> dict:
         
     return agents
 
-def _is_agent_waiting(info: dict) -> bool:
-    """Returns True if the agent is actively busy or waiting for approval."""
-    busy_statuses = {"working", "waiting", "spawning"}
-    return info.get("status") in busy_statuses or info.get("waiting_approval", False)
+
 
 def _publish_message_notified(info: dict, agent_name: str, pending_item):
     sender_name = pending_item.get("sender") if isinstance(pending_item, dict) else pending_item
@@ -253,35 +250,16 @@ def _publish_message_notified(info: dict, agent_name: str, pending_item):
         })
 
 
-def _flush_notifications(agent_name: str):
-    """Sends all pending notifications for an agent if it is no longer waiting."""
-    info = state.get_agent(agent_name)
-    if not info or _is_agent_waiting(info):
-        return
 
-    pending = info.get("pending_notifications", [])
-    if not pending:
-        return
-
-    logging.info(f"Flushing {len(pending)} notifications for {agent_name}")
-    if not info.get("no_notify_with_send_keys", False):
-        for pending_item in pending:
-            sender_name = pending_item.get("sender") if isinstance(pending_item, dict) else pending_item
-            notify_msg = f"New message in inbox from {sender_name}"
-            tmux_util.send_keys(info["tmux_pane"], notify_msg, info["tmux_socket"])
-            _publish_message_notified(info, agent_name, pending_item)
-
-    state.update_agent(agent_name, pending_notifications=[])
 
 def handle_update_agent(params: dict, caller_pid: int = None) -> bool:
-    """Updates agent state fields and flushes notifications if it becomes idle."""
+    """Updates agent state fields."""
     agent_name = _identify_agent(params, caller_pid)
     if not agent_name:
         raise ValueError("Agent not identified")
         
     kwargs = {k: v for k, v in params.items() if k not in ["agent_id", "agent_name", "tmux_pane"]}
     if state.update_agent(agent_name, **kwargs):
-        _flush_notifications(agent_name)
         if "status" in kwargs:
             registry_client.push_agent_update(state.get_agent(agent_name)["agent_id"], kwargs["status"])
         return True
@@ -429,7 +407,7 @@ def handle_spin_agent(params: dict, caller_pid: int = None) -> str:
         state.delete_agent(agent_name)
         raise RuntimeError(f"Failed to spin agent: {e}")
 
-def deliver_local_message(target_name_or_id: str, msg_obj: dict, notify_sender: str | None = None) -> str:
+def deliver_local_message(target_name_or_id: str, msg_obj: dict, notify_sender: str | None = None, verify: bool = False) -> str:
     """Writes a message to a local agent inbox and triggers/queues notification."""
     info = state.get_agent(target_name_or_id)
     if not info:
@@ -512,13 +490,28 @@ def deliver_local_message(target_name_or_id: str, msg_obj: dict, notify_sender: 
         }
         if info.get("no_notify_with_send_keys", False):
             logging.info(f"Skipping tmux send-keys notification for {current_name} from {notify_sender}")
-        elif _is_agent_waiting(info):
-            logging.info(f"Queuing notification for {current_name} from {notify_sender} (agent is busy)")
-            pending = info.get("pending_notifications", [])
-            pending.append(pending_item)
-            state.update_agent(current_name, pending_notifications=pending)
         else:
-            tmux_util.send_keys(info["tmux_pane"], f"New message in inbox from {notify_sender}", info["tmux_socket"])
+            notify_msg = f"New message in inbox from {notify_sender}"
+            enable_reliable = os.environ.get("ENABLE_RELIABLE_SEND_KEYS", "true").lower() == "true"
+            delivered = False
+            if enable_reliable or verify:
+                try:
+                    logging.info(f"Attempting reliable notification delivery for {current_name} to pane {info['tmux_pane']} (verify={verify})")
+                    delivered = tmux_util.send_keys_reliable(info["tmux_pane"], notify_msg, info["tmux_socket"], timeout=5)
+                    if delivered:
+                        logging.info(f"Reliable notification successfully delivered to {current_name} in pane {info['tmux_pane']}")
+                    else:
+                        if verify:
+                            raise RuntimeError("Notification delivery timed out")
+                        logging.warning(f"Reliable notification delivery timed out/failed for {current_name} in pane {info['tmux_pane']}. Falling back to legacy send_keys.")
+                except Exception as e:
+                    if verify:
+                        raise RuntimeError(f"Reliable notification delivery failed: {e}")
+                    logging.warning(f"Error during reliable notification delivery: {e}. Falling back to legacy send_keys.")
+
+            if not delivered:
+                tmux_util.send_keys(info["tmux_pane"], notify_msg, info["tmux_socket"])
+                
             _publish_message_notified(info, current_name, pending_item)
         return current_name
     except DeliveryValidationError:
@@ -596,7 +589,8 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
         "sender_tracker_id": registry_client.TRACKER_ID,
     }
     logging.info("local delivery payload target=%s sender=%s message_id=%s sender_agent_id=%s sender_tracker_id=%s", agent_name, sender_name, payload.get("message_id"), payload.get("sender_agent_id"), payload.get("sender_tracker_id"))
-    deliver_local_message(agent_name, payload, sender_name)
+    verify = params.get("verify", False)
+    deliver_local_message(agent_name, payload, sender_name, verify=verify)
     return {"success": True, "warning": warning_msg} if warning_msg else True
 
 def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None, agent_name: str | None = None, agent_info: dict | None = None) -> dict:

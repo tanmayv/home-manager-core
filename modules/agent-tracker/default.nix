@@ -49,6 +49,7 @@ let
     AGENT_TRACKER_HTTP_PORT = toString cfg.httpPort;
     AGENT_REGISTRY_HEARTBEAT_SECONDS = toString cfg.registryHeartbeatSeconds;
     AGENT_REGISTRY_AUTH = if cfg.registryAuth then "true" else "false";
+    ENABLE_RELIABLE_SEND_KEYS = if cfg.enableReliableSendKeys then "true" else "false";
     # systemd user services and launchd agents both start with a minimal PATH.
     # agent-tracker intentionally invokes `tmux` and `sleep` by name from
     # Python, so provide an explicit cross-platform tool PATH instead of
@@ -75,6 +76,7 @@ in
       services.agent-tracker.registryTokenFile = mkDefault registryTokenFileFromSettings;
       services.agent-tracker.httpPort = mkDefault (agentTrackerSettings.http-port or 19876);
       services.agent-tracker.registryHeartbeatSeconds = mkDefault (agentTrackerSettings.registry-heartbeat-seconds or 30);
+      services.agent-tracker.enableReliableSendKeys = mkDefault (agentTrackerSettings.enable-reliable-send-keys or true);
     }
 
     (mkIf cfg.enable {
@@ -108,6 +110,7 @@ in
           os.environ.setdefault("AGENT_TRACKER_HTTP_PORT", "${toString cfg.httpPort}")
           os.environ.setdefault("AGENT_REGISTRY_HEARTBEAT_SECONDS", "${toString cfg.registryHeartbeatSeconds}")
           os.environ.setdefault("AGENT_REGISTRY_AUTH", "${if cfg.registryAuth then "true" else "false"}")
+          os.environ.setdefault("ENABLE_RELIABLE_SEND_KEYS", "${if cfg.enableReliableSendKeys then "true" else "false"}")
           ${lib.optionalString (cfg.registryUrl != null && cfg.registries == []) ''os.environ.setdefault("AGENT_REGISTRY_URL", "${cfg.registryUrl}")''}
           ${lib.optionalString (cfg.registryTokenFile != null && cfg.registries == []) ''os.environ.setdefault("AGENT_REGISTRY_TOKEN", open(${builtins.toJSON (toString cfg.registryTokenFile)}).read().strip())''}
           ${lib.optionalString (cfg.registries != []) ''os.environ.setdefault("AGENT_REGISTRIES_JSON", ${builtins.toJSON (builtins.toJSON cfg.registries)})''}
