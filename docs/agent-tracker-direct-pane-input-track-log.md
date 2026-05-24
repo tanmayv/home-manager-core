@@ -181,7 +181,7 @@ Tests:
 
 ### Chunk 6 — Agent communicator TUI direct input actions
 Status: Completed
-Commit: `5ba89f3 agent-communicator: add direct pane input actions`
+Commit: `a99fece agent-communicator: add direct pane input actions`
 Owner: Coder
 Reviewer: Reviewer
 
@@ -223,4 +223,4 @@ Review follow-up:
 - 2026-05-25: Chunk 1 completed and committed as `661b962` after reviewer approval. Lead added later-scope requirement for `agent-communicator-tui` direct input actions.
 - 2026-05-25: Chunks 2, 3, and 4 completed and committed as `982a68f`, `b20ee00`, and `179c79a` after reviewer approval.
 - 2026-05-25: Chunk 5 completed and committed as `c975d4f` after reviewer approval.
-- 2026-05-25: Chunk 6 completed and committed as `5ba89f3` after reviewer approval.
+- 2026-05-25: Chunk 6 completed and committed as `a99fece` after reviewer approval.
