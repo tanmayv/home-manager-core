@@ -6,6 +6,7 @@ Add direct pane input functionality to `agent-tracker` and `agent-registry`:
 - `agent-tracker-ctl send-text TARGET "text"`: type literal text into the target agent pane and submit with Enter by default, bypassing inbox.
 - `agent-tracker-ctl send-key TARGET KEY [KEY...]`: send tmux key tokens such as `Escape`, `Enter`, `C-c` directly to the target agent pane, bypassing inbox.
 - Support the same local and remote target syntax as `send-message`, including `host/agent` and `registry:host/agent`.
+- After `agent-tracker` and `agent-registry` backend support is working, update `agent-communicator-tui` so its input/composer can use existing `send-message` plus new `send-text` and `send-key` actions.
 
 ## Roles
 
@@ -36,7 +37,8 @@ For every chunk:
 ## Implementation Plan / Chunks
 
 ### Chunk 1 — Local pane input primitives and RPC
-Status: Ready for review
+Status: Completed
+Commit: `661b962 agent-tracker: add local direct pane input RPC`
 Owner: Coder
 Reviewer: Reviewer
 
@@ -113,7 +115,7 @@ Acceptance:
 - Remote `send-key host/agent C-c` sends key to pane.
 - Transient local failures do not ack delivery.
 
-### Chunk 5 — Safety controls, docs, final tests
+### Chunk 5 — Safety controls and backend docs/tests
 Status: Pending
 Owner: Coder
 Reviewer: Reviewer
@@ -121,14 +123,34 @@ Reviewer: Reviewer
 Scope:
 - Add opt-out/config guardrails if needed.
 - Add audit logging without leaking full text payloads.
-- Update README/USAGE docs.
-- Run broad test suite.
+- Update backend CLI/registry docs.
+- Run broad backend test suite.
 
 Acceptance:
 - Remote direct input can be disabled or clearly guarded.
-- Documentation includes local and remote examples.
+- Backend documentation includes local and remote CLI examples.
 - Relevant Python tests pass.
+
+### Chunk 6 — Agent communicator TUI direct input actions
+Status: Pending
+Owner: Coder
+Reviewer: Reviewer
+
+Scope:
+- Update `agent-communicator-tui` input/composer workflow to support choosing between:
+  - `send-message` (existing inbox delivery),
+  - `send-text` (literal direct pane input, submit by default),
+  - `send-key` (direct symbolic key tokens).
+- Wire TUI actions through the tracker client once backend commands/RPC are available.
+- Preserve existing default send-message behavior unless the user explicitly selects direct input.
+- Add Go tests for mode selection, command dispatch, local/remote target preservation, and regression coverage for existing message send.
+
+Acceptance:
+- Users can send inbox messages as before.
+- Users can send direct text and direct keys from the TUI to local and remote targets supported by the backend.
+- Existing communicator tests pass.
 
 ## Timeline
 
 - 2026-05-25: Lead created feature branch `feature/agent-tracker-direct-pane-input`, spawned coder/reviewer agents, and initialized this track log.
+- 2026-05-25: Chunk 1 completed and committed as `661b962` after reviewer approval. Lead added later-scope requirement for `agent-communicator-tui` direct input actions.
