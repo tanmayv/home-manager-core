@@ -556,8 +556,16 @@ def _with_local_target_address(params: dict) -> dict:
     if ":" in hostname:
         _, hostname = hostname.split(":", 1)
     if hostname not in {"local", LOCAL_HOSTNAME}:
-        raise RuntimeError("Remote direct pane input is not implemented")
+        raise DeliveryTargetNotFound("Target agent not found locally")
     return {**params, **({"agent_id": target} if _is_uuid(target) else {"agent_name": target})}
+
+
+def _parse_target_address(target_address: str) -> tuple[str | None, str, str]:
+    registry_name = None
+    hostname, target = target_address.split("/", 1)
+    if ":" in hostname:
+        registry_name, hostname = hostname.split(":", 1)
+    return registry_name, hostname, target
 
 
 def _resolve_local_pane_target(params: dict) -> tuple[str, dict]:
@@ -637,9 +645,7 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
     return {"success": True, "warning": warning_msg} if warning_msg else True
 
 
-def handle_send_input(params: dict, caller_pid: int = None) -> dict:
-    """Inject literal text or symbolic keys directly into a local agent pane."""
-    agent_name, info = _resolve_local_pane_target(params)
+def _send_input_mode(params: dict) -> str:
     mode = params.get("mode") or params.get("input_type")
     if not mode:
         if "text" in params:
@@ -647,22 +653,68 @@ def handle_send_input(params: dict, caller_pid: int = None) -> dict:
         elif "keys" in params or "key" in params:
             mode = "keys"
     mode = (mode or "").lower()
+    if mode == "key":
+        mode = "keys"
+    if mode not in {"text", "keys"}:
+        raise ValueError("mode must be 'text' or 'keys'")
+    return mode
 
+
+def _validate_send_input_params(params: dict, mode: str) -> tuple[str | None, list | None, bool | None]:
     if mode == "text":
         if "text" not in params or not isinstance(params.get("text"), str):
             raise ValueError("text must be a string")
         submit = params.get("submit", True)
         if not isinstance(submit, bool):
             raise ValueError("submit must be a boolean")
-        tmux_util.send_literal_text(info["tmux_pane"], params.get("text"), submit=submit, socket_path=info.get("tmux_socket"))
+        return params.get("text"), None, submit
+
+    keys = params.get("keys") if "keys" in params else params.get("key")
+    normalized = tmux_util.normalize_tmux_key_tokens(keys)
+    return None, normalized, None
+
+
+def handle_send_input(params: dict, caller_pid: int = None) -> dict:
+    """Inject literal text or symbolic keys directly into an agent pane."""
+    sender_name = params.get("sender_name") or _identify_agent(params, caller_pid) or "cli-user"
+    sender_info = state.get_agent(params.get("sender_id") or sender_name) or {}
+    sender_id = sender_info.get("agent_id") or params.get("sender_id")
+    target_address = params.get("target_address")
+    mode = _send_input_mode(params)
+    text, keys, submit = _validate_send_input_params(params, mode)
+
+    if target_address and "/" in target_address:
+        registry_name, hostname, target = _parse_target_address(target_address)
+        logging.info("handle_send_input sender=%s sender_id=%s target_address=%s input_type=%s", sender_name, sender_id, target_address, mode)
+        if hostname not in {"local", LOCAL_HOSTNAME}:
+            if registry_name:
+                status, body = registry_client.send_remote_pane_input_to_registry(
+                    registry_name, sender_name, sender_id, registry_client.TRACKER_ID, hostname, target, mode, text=text, keys=keys, submit=True if submit is None else submit
+                )
+            else:
+                status, body = registry_client.send_remote_pane_input(
+                    sender_name,
+                    sender_id,
+                    registry_client.TRACKER_ID,
+                    hostname,
+                    target,
+                    mode,
+                    text=text,
+                    keys=keys,
+                    submit=True if submit is None else submit,
+                )
+            if status == 202:
+                return {"success": True, "target": target_address, "mode": mode, "remote": True}
+            raise RuntimeError(f"Remote pane input failed: {(body or {}).get('message', 'unknown error')}")
+        params = {**params, **({"agent_id": target} if _is_uuid(target) else {"agent_name": target})}
+
+    agent_name, info = _resolve_local_pane_target(params)
+    if mode == "text":
+        tmux_util.send_literal_text(info["tmux_pane"], text, submit=submit, socket_path=info.get("tmux_socket"))
         return {"success": True, "target": agent_name, "mode": "text", "submitted": submit}
 
-    if mode in {"key", "keys"}:
-        keys = params.get("keys") if "keys" in params else params.get("key")
-        normalized = tmux_util.send_symbolic_keys(info["tmux_pane"], keys, socket_path=info.get("tmux_socket"))
-        return {"success": True, "target": agent_name, "mode": "keys", "keys": normalized}
-
-    raise ValueError("mode must be 'text' or 'keys'")
+    tmux_util.send_symbolic_keys(info["tmux_pane"], keys, socket_path=info.get("tmux_socket"))
+    return {"success": True, "target": agent_name, "mode": "keys", "keys": keys}
 
 
 def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None, agent_name: str | None = None, agent_info: dict | None = None) -> dict:

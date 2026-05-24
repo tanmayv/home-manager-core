@@ -4,6 +4,7 @@ import errno
 import json
 import logging
 import os
+import re
 import threading
 import time
 import uuid
@@ -344,6 +345,45 @@ def _validate_attachments(body):
     return None
 
 
+KEY_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*$")
+KEY_MODIFIERS = {"C", "M", "S"}
+
+
+def _valid_key_token(key):
+    if not isinstance(key, str) or not key or key != key.strip() or any(ch.isspace() for ch in key):
+        return False
+    if not KEY_TOKEN_RE.match(key):
+        return False
+    parts = key.split("-")
+    if len(parts) > 1:
+        return bool(parts[-1]) and all(part.upper() in KEY_MODIFIERS for part in parts[:-1])
+    return True
+
+
+def _validate_pane_input(body):
+    for field in ("target_agent_id", "target_agent_name", "target_hostname"):
+        if field in body and body.get(field) is not None and not isinstance(body.get(field), str):
+            return f"{field} must be a string"
+    if "sender_tracker_id" in body and body.get("sender_tracker_id") is not None and not isinstance(body.get("sender_tracker_id"), str):
+        return "sender_tracker_id must be a string"
+
+    input_type = body.get("input_type") or body.get("mode")
+    if input_type not in {"text", "keys"}:
+        return "input_type must be 'text' or 'keys'"
+    if input_type == "text":
+        if "text" not in body or not isinstance(body.get("text"), str):
+            return "text is required for text pane input"
+        if "submit" in body and not isinstance(body.get("submit"), bool):
+            return "submit must be a boolean"
+    else:
+        keys = body.get("keys")
+        if not isinstance(keys, list) or not keys or not all(_valid_key_token(key) for key in keys):
+            return "keys must be a non-empty list of valid key tokens"
+        if "submit" in body:
+            return "submit is only valid for text pane input"
+    return None
+
+
 def make_handler(store=None, token=None, auth_required=None):
     store, token = store or Store(), TOKEN if token is None else token
     auth_required = AUTH_REQUIRED if auth_required is None else auth_required
@@ -507,6 +547,41 @@ def make_handler(store=None, token=None, auth_required=None):
                     }
                 )
                 return self._json(202, {"ok": True, "queued": True, "event_id": event["event_id"], "target_tracker": target["hostname"]})
+
+            if parts == ["pane-inputs"]:
+                validation_error = _validate_pane_input(body)
+                if validation_error:
+                    return self._json(400, {"error": "invalid_request", "message": validation_error})
+                target = store.get_agent(body.get("target_agent_id")) if body.get("target_agent_id") else None
+                if not target and body.get("target_agent_name"):
+                    if not body.get("target_hostname"):
+                        return self._json(400, {"error": "hostname_required", "message": "target_hostname is required when using target_agent_name; bare-name global resolution is not supported"})
+                    target = next((agent for agent in store.list_agents() if agent["hostname"] == body["target_hostname"] and (agent["name"] == body["target_agent_name"] or body["target_agent_name"] in agent.get("aliases", []))), None)
+                if not target:
+                    if body.get("target_agent_name") or body.get("target_agent_id"):
+                        LOG.warning("pane input target not found target_agent_id=%s target_agent_name=%s target_hostname=%s sender_tracker_id=%s", body.get("target_agent_id"), body.get("target_agent_name"), body.get("target_hostname"), body.get("sender_tracker_id"))
+                        return self._json(404, {"error": "agent_not_found", "message": "no agent with that ID or name is registered on the specified tracker"})
+                    return self._json(400, {"error": "missing_target", "message": "provide target_agent_id or target_agent_name"})
+                if body.get("sender_tracker_id") == target["tracker_id"]:
+                    return self._json(400, {"error": "same_tracker", "message": "target agent is on the same tracker; use local send"})
+                tracker = store.get_tracker(target["tracker_id"]) or {}
+                if tracker.get("status") != "active":
+                    LOG.warning("pane input target tracker not active target_tracker_id=%s status=%s target_agent_id=%s", target["tracker_id"], tracker.get("status", "gone"), target["agent_id"])
+                    return self._json(503, {"error": "tracker_offline", "message": "target tracker is stale or gone", "tracker_status": tracker.get("status", "gone")})
+                entry = store.enqueue_delivery(target["tracker_id"], {
+                    "delivery_type": "pane_input",
+                    "target_agent_id": target["agent_id"],
+                    "sender_name": body.get("sender_agent_name", "unknown"),
+                    "sender_agent_id": body.get("sender_agent_id"),
+                    "sender_tracker": (store.get_tracker(body.get("sender_tracker_id")) or {}).get("hostname", body.get("sender_tracker_id")),
+                    "sender_tracker_id": body.get("sender_tracker_id"),
+                    "input_type": body.get("input_type") or body.get("mode"),
+                    "text": body.get("text"),
+                    "keys": body.get("keys"),
+                    "submit": body.get("submit", True),
+                    "sent_at": time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime()),
+                })
+                return self._json(202, {"ok": True, "queued": True, "message_id": entry["message_id"], "target_agent_id": target["agent_id"], "target_name": target["name"], "target_tracker": target["hostname"]})
 
             if parts == ["messages"]:
                 if not body.get("message") and not body.get("attachments"):

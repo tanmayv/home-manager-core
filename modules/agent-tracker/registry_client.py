@@ -83,6 +83,9 @@ class RegistryClient:
     def send_remote_message(self, sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, message=None, attachments=None, message_id=None):
         return self.request("POST", "/messages", _remote_message_payload(sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, message, attachments, message_id))
 
+    def send_remote_pane_input(self, sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, input_type, text=None, keys=None, submit=True):
+        return self.request("POST", "/pane-inputs", _remote_pane_input_payload(sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, input_type, text, keys, submit))
+
     def fetch_agents(self):
         return self.request("GET", "/agents")
 
@@ -185,6 +188,27 @@ def _remote_message_payload(sender_name, sender_agent_id, sender_tracker_id, tar
     return payload
 
 
+def _remote_pane_input_payload(sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, input_type, text=None, keys=None, submit=True):
+    payload = {
+        "sender_agent_id": sender_agent_id,
+        "sender_agent_name": sender_name,
+        "sender_tracker_id": sender_tracker_id,
+        "input_type": input_type,
+    }
+    if input_type == "text":
+        payload["text"] = text
+        payload["submit"] = submit
+    elif input_type == "keys":
+        payload["keys"] = keys
+    try:
+        uuid.UUID(target_name_or_id)
+        payload["target_agent_id"] = target_name_or_id
+    except (ValueError, TypeError):
+        payload["target_agent_name"] = target_name_or_id
+        payload["target_hostname"] = target_hostname
+    return payload
+
+
 def _client_has_hostname(client, hostname):
     status, body = client.fetch_agents()
     if status != 200:
@@ -210,6 +234,27 @@ def send_remote_message_to_registry(registry_name, sender_name, sender_agent_id,
     for client in load_registry_clients():
         if client.name == registry_name:
             return client.request("POST", "/messages", _remote_message_payload(sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, message, attachments, message_id))
+    return 404, {"message": f"registry not configured: {registry_name}"}
+
+
+def send_remote_pane_input(sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, input_type, text=None, keys=None, submit=True):
+    clients = load_registry_clients()
+    if clients:
+        if len(clients) == 1:
+            return clients[0].send_remote_pane_input(sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, input_type, text, keys, submit)
+        matches = [client for client in clients if _client_has_hostname(client, target_hostname)]
+        if len(matches) > 1:
+            choices = ", ".join(f"{client.name}:{target_hostname}/{target_name_or_id}" for client in matches)
+            return 409, {"message": f"Ambiguous remote target; use one of: {choices}"}
+        client = matches[0] if matches else clients[0]
+        return client.send_remote_pane_input(sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, input_type, text, keys, submit)
+    return 404, {"message": "registry not configured"}
+
+
+def send_remote_pane_input_to_registry(registry_name, sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, input_type, text=None, keys=None, submit=True):
+    for client in load_registry_clients():
+        if client.name == registry_name:
+            return client.request("POST", "/pane-inputs", _remote_pane_input_payload(sender_name, sender_agent_id, sender_tracker_id, target_hostname, target_name_or_id, input_type, text, keys, submit))
     return 404, {"message": f"registry not configured: {registry_name}"}
 
 
@@ -634,6 +679,11 @@ def _delivery_loop(client=None):
         from rpc_handler import deliver_local_message, DeliveryTargetNotFound, DeliveryValidationError
         for delivery in deliveries:
             try:
+                if delivery.get("delivery_type") == "pane_input":
+                    LOG.info("deferring queued registry pane_input message_id=%s until pane-input dispatch is enabled", delivery.get("message_id"))
+                    time.sleep(2)
+                    continue
+
                 LOG.info("delivering queued registry message message_id=%s sender_agent_id=%s sender_tracker_id=%s target_agent_id=%s", delivery.get("message_id"), delivery.get("sender_agent_id"), delivery.get("sender_tracker_id"), delivery.get("target_agent_id"))
                 deliver_local_message(
                     delivery["target_agent_id"],

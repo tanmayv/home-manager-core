@@ -360,7 +360,7 @@ class TestRpcHandler(unittest.TestCase):
         result = rpc_handler.handle_send_input({"agent_id": "id-1", "mode": "keys", "keys": ["ESC", "ENTER", "C-C"]})
 
         self.assertEqual(result, {"success": True, "target": "agent1", "mode": "keys", "keys": ["Escape", "Enter", "C-c"]})
-        send_symbolic_keys.assert_called_once_with("%1", ["ESC", "ENTER", "C-C"], socket_path="sock")
+        send_symbolic_keys.assert_called_once_with("%1", ["Escape", "Enter", "C-c"], socket_path="sock")
 
     @mock.patch("tmux_util.send_literal_text")
     def test_send_input_local_target_address_is_local_only(self, send_literal_text):
@@ -370,6 +370,24 @@ class TestRpcHandler(unittest.TestCase):
         send_literal_text.assert_called_once_with("%1", "hi", submit=True, socket_path="sock")
         with self.assertRaises(RuntimeError):
             rpc_handler.handle_send_input({"target_address": "remote-host/agent1", "text": "hi"})
+
+    @mock.patch("registry_client.send_remote_pane_input", return_value=(202, {"queued": True}))
+    def test_send_input_routes_remote_target_address_via_registry(self, send_remote):
+        state.set_agent("sender", {"agent_id": "sender-id", "tmux_pane": "%1"})
+
+        result = rpc_handler.handle_send_input({"agent_name": "sender", "target_address": "remote-host/agent2", "input_type": "text", "text": "hello", "submit": False})
+
+        self.assertEqual(result, {"success": True, "target": "remote-host/agent2", "mode": "text", "remote": True})
+        send_remote.assert_called_once_with("sender", "sender-id", registry_client.TRACKER_ID, "remote-host", "agent2", "text", text="hello", keys=None, submit=False)
+
+    @mock.patch("registry_client.send_remote_pane_input_to_registry", return_value=(202, {"queued": True}))
+    def test_send_input_routes_explicit_registry_target_address(self, send_remote):
+        state.set_agent("sender", {"agent_id": "sender-id", "tmux_pane": "%1"})
+
+        result = rpc_handler.handle_send_input({"agent_name": "sender", "target_address": "corp:remote-host/agent2", "input_type": "keys", "keys": ["ESC", "C-c"]})
+
+        self.assertTrue(result["success"])
+        send_remote.assert_called_once_with("corp", "sender", "sender-id", registry_client.TRACKER_ID, "remote-host", "agent2", "keys", text=None, keys=["Escape", "C-c"], submit=True)
 
     def test_deliver_local_message_is_idempotent_for_message_id(self):
         inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")

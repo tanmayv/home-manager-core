@@ -94,7 +94,7 @@ Tests:
 - `git diff --check` — OK
 
 ### Chunk 3 — Registry protocol for remote pane input
-Status: Pending
+Status: Ready for review
 Owner: Coder
 Reviewer: Reviewer
 
@@ -108,6 +108,22 @@ Acceptance:
 - Remote pane input queues as a distinct delivery type.
 - Target resolution and stale/offline handling mirror `/messages`.
 - Invalid payloads are rejected.
+
+Implementation notes:
+- Added `POST /pane-inputs` to `agent-registry`, queueing deliveries with `delivery_type: pane_input` while keeping `/messages` unchanged.
+- Added pane-input validation for target, `input_type=text|keys`, text payloads, key-token lists, and text-only `submit`.
+- Added `registry_client` helpers for default/explicit registry pane-input routing and wired remote `handle_send_input()` target addresses to them.
+- Registry delivery polling leaves queued `pane_input` deliveries unacked/deferred until Chunk 4 dispatch support is implemented.
+
+Tests:
+- `cd modules/agent-tracker && python -m unittest test_http_registry.py test_registry_client_routing.py test_rpc_handler.py test_agent_tracker_ctl.py test_tmux_util.py` — OK (108 tests)
+- `git diff --check` — OK
+
+Review follow-up:
+- Added type validation for `/pane-inputs` lookup fields before registry dict lookups/comparisons: non-null `target_agent_id`, `target_agent_name`, `target_hostname`, and `sender_tracker_id` must be strings.
+- Added regression tests that malformed authenticated requests with non-string lookup fields return JSON 400 instead of disconnecting.
+- Reran `cd modules/agent-tracker && python -m unittest test_http_registry.py test_registry_client_routing.py test_rpc_handler.py test_agent_tracker_ctl.py test_tmux_util.py` — OK (109 tests)
+- Reran `git diff --check` — OK
 
 ### Chunk 4 — Remote delivery loop dispatch
 Status: Pending
