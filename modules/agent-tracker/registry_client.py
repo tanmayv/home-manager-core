@@ -676,12 +676,23 @@ def _delivery_loop(client=None):
         if not deliveries:
             continue
         LOG.info("received %s queued registry deliveries for tracker_id=%s", len(deliveries), tracker_id)
-        from rpc_handler import deliver_local_message, DeliveryTargetNotFound, DeliveryValidationError
+        from rpc_handler import deliver_local_message, deliver_local_pane_input, DeliveryTargetNotFound, DeliveryValidationError
         for delivery in deliveries:
             try:
                 if delivery.get("delivery_type") == "pane_input":
-                    LOG.info("deferring queued registry pane_input message_id=%s until pane-input dispatch is enabled", delivery.get("message_id"))
-                    time.sleep(2)
+                    LOG.info("delivering queued registry pane_input message_id=%s input_type=%s target_agent_id=%s", delivery.get("message_id"), delivery.get("input_type"), delivery.get("target_agent_id"))
+                    if not delivery.get("target_agent_id"):
+                        raise DeliveryValidationError("target_agent_id is required")
+                    input_obj = {"input_type": delivery.get("input_type")}
+                    if delivery.get("input_type") == "text":
+                        input_obj.update({"text": delivery.get("text"), "submit": delivery.get("submit", True)})
+                    else:
+                        input_obj["keys"] = delivery.get("keys")
+                    deliver_local_pane_input(delivery["target_agent_id"], input_obj)
+                    ack_status = _ack(client, delivery["message_id"])
+                    if ack_status == 200:
+                        missing_target_first_seen.pop(delivery.get("message_id"), None)
+                        LOG.info("delivered and acked queued registry pane_input message_id=%s target_agent_id=%s", delivery["message_id"], delivery["target_agent_id"])
                     continue
 
                 LOG.info("delivering queued registry message message_id=%s sender_agent_id=%s sender_tracker_id=%s target_agent_id=%s", delivery.get("message_id"), delivery.get("sender_agent_id"), delivery.get("sender_tracker_id"), delivery.get("target_agent_id"))

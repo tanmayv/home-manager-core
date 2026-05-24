@@ -126,7 +126,7 @@ Review follow-up:
 - Reran `git diff --check` — OK
 
 ### Chunk 4 — Remote delivery loop dispatch
-Status: Pending
+Status: Ready for review
 Owner: Coder
 Reviewer: Reviewer
 
@@ -139,6 +139,15 @@ Acceptance:
 - Remote `send-text host/agent "hello"` bypasses inbox and injects into pane.
 - Remote `send-key host/agent C-c` sends key to pane.
 - Transient local failures do not ack delivery.
+
+Implementation notes:
+- Added `rpc_handler.deliver_local_pane_input()` to validate and inject queued pane input by local target agent ID.
+- Updated registry delivery loop to dispatch `delivery_type=pane_input` to direct pane input instead of inbox delivery.
+- Pane-input deliveries ack only after local tmux input succeeds; invalid pane-input deliveries are acked/dropped, and transient tmux failures are retried without ack.
+- Existing message delivery path remains unchanged.
+
+Tests:
+- `cd modules/agent-tracker && python -m unittest test_http_registry.py test_rpc_handler.py test_tmux_util.py test_registry_client_routing.py test_agent_tracker_ctl.py` — OK (112 tests)
 
 ### Chunk 5 — Safety controls and backend docs/tests
 Status: Pending

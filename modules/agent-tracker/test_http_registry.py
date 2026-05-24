@@ -295,23 +295,79 @@ class TestHttpAndRegistry(unittest.TestCase):
                 post(f"{base}/messages", {"sender_tracker_id": "t1", "target_agent_id": "a2", "message": "hi", "attachments": [{"name": "bad.txt", "content_b64": "%%%"}]}, token="secret")
             self.assertEqual(ctx.exception.code, 400)
 
-    def test_registry_client_delivery_loop_defers_pane_input_until_dispatch_chunk(self):
+    @mock.patch("tmux_util.send_literal_text")
+    @mock.patch("rpc_handler.deliver_local_message")
+    def test_registry_client_delivery_loop_dispatches_pane_input_text_and_acks(self, deliver_message, send_literal_text):
+        inbox_path = os.path.join(state.INBOX_DIR, "a2.inbox")
+        if os.path.exists(inbox_path):
+            os.remove(inbox_path)
+        state.set_agent("agent2", {"agent_id": "a2", "status": "idle", "tmux_pane": "%2", "tmux_socket": "sock"})
         delivery = {
             "delivery_type": "pane_input",
             "message_id": "m1",
             "target_agent_id": "a2",
             "input_type": "text",
             "text": "hello",
-            "submit": True,
+            "submit": False,
+        }
+        with mock.patch.object(registry_client, "fetch_deliveries", side_effect=[(200, {"deliveries": [delivery]}), SystemExit]), \
+             mock.patch.object(registry_client, "ack_delivery") as ack:
+            with self.assertRaises(SystemExit):
+                registry_client._delivery_loop()
+        send_literal_text.assert_called_once_with("%2", "hello", submit=False, socket_path="sock")
+        deliver_message.assert_not_called()
+        ack.assert_called_once_with("m1")
+        self.assertFalse(os.path.exists(inbox_path))
+
+    @mock.patch("tmux_util.send_symbolic_keys")
+    def test_registry_client_delivery_loop_dispatches_pane_input_keys_and_acks(self, send_symbolic_keys):
+        state.set_agent("agent2", {"agent_id": "a2", "status": "idle", "tmux_pane": "%2", "tmux_socket": "sock"})
+        delivery = {
+            "delivery_type": "pane_input",
+            "message_id": "m1",
+            "target_agent_id": "a2",
+            "input_type": "keys",
+            "keys": ["C-c"],
+        }
+        with mock.patch.object(registry_client, "fetch_deliveries", side_effect=[(200, {"deliveries": [delivery]}), SystemExit]), \
+             mock.patch.object(registry_client, "ack_delivery") as ack:
+            with self.assertRaises(SystemExit):
+                registry_client._delivery_loop()
+        send_symbolic_keys.assert_called_once_with("%2", ["C-c"], socket_path="sock")
+        ack.assert_called_once_with("m1")
+
+    def test_registry_client_delivery_loop_acks_invalid_pane_input_immediately(self):
+        delivery = {
+            "delivery_type": "pane_input",
+            "message_id": "m1",
+            "target_agent_id": "a2",
+            "input_type": "keys",
+            "keys": [],
         }
         with mock.patch.object(registry_client, "fetch_deliveries", side_effect=[(200, {"deliveries": [delivery]}), SystemExit]), \
              mock.patch.object(registry_client, "ack_delivery") as ack, \
-             mock.patch.object(registry_client.time, "sleep") as sleep, \
-             mock.patch("rpc_handler.deliver_local_message") as deliver:
+             mock.patch.object(registry_client.time, "sleep") as sleep:
+            with self.assertRaises(SystemExit):
+                registry_client._delivery_loop()
+        ack.assert_called_once_with("m1")
+        sleep.assert_not_called()
+
+    @mock.patch("tmux_util.send_literal_text", side_effect=RuntimeError("tmux failed"))
+    def test_registry_client_delivery_loop_does_not_ack_transient_pane_input_failure(self, _send_literal_text):
+        state.set_agent("agent2", {"agent_id": "a2", "status": "idle", "tmux_pane": "%2", "tmux_socket": "sock"})
+        delivery = {
+            "delivery_type": "pane_input",
+            "message_id": "m1",
+            "target_agent_id": "a2",
+            "input_type": "text",
+            "text": "hello",
+        }
+        with mock.patch.object(registry_client, "fetch_deliveries", side_effect=[(200, {"deliveries": [delivery]}), SystemExit]), \
+             mock.patch.object(registry_client, "ack_delivery") as ack, \
+             mock.patch.object(registry_client.time, "sleep") as sleep:
             with self.assertRaises(SystemExit):
                 registry_client._delivery_loop()
         ack.assert_not_called()
-        deliver.assert_not_called()
         sleep.assert_called_once_with(2)
 
     def test_registry_client_delivery_loop_delivers_and_acks(self):

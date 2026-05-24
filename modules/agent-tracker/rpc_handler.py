@@ -674,6 +674,24 @@ def _validate_send_input_params(params: dict, mode: str) -> tuple[str | None, li
     return None, normalized, None
 
 
+def deliver_local_pane_input(target_agent_id: str, input_obj: dict) -> dict:
+    """Inject a validated pane-input delivery directly into a local agent pane."""
+    params = {**(input_obj or {}), "agent_id": target_agent_id}
+    try:
+        mode = _send_input_mode(params)
+        text, keys, submit = _validate_send_input_params(params, mode)
+    except ValueError as e:
+        raise DeliveryValidationError(str(e)) from e
+    agent_name, info = _resolve_local_pane_target(params)
+
+    if mode == "text":
+        tmux_util.send_literal_text(info["tmux_pane"], text, submit=submit, socket_path=info.get("tmux_socket"))
+        return {"success": True, "target": agent_name, "mode": "text", "submitted": submit}
+
+    tmux_util.send_symbolic_keys(info["tmux_pane"], keys, socket_path=info.get("tmux_socket"))
+    return {"success": True, "target": agent_name, "mode": "keys", "keys": keys}
+
+
 def handle_send_input(params: dict, caller_pid: int = None) -> dict:
     """Inject literal text or symbolic keys directly into an agent pane."""
     sender_name = params.get("sender_name") or _identify_agent(params, caller_pid) or "cli-user"
@@ -709,12 +727,12 @@ def handle_send_input(params: dict, caller_pid: int = None) -> dict:
         params = {**params, **({"agent_id": target} if _is_uuid(target) else {"agent_name": target})}
 
     agent_name, info = _resolve_local_pane_target(params)
+    local_input = {"input_type": mode}
     if mode == "text":
-        tmux_util.send_literal_text(info["tmux_pane"], text, submit=submit, socket_path=info.get("tmux_socket"))
-        return {"success": True, "target": agent_name, "mode": "text", "submitted": submit}
-
-    tmux_util.send_symbolic_keys(info["tmux_pane"], keys, socket_path=info.get("tmux_socket"))
-    return {"success": True, "target": agent_name, "mode": "keys", "keys": keys}
+        local_input.update({"text": text, "submit": submit})
+    else:
+        local_input["keys"] = keys
+    return deliver_local_pane_input(info.get("agent_id") or agent_name, local_input)
 
 
 def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None, agent_name: str | None = None, agent_info: dict | None = None) -> dict:
