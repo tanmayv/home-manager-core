@@ -180,7 +180,8 @@ Tests:
 - `git diff --check` — OK
 
 ### Chunk 6 — Agent communicator TUI direct input actions
-Status: Pending
+Status: Completed
+Commit: `5ba89f3 agent-communicator: add direct pane input actions`
 Owner: Coder
 Reviewer: Reviewer
 
@@ -198,9 +199,28 @@ Acceptance:
 - Users can send direct text and direct keys from the TUI to local and remote targets supported by the backend.
 - Existing communicator tests pass.
 
+Implementation notes:
+- Added composer commands: `/text body`, `/text --no-submit body`, `/key KEY...`, and `/msg body`.
+- Default Enter behavior remains send-message/inbox and still appends the markdown reply instruction.
+- Added tracker client `SendText` and `SendKeys` methods that call `send_input` while preserving local/remote target addressing via `rowTarget(row)`.
+- Direct input commands show a short status instead of appending an inbox/outbox message, and they do not add the markdown reply instruction.
+- Direct input failures restore the original composer command (for example `/text ...` or `/key ...`) so retry cannot silently fall back to normal inbox send-message.
+- Added composer/help hints for direct input discovery.
+
+Tests:
+- `cd agent-communicator-tui && nix develop --command go test ./...` — OK
+- `git diff --check` — OK
+
+Review follow-up:
+- Preserved original direct-input composer command on `/text` and `/key` send failures instead of restoring only the stripped payload/key list.
+- Added regression tests for failed `/text` and `/key` ensuring the composer remains a direct-input command and does not use send-message.
+- Reran `cd agent-communicator-tui && nix develop --command go test ./...` — OK
+- Reran `git diff --check` — OK
+
 ## Timeline
 
 - 2026-05-25: Lead created feature branch `feature/agent-tracker-direct-pane-input`, spawned coder/reviewer agents, and initialized this track log.
 - 2026-05-25: Chunk 1 completed and committed as `661b962` after reviewer approval. Lead added later-scope requirement for `agent-communicator-tui` direct input actions.
 - 2026-05-25: Chunks 2, 3, and 4 completed and committed as `982a68f`, `b20ee00`, and `179c79a` after reviewer approval.
 - 2026-05-25: Chunk 5 completed and committed as `c975d4f` after reviewer approval.
+- 2026-05-25: Chunk 6 completed and committed as `5ba89f3` after reviewer approval.

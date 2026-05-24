@@ -20,6 +20,8 @@ type localClient interface {
 	ReadInbox(context.Context, string, int, bool) (tracker.ReadInboxResult, error)
 	SendMessage(context.Context, string, string, []tracker.Attachment) error
 	SendMessageFrom(context.Context, string, string, string, []tracker.Attachment) error
+	SendText(context.Context, string, string, bool) error
+	SendKeys(context.Context, string, []string) error
 	WaitEvents(context.Context, tracker.WaitOptions) (tracker.WaitEventsResult, error)
 	ListTrackers(context.Context) ([]tracker.RemoteTracker, error)
 	PublishTrackerEvent(ctx context.Context, targetTrackerID, eventType string, payload any) error
@@ -46,6 +48,12 @@ type messageSent struct {
 	Body   string
 	Row    agentRow
 	Record outboxRecord
+	Err    error
+}
+type directInputSent struct {
+	Body   string
+	Row    agentRow
+	Action string
 	Err    error
 }
 type eventsLoaded struct {
@@ -197,6 +205,30 @@ func deletePreviousWord(value []rune) []rune {
 
 const markdownReplyInstruction = "PS: Reply in markdown format."
 
+type composerAction struct {
+	Kind   string
+	Body   string
+	Submit bool
+	Keys   []string
+}
+
+func parseComposerAction(input string) composerAction {
+	body := strings.TrimSpace(input)
+	if strings.HasPrefix(body, "/text --no-submit ") {
+		return composerAction{Kind: "text", Body: strings.TrimSpace(strings.TrimPrefix(body, "/text --no-submit ")), Submit: false}
+	}
+	if strings.HasPrefix(body, "/text ") {
+		return composerAction{Kind: "text", Body: strings.TrimSpace(strings.TrimPrefix(body, "/text ")), Submit: true}
+	}
+	if strings.HasPrefix(body, "/key ") {
+		return composerAction{Kind: "key", Keys: strings.Fields(strings.TrimSpace(strings.TrimPrefix(body, "/key ")))}
+	}
+	if strings.HasPrefix(body, "/msg ") {
+		return composerAction{Kind: "message", Body: strings.TrimSpace(strings.TrimPrefix(body, "/msg "))}
+	}
+	return composerAction{Kind: "message", Body: input}
+}
+
 func sendCurrentMessage(local localClient, senderName string, row agentRow, body string) tea.Cmd {
 	return sendOutboxRecord(local, senderName, row, makeOutboxRecord(senderName, row, body))
 }
@@ -230,6 +262,38 @@ func sendOutboxRecord(local localClient, senderName string, row agentRow, record
 
 func messageBodyForDelivery(body string) string {
 	return strings.TrimRight(body, " \t\r\n") + "\n\n(" + markdownReplyInstruction + ")"
+}
+
+func sendDirectText(local localClient, row agentRow, body string, submit bool, original string) tea.Cmd {
+	return func() tea.Msg {
+		if local == nil {
+			return directInputSent{Body: original, Row: row, Action: "send-text", Err: errors.New("local tracker client unavailable")}
+		}
+		target := rowTarget(row)
+		if strings.TrimSpace(body) == "" || target == "" {
+			return directInputSent{Body: original, Row: row, Action: "send-text"}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		err := local.SendText(ctx, target, body, submit)
+		return directInputSent{Body: original, Row: row, Action: "send-text", Err: err}
+	}
+}
+
+func sendDirectKeys(local localClient, row agentRow, keys []string, original string) tea.Cmd {
+	return func() tea.Msg {
+		if local == nil {
+			return directInputSent{Body: original, Row: row, Action: "send-key", Err: errors.New("local tracker client unavailable")}
+		}
+		target := rowTarget(row)
+		if len(keys) == 0 || target == "" {
+			return directInputSent{Body: original, Row: row, Action: "send-key"}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		err := local.SendKeys(ctx, target, keys)
+		return directInputSent{Body: original, Row: row, Action: "send-key", Err: err}
+	}
 }
 
 func waitEvents(local localClient, since int64) tea.Cmd {

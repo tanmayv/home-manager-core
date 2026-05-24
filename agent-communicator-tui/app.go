@@ -254,14 +254,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.mode != savedView && m.canSendCurrent() && strings.TrimSpace(string(m.composer)) != "" {
 				body := string(m.composer)
 				row := m.rows[m.selected]
-				record := makeOutboxRecord(m.ownName, row, body)
+				action := parseComposerAction(body)
 				m.composer = nil
 				unhideCmd := m.unhideAgent(row)
 				m.clearUnread(row)
-				m.appendSentMessage(row, record)
-				m.refreshMergedMessages()
-				m.selectLatestMessage()
-				return m, tea.Batch(unhideCmd, sendOutboxRecord(m.local, m.ownName, row, record))
+				switch action.Kind {
+				case "text":
+					return m, tea.Batch(unhideCmd, sendDirectText(m.local, row, action.Body, action.Submit, body))
+				case "key":
+					return m, tea.Batch(unhideCmd, sendDirectKeys(m.local, row, action.Keys, body))
+				default:
+					record := makeOutboxRecord(m.ownName, row, action.Body)
+					m.appendSentMessage(row, record)
+					m.refreshMergedMessages()
+					m.selectLatestMessage()
+					return m, tea.Batch(unhideCmd, sendOutboxRecord(m.local, m.ownName, row, record))
+				}
 			}
 		case tea.KeyBackspace:
 			m.messageFocused = false
@@ -343,6 +351,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = nil
 			m.allMessages = m.mergeAllMessages(msg.Messages)
 			m.selectLatestMessage()
+		}
+	case directInputSent:
+		m.err = msg.Err
+		if msg.Err != nil {
+			m.composer = []rune(msg.Body)
+		} else {
+			m.paneCaptureStatus = fmt.Sprintf("%s sent to %s", msg.Action, rowTarget(msg.Row))
+			return m, tea.Tick(4*time.Second, func(time.Time) tea.Msg {
+				return clearPaneCaptureStatusTick{}
+			})
 		}
 	case messageSent:
 		m.err = msg.Err

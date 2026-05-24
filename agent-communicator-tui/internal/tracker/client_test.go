@@ -136,6 +136,39 @@ func TestSendMessageUsesLocalTargetAddressForUUIDTarget(t *testing.T) {
 	}
 }
 
+func TestSendTextCallsSendInput(t *testing.T) {
+	client := fakeClient(t, func(req rpcRequest) any {
+		if req.Method != "send_input" {
+			t.Fatalf("method = %s, want send_input", req.Method)
+		}
+		params := req.Params.(map[string]any)
+		if params["target_address"] != "host/alpha" || params["input_type"] != "text" || params["text"] != "hello" || params["submit"] != false {
+			t.Fatalf("params = %+v", params)
+		}
+		return true
+	})
+	if err := client.SendText(context.Background(), "host/alpha", "hello", false); err != nil {
+		t.Fatalf("SendText: %v", err)
+	}
+}
+
+func TestSendKeysCallsSendInput(t *testing.T) {
+	client := fakeClient(t, func(req rpcRequest) any {
+		if req.Method != "send_input" {
+			t.Fatalf("method = %s, want send_input", req.Method)
+		}
+		params := req.Params.(map[string]any)
+		keys := params["keys"].([]any)
+		if params["agent_name"] != "alpha" || params["input_type"] != "keys" || len(keys) != 2 || keys[0] != "Escape" || keys[1] != "C-c" {
+			t.Fatalf("params = %+v", params)
+		}
+		return true
+	})
+	if err := client.SendKeys(context.Background(), "alpha", []string{"Escape", "C-c"}); err != nil {
+		t.Fatalf("SendKeys: %v", err)
+	}
+}
+
 func TestCallHonorsContextCancellationAfterDial(t *testing.T) {
 	client := &Client{
 		SocketPath: "fake.sock",

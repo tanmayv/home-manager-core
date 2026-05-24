@@ -171,6 +171,26 @@ func (c *Client) SendMessageWithID(ctx context.Context, senderName, target, body
 	if messageID != "" {
 		params["message_id"] = messageID
 	}
+	applyTargetParams(params, target)
+	if len(attachments) > 0 {
+		params["attachments"] = attachments
+	}
+	return c.call(ctx, "send_message", params, 10*time.Second, nil)
+}
+
+func (c *Client) SendText(ctx context.Context, target, text string, submit bool) error {
+	params := map[string]any{"input_type": "text", "text": text, "submit": submit}
+	applyTargetParams(params, target)
+	return c.call(ctx, "send_input", params, 10*time.Second, nil)
+}
+
+func (c *Client) SendKeys(ctx context.Context, target string, keys []string) error {
+	params := map[string]any{"input_type": "keys", "keys": keys}
+	applyTargetParams(params, target)
+	return c.call(ctx, "send_input", params, 10*time.Second, nil)
+}
+
+func applyTargetParams(params map[string]any, target string) {
 	if strings.Contains(target, "/") {
 		params["target_address"] = target
 	} else if isUUID(target) {
@@ -178,10 +198,6 @@ func (c *Client) SendMessageWithID(ctx context.Context, senderName, target, body
 	} else {
 		params["agent_name"] = target
 	}
-	if len(attachments) > 0 {
-		params["attachments"] = attachments
-	}
-	return c.call(ctx, "send_message", params, 10*time.Second, nil)
 }
 
 func isUUID(value string) bool {
