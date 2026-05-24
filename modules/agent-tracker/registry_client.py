@@ -683,7 +683,15 @@ def _delivery_loop(client=None):
                     LOG.info("delivering queued registry pane_input message_id=%s input_type=%s target_agent_id=%s", delivery.get("message_id"), delivery.get("input_type"), delivery.get("target_agent_id"))
                     if not delivery.get("target_agent_id"):
                         raise DeliveryValidationError("target_agent_id is required")
-                    input_obj = {"input_type": delivery.get("input_type")}
+                    input_obj = {
+                        "input_type": delivery.get("input_type"),
+                        "remote": True,
+                        "message_id": delivery.get("message_id"),
+                        "sender_agent_id": delivery.get("sender_agent_id"),
+                        "sender_name": delivery.get("sender_name"),
+                        "sender_tracker_id": delivery.get("sender_tracker_id"),
+                        "sender_tracker": delivery.get("sender_tracker"),
+                    }
                     if delivery.get("input_type") == "text":
                         input_obj.update({"text": delivery.get("text"), "submit": delivery.get("submit", True)})
                     else:

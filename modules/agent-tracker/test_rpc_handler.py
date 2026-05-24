@@ -380,6 +380,30 @@ class TestRpcHandler(unittest.TestCase):
         self.assertEqual(result, {"success": True, "target": "remote-host/agent2", "mode": "text", "remote": True})
         send_remote.assert_called_once_with("sender", "sender-id", registry_client.TRACKER_ID, "remote-host", "agent2", "text", text="hello", keys=None, submit=False)
 
+    @mock.patch("registry_client.send_remote_pane_input")
+    def test_send_input_remote_can_be_disabled(self, send_remote):
+        state.set_agent("sender", {"agent_id": "sender-id", "tmux_pane": "%1"})
+
+        with mock.patch.dict(os.environ, {"AGENT_TRACKER_ALLOW_REMOTE_PANE_INPUT": "false"}):
+            with self.assertRaises(RuntimeError):
+                rpc_handler.handle_send_input({"agent_name": "sender", "target_address": "remote-host/agent2", "input_type": "text", "text": "hello"})
+
+        send_remote.assert_not_called()
+
+    @mock.patch("tmux_util.send_literal_text")
+    def test_send_input_audit_log_redacts_text_payload(self, send_literal_text):
+        state.set_agent("agent1", {"agent_id": "id-1", "tmux_pane": "%1", "tmux_socket": "sock"})
+
+        with self.assertLogs(level="INFO") as logs:
+            rpc_handler.handle_send_input({"agent_name": "agent1", "input_type": "text", "text": "super-secret-text", "submit": True, "sender_name": "tester", "message_id": "m1"})
+
+        joined = "\n".join(logs.output)
+        self.assertIn("audit direct_pane_input", joined)
+        self.assertIn("text_length=17", joined)
+        self.assertIn("message_id=m1", joined)
+        self.assertNotIn("super-secret-text", joined)
+        send_literal_text.assert_called_once_with("%1", "super-secret-text", submit=True, socket_path="sock")
+
     @mock.patch("registry_client.send_remote_pane_input_to_registry", return_value=(202, {"queued": True}))
     def test_send_input_routes_explicit_registry_target_address(self, send_remote):
         state.set_agent("sender", {"agent_id": "sender-id", "tmux_pane": "%1"})

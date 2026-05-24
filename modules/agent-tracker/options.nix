@@ -103,5 +103,11 @@ with lib;
       default = 25;
       description = "Default number of tmux pane history lines captured by agent-tracker capture-pane and send-pane commands when --last is omitted.";
     };
+
+    allowRemotePaneInput = mkOption {
+      type = types.bool;
+      default = true;
+      description = "Allow registry-routed remote direct pane input (send-text/send-key). Local direct pane input remains available.";
+    };
   };
 }

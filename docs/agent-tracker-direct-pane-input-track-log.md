@@ -153,7 +153,7 @@ Tests:
 - `cd modules/agent-tracker && python -m unittest test_http_registry.py test_rpc_handler.py test_tmux_util.py test_registry_client_routing.py test_agent_tracker_ctl.py` — OK (112 tests)
 
 ### Chunk 5 — Safety controls and backend docs/tests
-Status: Pending
+Status: Ready for review
 Owner: Coder
 Reviewer: Reviewer
 
@@ -167,6 +167,16 @@ Acceptance:
 - Remote direct input can be disabled or clearly guarded.
 - Backend documentation includes local and remote CLI examples.
 - Relevant Python tests pass.
+
+Implementation notes:
+- Added `services.agent-tracker.allowRemotePaneInput` / `agent-tracker.allow-remote-pane-input` setting, exported as `AGENT_TRACKER_ALLOW_REMOTE_PANE_INPUT`, to disable registry-routed direct pane input while leaving local direct input available.
+- Added direct pane input audit logs for local and remote send/delivery paths. Logs include source/target metadata, input type, message/request id, submit flag, text length, and key count; full text payloads are not logged.
+- Updated README and USAGE with send-message vs send-text/send-key distinctions, local/remote examples, and safety notes.
+
+Tests:
+- `cd modules/agent-tracker && python -m unittest test_rpc_handler.py test_http_registry.py test_nix_eval.py test_agent_tracker_ctl.py test_registry_client_routing.py test_tmux_util.py` — OK (120 tests)
+- `cd modules/agent-tracker && python -m unittest discover -v` — OK (168 tests)
+- `git diff --check` — OK
 
 ### Chunk 6 — Agent communicator TUI direct input actions
 Status: Pending

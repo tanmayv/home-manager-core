@@ -56,6 +56,7 @@ let
           registry-auth = false;
           http-port = 29876;
           registry-heartbeat-seconds = 45;
+          allow-remote-pane-input = false;
         }};
       }};
     }};
@@ -66,6 +67,8 @@ in builtins.toJSON {{
   registryAuth = cfg.config.services.agent-tracker.registryAuth;
   httpPort = cfg.config.services.agent-tracker.httpPort;
   registryHeartbeatSeconds = cfg.config.services.agent-tracker.registryHeartbeatSeconds;
+  allowRemotePaneInput = cfg.config.services.agent-tracker.allowRemotePaneInput;
+  serviceEnv = cfg.config.systemd.user.services.agent-tracker.Service.Environment;
 }}
 '''
         out = subprocess.check_output(["nix", "eval", "--impure", "--raw", "--expr", expr], text=True).strip()
@@ -77,6 +80,8 @@ in builtins.toJSON {{
         self.assertFalse(data["registryAuth"])
         self.assertEqual(data["httpPort"], 29876)
         self.assertEqual(data["registryHeartbeatSeconds"], 45)
+        self.assertFalse(data["allowRemotePaneInput"])
+        self.assertIn('AGENT_TRACKER_ALLOW_REMOTE_PANE_INPUT="false"', data["serviceEnv"])
 
     def test_agent_tracker_user_settings_multiple_registries_evaluate(self):
         repo = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))

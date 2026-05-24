@@ -352,6 +352,26 @@ class TestHttpAndRegistry(unittest.TestCase):
         ack.assert_called_once_with("m1")
         sleep.assert_not_called()
 
+    @mock.patch("tmux_util.send_literal_text")
+    def test_registry_client_delivery_loop_acks_disabled_remote_pane_input(self, send_literal_text):
+        state.set_agent("agent2", {"agent_id": "a2", "status": "idle", "tmux_pane": "%2", "tmux_socket": "sock"})
+        delivery = {
+            "delivery_type": "pane_input",
+            "message_id": "m1",
+            "target_agent_id": "a2",
+            "input_type": "text",
+            "text": "hello",
+        }
+        with mock.patch.dict(os.environ, {"AGENT_TRACKER_ALLOW_REMOTE_PANE_INPUT": "false"}), \
+             mock.patch.object(registry_client, "fetch_deliveries", side_effect=[(200, {"deliveries": [delivery]}), SystemExit]), \
+             mock.patch.object(registry_client, "ack_delivery") as ack, \
+             mock.patch.object(registry_client.time, "sleep") as sleep:
+            with self.assertRaises(SystemExit):
+                registry_client._delivery_loop()
+        send_literal_text.assert_not_called()
+        ack.assert_called_once_with("m1")
+        sleep.assert_not_called()
+
     @mock.patch("tmux_util.send_literal_text", side_effect=RuntimeError("tmux failed"))
     def test_registry_client_delivery_loop_does_not_ack_transient_pane_input_failure(self, _send_literal_text):
         state.set_agent("agent2", {"agent_id": "a2", "status": "idle", "tmux_pane": "%2", "tmux_socket": "sock"})

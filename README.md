@@ -61,10 +61,13 @@ build-and-switch
 <!-- [Screencast Placeholder: Agent Tracker and Status Bar Demo] -->
 <!-- Suggested: Show the status bar with color-coded agents and focusing a pane -->
 
-### Inter-Agent Communication vs. Sub-Agents
+### Inter-Agent Communication vs. Direct Pane Input
 Traditional AI workflows use "sub-agents"—child processes managed entirely by a primary agent. Our model is different: **Independent, Interactable Agents**.
 - **User Visibility**: Agents run in their own visible Tmux panes. You can see what they are doing, intervene, or take over at any time.
-- **Communication**: Agents can communicate asynchronously via the Inbox system, avoiding cluttering terminal input.
+- **Inbox Communication**: `agent-tracker-ctl send-message TARGET "message"` sends an asynchronous inbox message and notifies the target without typing into its prompt.
+- **Direct Pane Input**: `agent-tracker-ctl send-text TARGET "text"` types literal text into the target pane and submits with Enter by default. `agent-tracker-ctl send-key TARGET ESC C-c Enter` sends symbolic tmux keys. These commands bypass inbox history and are intended for explicit operator/automation control.
+- **Remote Targets**: Use the same host-qualified syntax as messaging, e.g. `send-text host-a/alice "run tests"` or `send-key corp:host-a/alice C-c`. Remote direct input requires registry routing.
+- **Safety**: Remote direct pane input can be disabled with `services.agent-tracker.allowRemotePaneInput = false;` (or `agent-tracker.allow-remote-pane-input = false` in starter settings). Audit logs record source/target metadata, input type, IDs, and text length only; full direct text payloads are not logged.
 
 <!-- [Screencast Placeholder: Inter-Agent Communication Demo] -->
 <!-- Suggested: Show an agent sending a message to another agent's inbox -->
