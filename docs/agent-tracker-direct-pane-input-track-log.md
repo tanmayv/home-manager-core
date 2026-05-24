@@ -69,7 +69,8 @@ Review follow-up:
 - Reran `cd modules/agent-tracker && python -m unittest test_tmux_util.py test_rpc_handler.py test_send_message_verify.py test_agent_tracker_ctl.py` — OK (73 tests)
 
 ### Chunk 2 — CLI commands
-Status: Ready for review
+Status: Completed
+Commit: `982a68f agent-tracker: add direct input CLI commands`
 Owner: Coder
 Reviewer: Reviewer
 
@@ -94,7 +95,8 @@ Tests:
 - `git diff --check` — OK
 
 ### Chunk 3 — Registry protocol for remote pane input
-Status: Ready for review
+Status: Completed
+Commit: `b20ee00 agent-registry: queue direct pane input deliveries`
 Owner: Coder
 Reviewer: Reviewer
 
@@ -126,7 +128,8 @@ Review follow-up:
 - Reran `git diff --check` — OK
 
 ### Chunk 4 — Remote delivery loop dispatch
-Status: Ready for review
+Status: Completed
+Commit: `179c79a agent-tracker: deliver remote pane input`
 Owner: Coder
 Reviewer: Reviewer
 
@@ -188,3 +191,4 @@ Acceptance:
 
 - 2026-05-25: Lead created feature branch `feature/agent-tracker-direct-pane-input`, spawned coder/reviewer agents, and initialized this track log.
 - 2026-05-25: Chunk 1 completed and committed as `661b962` after reviewer approval. Lead added later-scope requirement for `agent-communicator-tui` direct input actions.
+- 2026-05-25: Chunks 2, 3, and 4 completed and committed as `982a68f`, `b20ee00`, and `179c79a` after reviewer approval.
