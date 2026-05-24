@@ -69,7 +69,7 @@ Review follow-up:
 - Reran `cd modules/agent-tracker && python -m unittest test_tmux_util.py test_rpc_handler.py test_send_message_verify.py test_agent_tracker_ctl.py` — OK (73 tests)
 
 ### Chunk 2 — CLI commands
-Status: Pending
+Status: Ready for review
 Owner: Coder
 Reviewer: Reviewer
 
@@ -83,6 +83,15 @@ Acceptance:
 - `agent-tracker-ctl send-text alice "hello"` calls RPC with text + submit.
 - `agent-tracker-ctl send-text --no-submit alice "draft"` does not submit.
 - `agent-tracker-ctl send-key alice ESC C-c Enter` calls RPC with normalized/requested keys.
+
+Implementation notes:
+- Added `ctl_commands/send_text.py` and `ctl_commands/send_key.py` commands that call `send_input` RPC with `input_type=text|keys`.
+- Registered both commands in `agent-tracker-ctl.py` and added top-level help examples.
+- Target selection mirrors `send-message`: bare names map to `agent_name`, UUIDs map to `agent_id`, and host-qualified targets pass through as `target_address` for later remote support.
+
+Tests:
+- `cd modules/agent-tracker && python -m unittest test_agent_tracker_ctl.py test_send_message_verify.py test_rpc_handler.py test_tmux_util.py` — OK (80 tests)
+- `git diff --check` — OK
 
 ### Chunk 3 — Registry protocol for remote pane input
 Status: Pending

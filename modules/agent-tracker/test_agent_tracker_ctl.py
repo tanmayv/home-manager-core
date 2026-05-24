@@ -235,6 +235,106 @@ class TestAgentTrackerCtl(unittest.TestCase):
         self.assertEqual(parser.parse_args(["capture-pane", "agent1"]).last, 42)
         self.assertEqual(parser.parse_args(["send-pane", "alice"]).last, 42)
 
+    @mock.patch.dict(os.environ, {}, clear=True)
+    def test_send_text_and_send_key_parser_registration(self):
+        parser = ctl.build_parser()
+
+        parsed = parser.parse_args(["send-text", "alice", "hello"])
+        self.assertEqual(parsed.subcommand, "send-text")
+        self.assertEqual(parsed.target, "alice")
+        self.assertEqual(parsed.text, "hello")
+        self.assertFalse(parsed.no_submit)
+
+        parsed_no_submit = parser.parse_args(["send-text", "--no-submit", "alice", "draft"])
+        self.assertEqual(parsed_no_submit.subcommand, "send-text")
+        self.assertEqual(parsed_no_submit.target, "alice")
+        self.assertEqual(parsed_no_submit.text, "draft")
+        self.assertTrue(parsed_no_submit.no_submit)
+
+        parsed_keys = parser.parse_args(["send-key", "alice", "ESC", "C-c", "Enter"])
+        self.assertEqual(parsed_keys.subcommand, "send-key")
+        self.assertEqual(parsed_keys.target, "alice")
+        self.assertEqual(parsed_keys.keys, ["ESC", "C-c", "Enter"])
+
+    @mock.patch("ctl_commands.send_text.call_rpc")
+    @mock.patch.dict("os.environ", {}, clear=True)
+    def test_send_text_handler_targets_local_name(self, mock_call_rpc):
+        from ctl_commands import send_text
+        args = ctl.build_parser().parse_args(["send-text", "alice", "hello"])
+
+        send_text.handle(args)
+
+        mock_call_rpc.assert_called_once_with("send_input", {
+            "input_type": "text",
+            "text": "hello",
+            "submit": True,
+            "agent_name": "alice",
+        })
+
+    @mock.patch("ctl_commands.send_text.call_rpc")
+    @mock.patch.dict("os.environ", {}, clear=True)
+    def test_send_text_handler_no_submit_targets_local_id(self, mock_call_rpc):
+        from ctl_commands import send_text
+        target_id = "123e4567-e89b-12d3-a456-426614174000"
+        args = ctl.build_parser().parse_args(["send-text", "--no-submit", target_id, "draft"])
+
+        send_text.handle(args)
+
+        mock_call_rpc.assert_called_once_with("send_input", {
+            "input_type": "text",
+            "text": "draft",
+            "submit": False,
+            "agent_id": target_id,
+        })
+
+    @mock.patch("ctl_commands.send_key.call_rpc")
+    @mock.patch.dict("os.environ", {}, clear=True)
+    def test_send_key_handler_targets_local_name(self, mock_call_rpc):
+        from ctl_commands import send_key
+        args = ctl.build_parser().parse_args(["send-key", "alice", "ESC", "C-c", "Enter"])
+
+        send_key.handle(args)
+
+        mock_call_rpc.assert_called_once_with("send_input", {
+            "input_type": "keys",
+            "keys": ["ESC", "C-c", "Enter"],
+            "agent_name": "alice",
+        })
+
+    @mock.patch("ctl_commands.send_text.call_rpc")
+    @mock.patch.dict("os.environ", {}, clear=True)
+    def test_send_text_handler_passes_remote_target_address(self, mock_call_rpc):
+        from ctl_commands import send_text
+        args = ctl.build_parser().parse_args(["send-text", "host-a/alice", "hello"])
+
+        send_text.handle(args)
+
+        mock_call_rpc.assert_called_once_with("send_input", {
+            "input_type": "text",
+            "text": "hello",
+            "submit": True,
+            "target_address": "host-a/alice",
+        })
+
+    @mock.patch("ctl_commands.send_key.call_rpc")
+    @mock.patch.dict("os.environ", {}, clear=True)
+    def test_send_key_handler_passes_remote_target_address(self, mock_call_rpc):
+        from ctl_commands import send_key
+        args = ctl.build_parser().parse_args(["send-key", "corp:host-a/alice", "Enter"])
+
+        send_key.handle(args)
+
+        mock_call_rpc.assert_called_once_with("send_input", {
+            "input_type": "keys",
+            "keys": ["Enter"],
+            "target_address": "corp:host-a/alice",
+        })
+
+    def test_direct_input_commands_are_in_help(self):
+        help_text = ctl.build_parser().format_help()
+        self.assertIn("send-text alice", help_text)
+        self.assertIn("send-key alice", help_text)
+
     @mock.patch("ctl_commands.send_pane.call_rpc")
     @mock.patch.dict("os.environ", {}, clear=True)
     def test_send_pane_handler_execution(self, mock_call_rpc):
