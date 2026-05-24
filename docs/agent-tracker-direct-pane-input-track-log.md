@@ -153,7 +153,8 @@ Tests:
 - `cd modules/agent-tracker && python -m unittest test_http_registry.py test_rpc_handler.py test_tmux_util.py test_registry_client_routing.py test_agent_tracker_ctl.py` — OK (112 tests)
 
 ### Chunk 5 — Safety controls and backend docs/tests
-Status: Ready for review
+Status: Completed
+Commit: `c975d4f agent-tracker: guard remote pane input`
 Owner: Coder
 Reviewer: Reviewer
 
@@ -202,3 +203,4 @@ Acceptance:
 - 2026-05-25: Lead created feature branch `feature/agent-tracker-direct-pane-input`, spawned coder/reviewer agents, and initialized this track log.
 - 2026-05-25: Chunk 1 completed and committed as `661b962` after reviewer approval. Lead added later-scope requirement for `agent-communicator-tui` direct input actions.
 - 2026-05-25: Chunks 2, 3, and 4 completed and committed as `982a68f`, `b20ee00`, and `179c79a` after reviewer approval.
+- 2026-05-25: Chunk 5 completed and committed as `c975d4f` after reviewer approval.
