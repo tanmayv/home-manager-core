@@ -109,6 +109,42 @@ class TestTmuxUtil(unittest.TestCase):
             "unset AGENT_ID AGENT_NAME AGENT_UUID; export SUGGESTED_AGENT_NAME=child-agent; exec pi --some-flag 'two words'",
         )
 
+    @mock.patch("tmux_util.run_tmux_cmd")
+    def test_send_literal_text_uses_literal_mode_and_submit(self, mock_run):
+        tmux_util.send_literal_text("%1", "hello; $USER", submit=True, socket_path="sock")
+
+        self.assertEqual(mock_run.call_args_list[0].args[0], ["-S", "sock", "send-keys", "-t", "%1", "-l", "--", "hello; $USER"])
+        self.assertEqual(mock_run.call_args_list[1].args[0], ["-S", "sock", "send-keys", "-t", "%1", "Enter"])
+
+    @mock.patch("tmux_util.run_tmux_cmd")
+    def test_send_literal_text_can_skip_submit(self, mock_run):
+        tmux_util.send_literal_text("%1", "draft", submit=False)
+
+        mock_run.assert_called_once_with(["send-keys", "-t", "%1", "-l", "--", "draft"])
+
+    @mock.patch("tmux_util.run_tmux_cmd")
+    def test_send_literal_text_starting_with_dash_uses_option_separator(self, mock_run):
+        tmux_util.send_literal_text("%1", "-n", submit=False)
+
+        mock_run.assert_called_once_with(["send-keys", "-t", "%1", "-l", "--", "-n"])
+
+    @mock.patch("tmux_util.run_tmux_cmd")
+    def test_send_symbolic_keys_normalizes_aliases(self, mock_run):
+        normalized = tmux_util.send_symbolic_keys("%1", ["ESC", "ENTER", "C-C"], socket_path="sock")
+
+        self.assertEqual(normalized, ["Escape", "Enter", "C-c"])
+        mock_run.assert_called_once_with(["-S", "sock", "send-keys", "-t", "%1", "Escape", "Enter", "C-c"])
+
+    def test_send_symbolic_keys_rejects_unsafe_tokens(self):
+        with self.assertRaises(ValueError):
+            tmux_util.normalize_tmux_key_tokens(["Enter; display-message pwned"])
+        with self.assertRaises(ValueError):
+            tmux_util.normalize_tmux_key_tokens(["C-Not-A-Modifier"])
+        with self.assertRaises(ValueError):
+            tmux_util.normalize_tmux_key_tokens([" Enter"])
+        with self.assertRaises(ValueError):
+            tmux_util.normalize_tmux_key_tokens(["C-"])
+
 
 if __name__ == "__main__":
     unittest.main()

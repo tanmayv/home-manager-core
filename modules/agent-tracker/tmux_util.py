@@ -207,6 +207,85 @@ def send_keys(pane_id, keys, socket_path=None):
         # 3. Send the Enter key to submit
         enqueue_tmux_cmd(cmd_base + ["send-keys", "-t", pane_id, "Enter"])
 
+
+TMUX_KEY_ALIASES = {
+    "ESC": "Escape",
+    "ESCAPE": "Escape",
+    "ENTER": "Enter",
+    "RETURN": "Enter",
+    "RET": "Enter",
+}
+TMUX_KEY_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*$")
+TMUX_KEY_MODIFIERS = {"C", "M", "S"}
+
+
+def _tmux_cmd_prefix(socket_path=None):
+    cmd = []
+    if socket_path:
+        cmd.extend(["-S", socket_path])
+    return cmd
+
+
+def normalize_tmux_key_token(key):
+    """Normalize one symbolic tmux key token and reject unsafe tokens."""
+    if not isinstance(key, str) or not key:
+        raise ValueError("key token must be a non-empty string")
+    if key != key.strip() or any(ch.isspace() for ch in key):
+        raise ValueError(f"invalid tmux key token: {key!r}")
+    if not TMUX_KEY_TOKEN_RE.match(key):
+        raise ValueError(f"invalid tmux key token: {key!r}")
+
+    alias = TMUX_KEY_ALIASES.get(key.upper())
+    if alias:
+        return alias
+
+    parts = key.split("-")
+    if len(parts) > 1:
+        modifiers = parts[:-1]
+        if not all(part.upper() in TMUX_KEY_MODIFIERS for part in modifiers):
+            raise ValueError(f"invalid tmux key token: {key!r}")
+        final = parts[-1]
+        if not final:
+            raise ValueError(f"invalid tmux key token: {key!r}")
+        final_alias = TMUX_KEY_ALIASES.get(final.upper())
+        if final_alias:
+            final = final_alias
+        elif len(final) == 1 and final.isalpha():
+            final = final.lower()
+        return "-".join([part.upper() for part in modifiers] + [final])
+
+    return key
+
+
+def normalize_tmux_key_tokens(keys):
+    if isinstance(keys, str):
+        keys = [keys]
+    if not isinstance(keys, (list, tuple)) or not keys:
+        raise ValueError("keys must be a non-empty list")
+    return [normalize_tmux_key_token(key) for key in keys]
+
+
+def send_literal_text(pane_id, text, submit=True, socket_path=None):
+    """Send literal text to a tmux pane, optionally submitting with Enter."""
+    if not pane_id:
+        raise ValueError("pane_id is required")
+    if not isinstance(text, str):
+        raise ValueError("text must be a string")
+
+    run_tmux_cmd(_tmux_cmd_prefix(socket_path) + ["send-keys", "-t", pane_id, "-l", "--", text])
+    if submit:
+        run_tmux_cmd(_tmux_cmd_prefix(socket_path) + ["send-keys", "-t", pane_id, "Enter"])
+
+
+def send_symbolic_keys(pane_id, keys, socket_path=None):
+    """Send normalized symbolic tmux key tokens to a pane."""
+    if not pane_id:
+        raise ValueError("pane_id is required")
+    normalized = normalize_tmux_key_tokens(keys)
+    run_tmux_cmd(_tmux_cmd_prefix(socket_path) + ["send-keys", "-t", pane_id] + normalized)
+    return normalized
+
+
 def spin_agent(agent_name, command, target_pane=None, session=None, directory=None, env=None, tmux_socket=None):
     import os
     import shlex

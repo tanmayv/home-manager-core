@@ -36,7 +36,7 @@ For every chunk:
 ## Implementation Plan / Chunks
 
 ### Chunk 1 — Local pane input primitives and RPC
-Status: Pending
+Status: Ready for review
 Owner: Coder
 Reviewer: Reviewer
 
@@ -50,6 +50,21 @@ Acceptance:
 - Key mode supports aliases like `ESC`, `ENTER`, `C-C` and rejects unsafe invalid tokens.
 - Local RPC resolves target by name/ID and bypasses inbox.
 - Existing `send-message` tests remain passing.
+
+Implementation notes:
+- Added `tmux_util.send_literal_text()` using `tmux send-keys -l` plus optional `Enter` submit.
+- Added `tmux_util.send_symbolic_keys()` with normalization for aliases and modifier tokens, rejecting whitespace/shell-like unsafe tokens.
+- Added local `rpc_handler.handle_send_input()` and dispatcher wiring for text/key direct pane input.
+- Local `target_address` (`local/name` or local hostname) resolves locally; remote direct input intentionally remains unimplemented for later chunks.
+
+Tests:
+- `cd modules/agent-tracker && python -m unittest test_tmux_util.py test_rpc_handler.py` — OK (55 tests)
+- `cd modules/agent-tracker && python -m unittest test_send_message_verify.py test_agent_tracker_ctl.py` — OK (17 tests)
+
+Review follow-up:
+- Added `--` separator before literal text (`tmux send-keys -l -- TEXT`) so text beginning with `-` is not parsed as tmux options.
+- Added regression coverage for literal `-n` and rejection of malformed trailing modifier key token `C-`.
+- Reran `cd modules/agent-tracker && python -m unittest test_tmux_util.py test_rpc_handler.py test_send_message_verify.py test_agent_tracker_ctl.py` — OK (73 tests)
 
 ### Chunk 2 — CLI commands
 Status: Pending

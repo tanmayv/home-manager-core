@@ -546,6 +546,34 @@ def deliver_local_message(target_name_or_id: str, msg_obj: dict, notify_sender: 
         raise RuntimeError(f"Failed to send message: {e}")
 
 
+def _with_local_target_address(params: dict) -> dict:
+    """Convert a local host-qualified target_address into agent_name/agent_id params."""
+    target_address = params.get("target_address")
+    if not target_address or "/" not in target_address:
+        return params
+
+    hostname, target = target_address.split("/", 1)
+    if ":" in hostname:
+        _, hostname = hostname.split(":", 1)
+    if hostname not in {"local", LOCAL_HOSTNAME}:
+        raise RuntimeError("Remote direct pane input is not implemented")
+    return {**params, **({"agent_id": target} if _is_uuid(target) else {"agent_name": target})}
+
+
+def _resolve_local_pane_target(params: dict) -> tuple[str, dict]:
+    local_params = _with_local_target_address(params)
+    agent_name = _resolve_target_agent_name(local_params)
+    if not agent_name:
+        raise DeliveryTargetNotFound("Target agent not found")
+
+    info = state.get_agent(agent_name)
+    if not info:
+        raise DeliveryTargetNotFound("Target agent not found")
+    if not info.get("tmux_pane"):
+        raise ValueError("Target agent has no tmux pane")
+    return agent_name, info
+
+
 def handle_send_message(params: dict, caller_pid: int = None) -> bool:
     """Sends a message locally or routes it remotely via the registry when target_address is hostname-qualified."""
     sender_name = params.get("sender_name") or _identify_agent(params, caller_pid) or "cli-user"
@@ -607,6 +635,35 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
     verify = params.get("verify", False)
     deliver_local_message(agent_name, payload, sender_name, verify=verify)
     return {"success": True, "warning": warning_msg} if warning_msg else True
+
+
+def handle_send_input(params: dict, caller_pid: int = None) -> dict:
+    """Inject literal text or symbolic keys directly into a local agent pane."""
+    agent_name, info = _resolve_local_pane_target(params)
+    mode = params.get("mode") or params.get("input_type")
+    if not mode:
+        if "text" in params:
+            mode = "text"
+        elif "keys" in params or "key" in params:
+            mode = "keys"
+    mode = (mode or "").lower()
+
+    if mode == "text":
+        if "text" not in params or not isinstance(params.get("text"), str):
+            raise ValueError("text must be a string")
+        submit = params.get("submit", True)
+        if not isinstance(submit, bool):
+            raise ValueError("submit must be a boolean")
+        tmux_util.send_literal_text(info["tmux_pane"], params.get("text"), submit=submit, socket_path=info.get("tmux_socket"))
+        return {"success": True, "target": agent_name, "mode": "text", "submitted": submit}
+
+    if mode in {"key", "keys"}:
+        keys = params.get("keys") if "keys" in params else params.get("key")
+        normalized = tmux_util.send_symbolic_keys(info["tmux_pane"], keys, socket_path=info.get("tmux_socket"))
+        return {"success": True, "target": agent_name, "mode": "keys", "keys": normalized}
+
+    raise ValueError("mode must be 'text' or 'keys'")
+
 
 def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None, agent_name: str | None = None, agent_info: dict | None = None) -> dict:
     """Reads inbox history and marks returned messages read under a file lock."""
@@ -894,6 +951,7 @@ dispatcher = {
     "rename": handle_rename,
     "spin_agent": handle_spin_agent,
     "send_message": handle_send_message,
+    "send_input": handle_send_input,
     "get_inbox": handle_get_inbox,
     "wait_events": handle_wait_events,
     "whoami": handle_whoami,
@@ -943,7 +1001,7 @@ def handle_client(conn: socket.socket) -> None:
         if handler:
             try:
                 # Pass caller_pid to handlers that might need it
-                if method in ["get_inbox", "update_agent", "heartbeat", "send_message", "wait_events", "whoami", "list", "rename", "unregister", "spin_agent", "capture_pane"]:
+                if method in ["get_inbox", "update_agent", "heartbeat", "send_message", "send_input", "wait_events", "whoami", "list", "rename", "unregister", "spin_agent", "capture_pane"]:
                     result = handler(params, caller_pid=caller_pid)
                 else:
                     result = handler(params)

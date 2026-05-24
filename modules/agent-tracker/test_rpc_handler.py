@@ -334,6 +334,43 @@ class TestRpcHandler(unittest.TestCase):
             if os.path.exists(inbox_path):
                 os.remove(inbox_path)
 
+    @mock.patch("rpc_handler.deliver_local_message")
+    @mock.patch("tmux_util.send_literal_text")
+    def test_send_input_text_targets_name_and_bypasses_inbox(self, send_literal_text, deliver_local_message):
+        inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent("agent1", {"agent_id": "id-1", "tmux_pane": "%1", "tmux_socket": "sock"})
+
+            result = rpc_handler.handle_send_input({"agent_name": "agent1", "text": "hello", "submit": False})
+
+            self.assertEqual(result, {"success": True, "target": "agent1", "mode": "text", "submitted": False})
+            send_literal_text.assert_called_once_with("%1", "hello", submit=False, socket_path="sock")
+            deliver_local_message.assert_not_called()
+            self.assertFalse(os.path.exists(inbox_path))
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
+    @mock.patch("tmux_util.send_symbolic_keys", return_value=["Escape", "Enter", "C-c"])
+    def test_send_input_keys_targets_agent_id(self, send_symbolic_keys):
+        state.set_agent("agent1", {"agent_id": "id-1", "tmux_pane": "%1", "tmux_socket": "sock"})
+
+        result = rpc_handler.handle_send_input({"agent_id": "id-1", "mode": "keys", "keys": ["ESC", "ENTER", "C-C"]})
+
+        self.assertEqual(result, {"success": True, "target": "agent1", "mode": "keys", "keys": ["Escape", "Enter", "C-c"]})
+        send_symbolic_keys.assert_called_once_with("%1", ["ESC", "ENTER", "C-C"], socket_path="sock")
+
+    @mock.patch("tmux_util.send_literal_text")
+    def test_send_input_local_target_address_is_local_only(self, send_literal_text):
+        state.set_agent("agent1", {"agent_id": "id-1", "tmux_pane": "%1", "tmux_socket": "sock"})
+
+        self.assertTrue(rpc_handler.handle_send_input({"target_address": "local/agent1", "text": "hi"})["success"])
+        send_literal_text.assert_called_once_with("%1", "hi", submit=True, socket_path="sock")
+        with self.assertRaises(RuntimeError):
+            rpc_handler.handle_send_input({"target_address": "remote-host/agent1", "text": "hi"})
+
     def test_deliver_local_message_is_idempotent_for_message_id(self):
         inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
         try:
