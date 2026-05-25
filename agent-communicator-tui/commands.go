@@ -147,11 +147,30 @@ func filterConversation(messages []tracker.Message, row agentRow) []tracker.Mess
 	}
 	filtered := []tracker.Message{}
 	for _, msg := range messages {
-		if senderMatchesRow(msg.Sender, row) {
+		if messageMatchesRow(msg, row) {
 			filtered = append(filtered, msg)
 		}
 	}
 	return filtered
+}
+
+func messageMatchesRow(msg tracker.Message, row agentRow) bool {
+	msgAgentID := strings.TrimSpace(msg.SenderAgentID)
+	rowAgentID := strings.TrimSpace(row.AgentID)
+	if msgAgentID != "" && rowAgentID != "" {
+		if msgAgentID != rowAgentID {
+			return false
+		}
+		if row.Scope == "remote" {
+			msgTrackerID := strings.TrimSpace(msg.SenderTrackerID)
+			rowTrackerID := strings.TrimSpace(row.TrackerID)
+			if msgTrackerID != "" && rowTrackerID != "" && msgTrackerID != rowTrackerID {
+				return false
+			}
+		}
+		return true
+	}
+	return senderMatchesRow(msg.Sender, row)
 }
 
 func senderMatchesRow(sender string, row agentRow) bool {

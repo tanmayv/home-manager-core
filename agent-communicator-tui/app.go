@@ -452,7 +452,46 @@ func (m model) canSendCurrent() bool {
 	return len(m.rows) > 0 && !m.agentListStale
 }
 
-func conversationKey(row agentRow) string { return rowTarget(row) }
+func conversationKey(row agentRow) string {
+	agentID := strings.TrimSpace(row.AgentID)
+	if agentID != "" {
+		if row.Scope == "remote" {
+			trackerID := strings.TrimSpace(row.TrackerID)
+			if trackerID != "" {
+				return "remote:" + trackerID + ":" + agentID
+			}
+			host := strings.TrimSpace(row.Hostname)
+			if host == "" {
+				host, _ = splitRemoteTarget(rowTarget(row))
+			}
+			if host != "" {
+				return "remote:" + host + ":" + agentID
+			}
+		} else {
+			return "local:" + agentID
+		}
+	}
+	return rowTarget(row)
+}
+
+func outboxRecordMatchesRow(rec outboxRecord, row agentRow) bool {
+	recAgentID := strings.TrimSpace(rec.TargetAgentID)
+	rowAgentID := strings.TrimSpace(row.AgentID)
+	if recAgentID != "" && rowAgentID != "" {
+		if recAgentID != rowAgentID {
+			return false
+		}
+		if row.Scope == "remote" {
+			recTrackerID := strings.TrimSpace(rec.TargetTrackerID)
+			rowTrackerID := strings.TrimSpace(row.TrackerID)
+			if recTrackerID != "" && rowTrackerID != "" && recTrackerID != rowTrackerID {
+				return false
+			}
+		}
+		return true
+	}
+	return rec.TargetAddress == rowTarget(row)
+}
 
 func (m *model) selectLatestMessage() {
 	m.messageSelected = 0
@@ -473,7 +512,7 @@ func (m model) mergeSentMessages(row agentRow, inbound []tracker.Message) []trac
 	merged := append([]tracker.Message{}, inbound...)
 	key := conversationKey(row)
 	for _, rec := range m.outbox {
-		if rec.TargetAddress == key {
+		if outboxRecordMatchesRow(rec, row) {
 			merged = append(merged, outboxMessage(rec, false))
 		}
 	}
