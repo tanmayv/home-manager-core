@@ -21,6 +21,11 @@ type fakeLocal struct {
 	sentBody   string
 	sentSender string
 	sentID     string
+	textTo     string
+	textBody   string
+	textSubmit bool
+	keysTo     string
+	keys       []string
 	sendErr    error
 	events     tracker.WaitEventsResult
 }
@@ -40,6 +45,14 @@ func (f *fakeLocal) SendMessageFrom(_ context.Context, sender, target, body stri
 }
 func (f *fakeLocal) SendMessageWithID(_ context.Context, sender, target, body, id string, _ []tracker.Attachment) error {
 	f.sentSender, f.sentTo, f.sentBody, f.sentID = sender, target, body, id
+	return f.sendErr
+}
+func (f *fakeLocal) SendText(_ context.Context, target, body string, submit bool) error {
+	f.textTo, f.textBody, f.textSubmit = target, body, submit
+	return f.sendErr
+}
+func (f *fakeLocal) SendKeys(_ context.Context, target string, keys []string) error {
+	f.keysTo, f.keys = target, append([]string(nil), keys...)
 	return f.sendErr
 }
 func (f *fakeLocal) WaitEvents(context.Context, tracker.WaitOptions) (tracker.WaitEventsResult, error) {

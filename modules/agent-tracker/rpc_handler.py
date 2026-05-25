@@ -555,6 +555,42 @@ def deliver_local_message(target_name_or_id: str, msg_obj: dict, notify_sender: 
         raise RuntimeError(f"Failed to send message: {e}")
 
 
+def _with_local_target_address(params: dict) -> dict:
+    """Convert a local host-qualified target_address into agent_name/agent_id params."""
+    target_address = params.get("target_address")
+    if not target_address or "/" not in target_address:
+        return params
+
+    hostname, target = target_address.split("/", 1)
+    if ":" in hostname:
+        _, hostname = hostname.split(":", 1)
+    if hostname not in {"local", LOCAL_HOSTNAME}:
+        raise DeliveryTargetNotFound("Target agent not found locally")
+    return {**params, **({"agent_id": target} if _is_uuid(target) else {"agent_name": target})}
+
+
+def _parse_target_address(target_address: str) -> tuple[str | None, str, str]:
+    registry_name = None
+    hostname, target = target_address.split("/", 1)
+    if ":" in hostname:
+        registry_name, hostname = hostname.split(":", 1)
+    return registry_name, hostname, target
+
+
+def _resolve_local_pane_target(params: dict) -> tuple[str, dict]:
+    local_params = _with_local_target_address(params)
+    agent_name = _resolve_target_agent_name(local_params)
+    if not agent_name:
+        raise DeliveryTargetNotFound("Target agent not found")
+
+    info = state.get_agent(agent_name)
+    if not info:
+        raise DeliveryTargetNotFound("Target agent not found")
+    if not info.get("tmux_pane"):
+        raise ValueError("Target agent has no tmux pane")
+    return agent_name, info
+
+
 def handle_send_message(params: dict, caller_pid: int = None) -> bool:
     """Sends a message locally or routes it remotely via the registry when target_address is hostname-qualified."""
     sender_name = params.get("sender_name") or _identify_agent(params, caller_pid) or "cli-user"
@@ -616,6 +652,160 @@ def handle_send_message(params: dict, caller_pid: int = None) -> bool:
     verify = params.get("verify", False)
     deliver_local_message(agent_name, payload, sender_name, verify=verify)
     return {"success": True, "warning": warning_msg} if warning_msg else True
+
+
+def _send_input_mode(params: dict) -> str:
+    mode = params.get("mode") or params.get("input_type")
+    if not mode:
+        if "text" in params:
+            mode = "text"
+        elif "keys" in params or "key" in params:
+            mode = "keys"
+    mode = (mode or "").lower()
+    if mode == "key":
+        mode = "keys"
+    if mode not in {"text", "keys"}:
+        raise ValueError("mode must be 'text' or 'keys'")
+    return mode
+
+
+def _remote_pane_input_enabled() -> bool:
+    return os.environ.get("AGENT_TRACKER_ALLOW_REMOTE_PANE_INPUT", "true").lower() not in {"0", "false", "no", "off"}
+
+
+def _audit_direct_pane_input(event: str, *, target_agent_id=None, target_agent_name=None, input_type=None, message_id=None, source_agent_id=None, source_agent_name=None, source_tracker_id=None, source_tracker=None, text=None, keys=None, submit=None, remote=False):
+    """Audit direct pane input without logging full text payloads."""
+    logging.info(
+        "audit direct_pane_input event=%s remote=%s message_id=%s source_agent_id=%s source_agent_name=%s source_tracker_id=%s source_tracker=%s target_agent_id=%s target_agent_name=%s input_type=%s text_length=%s key_count=%s submit=%s",
+        event,
+        remote,
+        message_id,
+        source_agent_id,
+        source_agent_name,
+        source_tracker_id,
+        source_tracker,
+        target_agent_id,
+        target_agent_name,
+        input_type,
+        len(text) if isinstance(text, str) else None,
+        len(keys) if isinstance(keys, list) else None,
+        submit,
+    )
+
+
+def _validate_send_input_params(params: dict, mode: str) -> tuple[str | None, list | None, bool | None]:
+    if mode == "text":
+        if "text" not in params or not isinstance(params.get("text"), str):
+            raise ValueError("text must be a string")
+        submit = params.get("submit", True)
+        if not isinstance(submit, bool):
+            raise ValueError("submit must be a boolean")
+        return params.get("text"), None, submit
+
+    keys = params.get("keys") if "keys" in params else params.get("key")
+    normalized = tmux_util.normalize_tmux_key_tokens(keys)
+    return None, normalized, None
+
+
+def deliver_local_pane_input(target_agent_id: str, input_obj: dict) -> dict:
+    """Inject a validated pane-input delivery directly into a local agent pane."""
+    input_obj = input_obj or {}
+    if input_obj.get("remote") and not _remote_pane_input_enabled():
+        raise DeliveryValidationError("remote direct pane input is disabled")
+    params = {**input_obj, "agent_id": target_agent_id}
+    try:
+        mode = _send_input_mode(params)
+        text, keys, submit = _validate_send_input_params(params, mode)
+    except ValueError as e:
+        raise DeliveryValidationError(str(e)) from e
+    agent_name, info = _resolve_local_pane_target(params)
+    _audit_direct_pane_input(
+        "deliver_local",
+        remote=bool(input_obj.get("remote")),
+        message_id=input_obj.get("message_id"),
+        source_agent_id=input_obj.get("sender_agent_id"),
+        source_agent_name=input_obj.get("sender_name"),
+        source_tracker_id=input_obj.get("sender_tracker_id"),
+        source_tracker=input_obj.get("sender_tracker"),
+        target_agent_id=info.get("agent_id") or target_agent_id,
+        target_agent_name=agent_name,
+        input_type=mode,
+        text=text,
+        keys=keys,
+        submit=submit,
+    )
+
+    if mode == "text":
+        tmux_util.send_literal_text(info["tmux_pane"], text, submit=submit, socket_path=info.get("tmux_socket"))
+        return {"success": True, "target": agent_name, "mode": "text", "submitted": submit}
+
+    tmux_util.send_symbolic_keys(info["tmux_pane"], keys, socket_path=info.get("tmux_socket"))
+    return {"success": True, "target": agent_name, "mode": "keys", "keys": keys}
+
+
+def handle_send_input(params: dict, caller_pid: int = None) -> dict:
+    """Inject literal text or symbolic keys directly into an agent pane."""
+    sender_name = params.get("sender_name") or _identify_agent(params, caller_pid) or "cli-user"
+    sender_info = state.get_agent(params.get("sender_id") or sender_name) or {}
+    sender_id = sender_info.get("agent_id") or params.get("sender_id")
+    target_address = params.get("target_address")
+    mode = _send_input_mode(params)
+    text, keys, submit = _validate_send_input_params(params, mode)
+
+    if target_address and "/" in target_address:
+        registry_name, hostname, target = _parse_target_address(target_address)
+        logging.info("handle_send_input sender=%s sender_id=%s target_address=%s input_type=%s", sender_name, sender_id, target_address, mode)
+        if hostname not in {"local", LOCAL_HOSTNAME}:
+            if not _remote_pane_input_enabled():
+                raise RuntimeError("Remote pane input is disabled")
+            _audit_direct_pane_input(
+                "send_remote",
+                remote=True,
+                message_id=params.get("message_id"),
+                source_agent_id=sender_id,
+                source_agent_name=sender_name,
+                source_tracker_id=registry_client.TRACKER_ID,
+                target_agent_name=target_address,
+                input_type=mode,
+                text=text,
+                keys=keys,
+                submit=submit,
+            )
+            if registry_name:
+                status, body = registry_client.send_remote_pane_input_to_registry(
+                    registry_name, sender_name, sender_id, registry_client.TRACKER_ID, hostname, target, mode, text=text, keys=keys, submit=True if submit is None else submit
+                )
+            else:
+                status, body = registry_client.send_remote_pane_input(
+                    sender_name,
+                    sender_id,
+                    registry_client.TRACKER_ID,
+                    hostname,
+                    target,
+                    mode,
+                    text=text,
+                    keys=keys,
+                    submit=True if submit is None else submit,
+                )
+            if status == 202:
+                return {"success": True, "target": target_address, "mode": mode, "remote": True}
+            raise RuntimeError(f"Remote pane input failed: {(body or {}).get('message', 'unknown error')}")
+        params = {**params, **({"agent_id": target} if _is_uuid(target) else {"agent_name": target})}
+
+    agent_name, info = _resolve_local_pane_target(params)
+    local_input = {
+        "input_type": mode,
+        "message_id": params.get("message_id"),
+        "sender_agent_id": sender_id,
+        "sender_name": sender_name,
+        "sender_tracker_id": registry_client.TRACKER_ID,
+    }
+    if mode == "text":
+        local_input.update({"text": text, "submit": submit})
+    else:
+        local_input["keys"] = keys
+    return deliver_local_pane_input(info.get("agent_id") or agent_name, local_input)
+
 
 def _read_and_update_inbox_file(inbox_file: str, clear: bool, last_n: int = None, agent_name: str | None = None, agent_info: dict | None = None) -> dict:
     """Reads inbox history and marks returned messages read under a file lock."""
@@ -903,6 +1093,7 @@ dispatcher = {
     "rename": handle_rename,
     "spin_agent": handle_spin_agent,
     "send_message": handle_send_message,
+    "send_input": handle_send_input,
     "get_inbox": handle_get_inbox,
     "wait_events": handle_wait_events,
     "whoami": handle_whoami,
@@ -952,7 +1143,7 @@ def handle_client(conn: socket.socket) -> None:
         if handler:
             try:
                 # Pass caller_pid to handlers that might need it
-                if method in ["get_inbox", "update_agent", "heartbeat", "send_message", "wait_events", "whoami", "list", "rename", "unregister", "spin_agent", "capture_pane"]:
+                if method in ["get_inbox", "update_agent", "heartbeat", "send_message", "send_input", "wait_events", "whoami", "list", "rename", "unregister", "spin_agent", "capture_pane"]:
                     result = handler(params, caller_pid=caller_pid)
                 else:
                     result = handler(params)

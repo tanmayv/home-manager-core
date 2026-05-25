@@ -151,6 +151,102 @@ class TestHttpAndRegistry(unittest.TestCase):
             self.assertEqual(post(f"{base}/trackers/t2/deliveries/{message_id}/ack", {}, token="secret")[0], 200)
             self.assertEqual(get(f"{base}/trackers/t2/deliveries?wait=0", token="secret")[1]["deliveries"], [])
 
+    def test_registry_pane_inputs_queue_distinct_delivery_and_validate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state_path = os.path.join(tmp, "registry-state.json")
+            store = registry_server.Store(state_path=state_path)
+            source = {"tracker_id": "t1", "hostname": "host1", "address": "host1", "http_port": 19875, "agents": [{"agent_id": "a1", "name": "agent1", "aliases": [], "status": "idle", "agent_type": "pi", "agent_cmd": "pi"}]}
+            target = {"tracker_id": "t2", "hostname": "host2", "address": "host2", "http_port": 19876, "agents": [{"agent_id": "a2", "name": "agent2", "aliases": [], "status": "idle", "agent_type": "pi", "agent_cmd": "pi"}]}
+            store.put_tracker(source)
+            store.put_tracker(target)
+            server, base = start(registry_server.make_handler(store=store, token="secret"))
+            self.addCleanup(server.shutdown)
+            self.addCleanup(server.server_close)
+
+            code, body = post(f"{base}/pane-inputs", {"sender_tracker_id": "t1", "sender_agent_name": "agent1", "target_agent_id": "a2", "input_type": "text", "text": "hello", "submit": False}, token="secret")
+            self.assertEqual(code, 202)
+            message_id = body["message_id"]
+            reloaded = registry_server.Store(state_path=state_path)
+            queued = reloaded.wait_for_deliveries("t2", 0)[0]
+            self.assertEqual(queued["delivery_type"], "pane_input")
+            self.assertEqual(queued["message_id"], message_id)
+            self.assertEqual(queued["input_type"], "text")
+            self.assertEqual(queued["text"], "hello")
+            self.assertFalse(queued["submit"])
+
+            code, deliveries = get(f"{base}/trackers/t2/deliveries?wait=0", token="secret")
+            self.assertEqual(code, 200)
+            self.assertEqual(deliveries["deliveries"][0]["delivery_type"], "pane_input")
+            self.assertEqual(post(f"{base}/trackers/t2/deliveries/{message_id}/ack", {}, token="secret")[0], 200)
+            self.assertEqual(get(f"{base}/trackers/t2/deliveries?wait=0", token="secret")[1]["deliveries"], [])
+
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                post(f"{base}/pane-inputs", {"sender_tracker_id": "t1", "target_agent_id": "a2", "input_type": "text"}, token="secret")
+            self.assertEqual(ctx.exception.code, 400)
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                post(f"{base}/pane-inputs", {"sender_tracker_id": "t1", "target_agent_id": "a2", "input_type": "keys", "keys": []}, token="secret")
+            self.assertEqual(ctx.exception.code, 400)
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                post(f"{base}/pane-inputs", {"sender_tracker_id": "t1", "target_agent_id": "a2", "input_type": "keys", "keys": ["Enter;bad"]}, token="secret")
+            self.assertEqual(ctx.exception.code, 400)
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                post(f"{base}/pane-inputs", {"sender_tracker_id": "t1", "input_type": "text", "text": "hello"}, token="secret")
+            self.assertEqual(ctx.exception.code, 400)
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                post(f"{base}/pane-inputs", {"sender_tracker_id": "t1", "target_agent_id": "a2", "input_type": "keys", "keys": ["Enter"], "submit": True}, token="secret")
+            self.assertEqual(ctx.exception.code, 400)
+
+    def test_registry_pane_inputs_rejects_non_string_lookup_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = registry_server.Store(state_path=os.path.join(tmp, "registry-state.json"))
+            source = {"tracker_id": "t1", "hostname": "host1", "address": "host1", "http_port": 19875, "agents": [{"agent_id": "a1", "name": "agent1", "aliases": [], "status": "idle", "agent_type": "pi", "agent_cmd": "pi"}]}
+            target = {"tracker_id": "t2", "hostname": "host2", "address": "host2", "http_port": 19876, "agents": [{"agent_id": "a2", "name": "agent2", "aliases": [], "status": "idle", "agent_type": "pi", "agent_cmd": "pi"}]}
+            store.put_tracker(source)
+            store.put_tracker(target)
+            server, base = start(registry_server.make_handler(store=store, token="secret"))
+            self.addCleanup(server.shutdown)
+            self.addCleanup(server.server_close)
+
+            invalid_bodies = [
+                {"sender_tracker_id": "t1", "target_agent_id": ["x"], "input_type": "text", "text": "hello"},
+                {"sender_tracker_id": "t1", "target_agent_name": 123, "target_hostname": "host2", "input_type": "text", "text": "hello"},
+                {"sender_tracker_id": "t1", "target_agent_name": "agent2", "target_hostname": ["host2"], "input_type": "text", "text": "hello"},
+                {"sender_tracker_id": ["t1"], "target_agent_id": "a2", "input_type": "text", "text": "hello"},
+            ]
+            for body in invalid_bodies:
+                with self.subTest(body=body):
+                    with self.assertRaises(urllib.error.HTTPError) as ctx:
+                        post(f"{base}/pane-inputs", body, token="secret")
+                    self.assertEqual(ctx.exception.code, 400)
+                    error_body = json.loads(ctx.exception.read().decode())
+                    self.assertEqual(error_body["error"], "invalid_request")
+
+    def test_registry_pane_inputs_same_tracker_offline_and_name_resolution(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = registry_server.Store(state_path=os.path.join(tmp, "registry-state.json"))
+            source = {"tracker_id": "t1", "hostname": "host1", "address": "host1", "http_port": 19875, "agents": [{"agent_id": "a1", "name": "agent1", "aliases": [], "status": "idle", "agent_type": "pi", "agent_cmd": "pi"}]}
+            target = {"tracker_id": "t2", "hostname": "host2", "address": "host2", "http_port": 19876, "agents": [{"agent_id": "a2", "name": "agent2", "aliases": ["alias2"], "status": "idle", "agent_type": "pi", "agent_cmd": "pi"}]}
+            store.put_tracker(source)
+            store.put_tracker(target)
+            server, base = start(registry_server.make_handler(store=store, token="secret"))
+            self.addCleanup(server.shutdown)
+            self.addCleanup(server.server_close)
+
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                post(f"{base}/pane-inputs", {"sender_tracker_id": "t2", "target_agent_id": "a2", "input_type": "keys", "keys": ["Enter"]}, token="secret")
+            self.assertEqual(ctx.exception.code, 400)
+
+            store.trackers["t2"]["last_heartbeat"] = time.time() - 100
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                post(f"{base}/pane-inputs", {"sender_tracker_id": "t1", "target_agent_id": "a2", "input_type": "keys", "keys": ["Enter"]}, token="secret")
+            self.assertEqual(ctx.exception.code, 503)
+            store.trackers["t2"]["last_heartbeat"] = time.time()
+
+            self.assertEqual(post(f"{base}/pane-inputs", {"sender_tracker_id": "t1", "target_hostname": "host2", "target_agent_name": "alias2", "input_type": "keys", "keys": ["C-c"]}, token="secret")[0], 202)
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                post(f"{base}/pane-inputs", {"sender_tracker_id": "t1", "target_agent_name": "agent2", "input_type": "keys", "keys": ["Enter"]}, token="secret")
+            self.assertEqual(ctx.exception.code, 400)
+
     def test_registry_tracker_events_queue_ack_and_persist(self):
         with tempfile.TemporaryDirectory() as tmp:
             state_path = os.path.join(tmp, "registry-state.json")
@@ -198,6 +294,101 @@ class TestHttpAndRegistry(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError) as ctx:
                 post(f"{base}/messages", {"sender_tracker_id": "t1", "target_agent_id": "a2", "message": "hi", "attachments": [{"name": "bad.txt", "content_b64": "%%%"}]}, token="secret")
             self.assertEqual(ctx.exception.code, 400)
+
+    @mock.patch("tmux_util.send_literal_text")
+    @mock.patch("rpc_handler.deliver_local_message")
+    def test_registry_client_delivery_loop_dispatches_pane_input_text_and_acks(self, deliver_message, send_literal_text):
+        inbox_path = os.path.join(state.INBOX_DIR, "a2.inbox")
+        if os.path.exists(inbox_path):
+            os.remove(inbox_path)
+        state.set_agent("agent2", {"agent_id": "a2", "status": "idle", "tmux_pane": "%2", "tmux_socket": "sock"})
+        delivery = {
+            "delivery_type": "pane_input",
+            "message_id": "m1",
+            "target_agent_id": "a2",
+            "input_type": "text",
+            "text": "hello",
+            "submit": False,
+        }
+        with mock.patch.object(registry_client, "fetch_deliveries", side_effect=[(200, {"deliveries": [delivery]}), SystemExit]), \
+             mock.patch.object(registry_client, "ack_delivery") as ack:
+            with self.assertRaises(SystemExit):
+                registry_client._delivery_loop()
+        send_literal_text.assert_called_once_with("%2", "hello", submit=False, socket_path="sock")
+        deliver_message.assert_not_called()
+        ack.assert_called_once_with("m1")
+        self.assertFalse(os.path.exists(inbox_path))
+
+    @mock.patch("tmux_util.send_symbolic_keys")
+    def test_registry_client_delivery_loop_dispatches_pane_input_keys_and_acks(self, send_symbolic_keys):
+        state.set_agent("agent2", {"agent_id": "a2", "status": "idle", "tmux_pane": "%2", "tmux_socket": "sock"})
+        delivery = {
+            "delivery_type": "pane_input",
+            "message_id": "m1",
+            "target_agent_id": "a2",
+            "input_type": "keys",
+            "keys": ["C-c"],
+        }
+        with mock.patch.object(registry_client, "fetch_deliveries", side_effect=[(200, {"deliveries": [delivery]}), SystemExit]), \
+             mock.patch.object(registry_client, "ack_delivery") as ack:
+            with self.assertRaises(SystemExit):
+                registry_client._delivery_loop()
+        send_symbolic_keys.assert_called_once_with("%2", ["C-c"], socket_path="sock")
+        ack.assert_called_once_with("m1")
+
+    def test_registry_client_delivery_loop_acks_invalid_pane_input_immediately(self):
+        delivery = {
+            "delivery_type": "pane_input",
+            "message_id": "m1",
+            "target_agent_id": "a2",
+            "input_type": "keys",
+            "keys": [],
+        }
+        with mock.patch.object(registry_client, "fetch_deliveries", side_effect=[(200, {"deliveries": [delivery]}), SystemExit]), \
+             mock.patch.object(registry_client, "ack_delivery") as ack, \
+             mock.patch.object(registry_client.time, "sleep") as sleep:
+            with self.assertRaises(SystemExit):
+                registry_client._delivery_loop()
+        ack.assert_called_once_with("m1")
+        sleep.assert_not_called()
+
+    @mock.patch("tmux_util.send_literal_text")
+    def test_registry_client_delivery_loop_acks_disabled_remote_pane_input(self, send_literal_text):
+        state.set_agent("agent2", {"agent_id": "a2", "status": "idle", "tmux_pane": "%2", "tmux_socket": "sock"})
+        delivery = {
+            "delivery_type": "pane_input",
+            "message_id": "m1",
+            "target_agent_id": "a2",
+            "input_type": "text",
+            "text": "hello",
+        }
+        with mock.patch.dict(os.environ, {"AGENT_TRACKER_ALLOW_REMOTE_PANE_INPUT": "false"}), \
+             mock.patch.object(registry_client, "fetch_deliveries", side_effect=[(200, {"deliveries": [delivery]}), SystemExit]), \
+             mock.patch.object(registry_client, "ack_delivery") as ack, \
+             mock.patch.object(registry_client.time, "sleep") as sleep:
+            with self.assertRaises(SystemExit):
+                registry_client._delivery_loop()
+        send_literal_text.assert_not_called()
+        ack.assert_called_once_with("m1")
+        sleep.assert_not_called()
+
+    @mock.patch("tmux_util.send_literal_text", side_effect=RuntimeError("tmux failed"))
+    def test_registry_client_delivery_loop_does_not_ack_transient_pane_input_failure(self, _send_literal_text):
+        state.set_agent("agent2", {"agent_id": "a2", "status": "idle", "tmux_pane": "%2", "tmux_socket": "sock"})
+        delivery = {
+            "delivery_type": "pane_input",
+            "message_id": "m1",
+            "target_agent_id": "a2",
+            "input_type": "text",
+            "text": "hello",
+        }
+        with mock.patch.object(registry_client, "fetch_deliveries", side_effect=[(200, {"deliveries": [delivery]}), SystemExit]), \
+             mock.patch.object(registry_client, "ack_delivery") as ack, \
+             mock.patch.object(registry_client.time, "sleep") as sleep:
+            with self.assertRaises(SystemExit):
+                registry_client._delivery_loop()
+        ack.assert_not_called()
+        sleep.assert_called_once_with(2)
 
     def test_registry_client_delivery_loop_delivers_and_acks(self):
         delivery = {

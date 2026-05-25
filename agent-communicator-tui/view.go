@@ -126,7 +126,7 @@ func (m model) composerBox(width int) string {
 func (m model) footer(width int) string {
 	lines := []string{
 		"c-t view · tab section · c-n/p agent · c-a read · c-o prompts · c-h hide · c-f save · c-s save agent",
-		"↑/↓ select msg · c-u/d scroll · c-e open · c-r config · enter send · c-q quit · c-x debug capture",
+		"↑/↓ select msg · c-u/d scroll · c-e open · enter send · /text /key direct · c-q quit",
 	}
 	if m.paneCaptureStatus != "" {
 		lines = []string{m.paneCaptureStatus}
@@ -412,7 +412,7 @@ func (m model) composerLines(width int) []string {
 	prefix := m.composerPrefix()
 	prompt := prefix + string(m.composer) + cursor
 	if len(m.composer) == 0 {
-		placeholder := "type message"
+		placeholder := "type message (/text direct, /key keys, /msg inbox)"
 		if m.agentListStale {
 			placeholder = "agent tracker unavailable; sending disabled"
 		}

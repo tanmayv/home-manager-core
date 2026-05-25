@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 import ctl_commands.common as _common
 from ctl_commands.common import *  # re-export helpers for tests/backward compatibility
-from ctl_commands import daemon, ensure_running, focus, list as list_cmd, read_inbox, registry_status, rename, save, send_message, spin, status_bar, unregister, whoami, capture_pane, send_pane
+from ctl_commands import daemon, ensure_running, focus, list as list_cmd, read_inbox, registry_status, rename, save, send_message, send_text, send_key, spin, status_bar, unregister, whoami, capture_pane, send_pane
 
 def _sync_common_overrides():
     _common.REGISTRY_STATUS_PATH = REGISTRY_STATUS_PATH
@@ -40,6 +40,8 @@ COMMAND_MODULES = [
     ensure_running,
     daemon,
     send_message,
+    send_text,
+    send_key,
     focus,
     rename,
     spin,
@@ -61,6 +63,11 @@ def build_parser():
             "  send-message 123e4567-e89b-12d3-a456-426614174000 \"hello\"  # local-only by bare UUID\n"
             "  send-message host-a/alice \"hello\"          # remote by hostname/name\n"
             "  send-message host-a/123e4567-e89b-12d3-a456-426614174000 \"hello\"  # remote by hostname/UUID\n"
+            "\n"
+            "Direct pane input:\n"
+            "  send-text alice \"hello\"                  # type literal text and press Enter\n"
+            "  send-text --no-submit alice \"draft\"     # type text without Enter\n"
+            "  send-key alice ESC C-c Enter                # send symbolic keys\n"
             "\n"
             "Bare names/UUIDs stay local-only. Host-qualified targets require registry integration."
         ),

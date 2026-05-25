@@ -238,6 +238,42 @@ Avoid deeply nested pane layouts. If you need more than 3 panes, consider a new 
 
 ---
 
+## Agent Tracker Messaging and Direct Input
+
+`agent-tracker-ctl` supports two delivery styles:
+
+### Inbox messages
+
+Use `send-message` for asynchronous communication. The target receives an inbox entry and a notification; text is not typed into the target pane.
+
+```bash
+agent-tracker-ctl send-message alice "Please review the latest diff"
+agent-tracker-ctl send-message host-a/alice "Remote inbox message"
+```
+
+### Direct pane input
+
+Use `send-text` or `send-key` only when you explicitly want to type into the target agent's tmux pane, bypassing the inbox.
+
+```bash
+agent-tracker-ctl send-text alice "continue"
+agent-tracker-ctl send-text --no-submit alice "draft text left at prompt"
+agent-tracker-ctl send-key alice ESC C-c Enter
+```
+
+Remote direct input uses the same host-qualified target syntax as `send-message`:
+
+```bash
+agent-tracker-ctl send-text host-a/alice "run the focused tests"
+agent-tracker-ctl send-key corp:host-a/alice C-c
+```
+
+Safety notes:
+
+- Remote direct pane input can be disabled with `services.agent-tracker.allowRemotePaneInput = false;` or starter setting `agent-tracker.allow-remote-pane-input = false`.
+- Direct pane input audit logs include source tracker/agent, target, input type, message/request ID, submit flag, and text length. They do **not** log full direct text payloads.
+- Prefer `send-message` for normal agent communication; reserve direct input for deliberate control of the target prompt.
+
 ## Agent Communicator
 
 Prompt templates live in `~/.config/agent-communicator/prompts/<prompt-name>.md`.

@@ -334,6 +334,85 @@ class TestRpcHandler(unittest.TestCase):
             if os.path.exists(inbox_path):
                 os.remove(inbox_path)
 
+    @mock.patch("rpc_handler.deliver_local_message")
+    @mock.patch("tmux_util.send_literal_text")
+    def test_send_input_text_targets_name_and_bypasses_inbox(self, send_literal_text, deliver_local_message):
+        inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent("agent1", {"agent_id": "id-1", "tmux_pane": "%1", "tmux_socket": "sock"})
+
+            result = rpc_handler.handle_send_input({"agent_name": "agent1", "text": "hello", "submit": False})
+
+            self.assertEqual(result, {"success": True, "target": "agent1", "mode": "text", "submitted": False})
+            send_literal_text.assert_called_once_with("%1", "hello", submit=False, socket_path="sock")
+            deliver_local_message.assert_not_called()
+            self.assertFalse(os.path.exists(inbox_path))
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
+    @mock.patch("tmux_util.send_symbolic_keys", return_value=["Escape", "Enter", "C-c"])
+    def test_send_input_keys_targets_agent_id(self, send_symbolic_keys):
+        state.set_agent("agent1", {"agent_id": "id-1", "tmux_pane": "%1", "tmux_socket": "sock"})
+
+        result = rpc_handler.handle_send_input({"agent_id": "id-1", "mode": "keys", "keys": ["ESC", "ENTER", "C-C"]})
+
+        self.assertEqual(result, {"success": True, "target": "agent1", "mode": "keys", "keys": ["Escape", "Enter", "C-c"]})
+        send_symbolic_keys.assert_called_once_with("%1", ["Escape", "Enter", "C-c"], socket_path="sock")
+
+    @mock.patch("tmux_util.send_literal_text")
+    def test_send_input_local_target_address_is_local_only(self, send_literal_text):
+        state.set_agent("agent1", {"agent_id": "id-1", "tmux_pane": "%1", "tmux_socket": "sock"})
+
+        self.assertTrue(rpc_handler.handle_send_input({"target_address": "local/agent1", "text": "hi"})["success"])
+        send_literal_text.assert_called_once_with("%1", "hi", submit=True, socket_path="sock")
+        with self.assertRaises(RuntimeError):
+            rpc_handler.handle_send_input({"target_address": "remote-host/agent1", "text": "hi"})
+
+    @mock.patch("registry_client.send_remote_pane_input", return_value=(202, {"queued": True}))
+    def test_send_input_routes_remote_target_address_via_registry(self, send_remote):
+        state.set_agent("sender", {"agent_id": "sender-id", "tmux_pane": "%1"})
+
+        result = rpc_handler.handle_send_input({"agent_name": "sender", "target_address": "remote-host/agent2", "input_type": "text", "text": "hello", "submit": False})
+
+        self.assertEqual(result, {"success": True, "target": "remote-host/agent2", "mode": "text", "remote": True})
+        send_remote.assert_called_once_with("sender", "sender-id", registry_client.TRACKER_ID, "remote-host", "agent2", "text", text="hello", keys=None, submit=False)
+
+    @mock.patch("registry_client.send_remote_pane_input")
+    def test_send_input_remote_can_be_disabled(self, send_remote):
+        state.set_agent("sender", {"agent_id": "sender-id", "tmux_pane": "%1"})
+
+        with mock.patch.dict(os.environ, {"AGENT_TRACKER_ALLOW_REMOTE_PANE_INPUT": "false"}):
+            with self.assertRaises(RuntimeError):
+                rpc_handler.handle_send_input({"agent_name": "sender", "target_address": "remote-host/agent2", "input_type": "text", "text": "hello"})
+
+        send_remote.assert_not_called()
+
+    @mock.patch("tmux_util.send_literal_text")
+    def test_send_input_audit_log_redacts_text_payload(self, send_literal_text):
+        state.set_agent("agent1", {"agent_id": "id-1", "tmux_pane": "%1", "tmux_socket": "sock"})
+
+        with self.assertLogs(level="INFO") as logs:
+            rpc_handler.handle_send_input({"agent_name": "agent1", "input_type": "text", "text": "super-secret-text", "submit": True, "sender_name": "tester", "message_id": "m1"})
+
+        joined = "\n".join(logs.output)
+        self.assertIn("audit direct_pane_input", joined)
+        self.assertIn("text_length=17", joined)
+        self.assertIn("message_id=m1", joined)
+        self.assertNotIn("super-secret-text", joined)
+        send_literal_text.assert_called_once_with("%1", "super-secret-text", submit=True, socket_path="sock")
+
+    @mock.patch("registry_client.send_remote_pane_input_to_registry", return_value=(202, {"queued": True}))
+    def test_send_input_routes_explicit_registry_target_address(self, send_remote):
+        state.set_agent("sender", {"agent_id": "sender-id", "tmux_pane": "%1"})
+
+        result = rpc_handler.handle_send_input({"agent_name": "sender", "target_address": "corp:remote-host/agent2", "input_type": "keys", "keys": ["ESC", "C-c"]})
+
+        self.assertTrue(result["success"])
+        send_remote.assert_called_once_with("corp", "sender", "sender-id", registry_client.TRACKER_ID, "remote-host", "agent2", "keys", text=None, keys=["Escape", "C-c"], submit=True)
+
     def test_deliver_local_message_is_idempotent_for_message_id(self):
         inbox_path = os.path.join(state.INBOX_DIR, "id-1.inbox")
         try:
