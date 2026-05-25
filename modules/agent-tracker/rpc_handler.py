@@ -434,6 +434,10 @@ def deliver_local_message(target_name_or_id: str, msg_obj: dict, notify_sender: 
     notify_sender = notify_sender or msg_obj.get("sender", "unknown")
     attach_dir = None
     msg_id = msg_obj.get("message_id")
+    is_remote_origin = bool(
+        msg_obj.get("sender_tracker_id")
+        and msg_obj.get("sender_tracker_id") != registry_client.TRACKER_ID
+    )
 
     try:
         with _locked_inbox(inbox_file):
@@ -489,13 +493,18 @@ def deliver_local_message(target_name_or_id: str, msg_obj: dict, notify_sender: 
             "has_attachments": bool(msg_obj.get("attachments")),
         }
         state.publish_event("message_delivered", notification)
-        if msg_obj.get("sender_tracker_id") and msg_obj.get("sender_tracker_id") != registry_client.TRACKER_ID:
+        if is_remote_origin:
             registry_client.publish_tracker_event(msg_obj.get("sender_tracker_id"), "message_delivered", {
                 "message_id": msg_obj.get("message_id"),
                 "sender_agent_id": msg_obj.get("sender_agent_id"),
                 "receiver_agent_id": info.get("agent_id"),
                 "receiver_agent_name": current_name,
             })
+            if info.get("tmux_pane"):
+                try:
+                    tmux_util.focus_pane(info.get("tmux_pane"), info.get("session"), info.get("tmux_socket"))
+                except Exception as e:
+                    logging.warning("Failed to focus pane for remote message delivery to %s: %s", current_name, e)
 
         pending_item = {
             "sender": notify_sender,

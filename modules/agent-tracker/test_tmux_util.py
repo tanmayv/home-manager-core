@@ -10,6 +10,34 @@ class TestTmuxUtil(unittest.TestCase):
         # Reset the global state before each test
         tmux_util.last_send_keys_time = 0.0
 
+    @mock.patch("tmux_util.subprocess.run")
+    def test_focus_pane_switches_session_window_and_pane(self, run):
+        self.assertTrue(tmux_util.focus_pane("%3", session="work", socket_path="/tmp/tmux.sock"))
+
+        run.assert_has_calls([
+            mock.call(["tmux", "-S", "/tmp/tmux.sock", "switch-client", "-t", "work"], check=True, capture_output=True, timeout=5),
+            mock.call(["tmux", "-S", "/tmp/tmux.sock", "select-window", "-t", "%3"], check=True, capture_output=True, timeout=5),
+            mock.call(["tmux", "-S", "/tmp/tmux.sock", "select-pane", "-t", "%3"], check=True, capture_output=True, timeout=5),
+        ])
+        self.assertEqual(run.call_count, 3)
+
+    @mock.patch("tmux_util.subprocess.run")
+    def test_focus_pane_without_session_selects_window_and_pane(self, run):
+        self.assertTrue(tmux_util.focus_pane("%4"))
+
+        run.assert_has_calls([
+            mock.call(["tmux", "select-window", "-t", "%4"], check=True, capture_output=True, timeout=5),
+            mock.call(["tmux", "select-pane", "-t", "%4"], check=True, capture_output=True, timeout=5),
+        ])
+        self.assertEqual(run.call_count, 2)
+
+    @mock.patch("tmux_util.subprocess.run")
+    def test_focus_pane_is_best_effort(self, run):
+        run.side_effect = [Exception("switch failed"), mock.Mock(), mock.Mock()]
+
+        self.assertFalse(tmux_util.focus_pane("%5", session="work"))
+        self.assertEqual(run.call_count, 3)
+
     @mock.patch("tmux_util.enqueue_tmux_cmd")
     def test_send_keys_rate_limiting_gap(self, mock_enqueue):
         # 1. Trigger first send_keys (initial state)

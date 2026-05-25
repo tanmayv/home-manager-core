@@ -424,9 +424,10 @@ class TestRpcHandler(unittest.TestCase):
             if os.path.exists(inbox_path):
                 os.remove(inbox_path)
 
+    @mock.patch("tmux_util.focus_pane")
     @mock.patch("registry_client.publish_tracker_event")
     @mock.patch("tmux_util.send_keys")
-    def test_deliver_local_message_relays_remote_delivered_and_notified(self, _send_keys, publish_tracker_event):
+    def test_deliver_local_message_relays_remote_delivered_and_notified(self, _send_keys, publish_tracker_event, focus_pane):
         inbox_path = os.path.join(state.INBOX_DIR, "receiver-id.inbox")
         try:
             if os.path.exists(inbox_path):
@@ -436,6 +437,7 @@ class TestRpcHandler(unittest.TestCase):
                 "uuid": "receiver-id",
                 "tmux_pane": "%1",
                 "tmux_socket": "sock",
+                "session": "sess",
                 "status": "idle",
             })
 
@@ -461,6 +463,80 @@ class TestRpcHandler(unittest.TestCase):
                 "receiver_agent_id": "receiver-id",
                 "receiver_agent_name": "receiver",
             })
+            focus_pane.assert_called_once_with("%1", "sess", "sock")
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
+    @mock.patch("tmux_util.focus_pane")
+    def test_deliver_local_message_local_origin_does_not_focus_pane(self, focus_pane):
+        inbox_path = os.path.join(state.INBOX_DIR, "receiver-id.inbox")
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent("receiver", {
+                "agent_id": "receiver-id",
+                "uuid": "receiver-id",
+                "tmux_pane": "%1",
+                "tmux_socket": "sock",
+                "session": "sess",
+                "status": "idle",
+                "no_notify_with_send_keys": True,
+            })
+
+            rpc_handler.deliver_local_message("receiver", {
+                "sender": "local-sender",
+                "timestamp": "now",
+                "message": "hello",
+                "read": False,
+                "message_id": "msg-local-1",
+            })
+            rpc_handler.deliver_local_message("receiver", {
+                "sender": "local-sender",
+                "timestamp": "now",
+                "message": "hello again",
+                "read": False,
+                "message_id": "msg-local-2",
+                "sender_tracker_id": registry_client.TRACKER_ID,
+            })
+
+            focus_pane.assert_not_called()
+        finally:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+
+    @mock.patch("registry_client.publish_tracker_event")
+    @mock.patch("tmux_util.focus_pane", side_effect=RuntimeError("focus failed"))
+    def test_deliver_local_message_focus_failure_does_not_prevent_delivery(self, focus_pane, _publish_tracker_event):
+        inbox_path = os.path.join(state.INBOX_DIR, "receiver-id.inbox")
+        try:
+            if os.path.exists(inbox_path):
+                os.remove(inbox_path)
+            state.set_agent("receiver", {
+                "agent_id": "receiver-id",
+                "uuid": "receiver-id",
+                "tmux_pane": "%1",
+                "tmux_socket": "sock",
+                "session": "sess",
+                "status": "idle",
+                "no_notify_with_send_keys": True,
+            })
+
+            result = rpc_handler.deliver_local_message("receiver", {
+                "sender": "sender-agent (via host)",
+                "timestamp": "now",
+                "message": "hello",
+                "read": False,
+                "message_id": "msg-remote-focus-failure",
+                "sender_agent_id": "sender-id",
+                "sender_tracker_id": "tracker-1",
+            })
+
+            self.assertEqual(result, "receiver")
+            focus_pane.assert_called_once_with("%1", "sess", "sock")
+            with open(inbox_path, "r") as f:
+                message = json.loads(f.readline())
+            self.assertEqual(message["message_id"], "msg-remote-focus-failure")
         finally:
             if os.path.exists(inbox_path):
                 os.remove(inbox_path)

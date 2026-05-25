@@ -46,6 +46,41 @@ def run_tmux_cmd(cmd, timeout=5):
         logging.error(f"Unexpected error running tmux command: {e}")
         raise
 
+
+def focus_pane(pane_id, session=None, socket_path=None, timeout=5):
+    """Best-effort focus of a tmux pane.
+
+    Attempts to switch the active client to the pane's session, select the
+    containing window, and select the pane. Failures are logged and suppressed
+    so callers can use this in notification/delivery paths without blocking
+    their primary work.
+    """
+    if not pane_id:
+        logging.warning("Cannot focus tmux pane: pane_id is missing")
+        return False
+
+    tmux_cmd = ["tmux"]
+    if socket_path:
+        tmux_cmd.extend(["-S", socket_path])
+
+    commands = []
+    if session:
+        commands.append(["switch-client", "-t", session])
+    commands.extend([
+        ["select-window", "-t", pane_id],
+        ["select-pane", "-t", pane_id],
+    ])
+
+    focused = True
+    for cmd in commands:
+        try:
+            subprocess.run(tmux_cmd + cmd, check=True, capture_output=True, timeout=timeout)
+        except Exception as e:
+            logging.warning("Failed to focus tmux pane %s with command %s: %s", pane_id, cmd, e)
+            focused = False
+    return focused
+
+
 def set_agent_id(pane_id, agent_id, socket_path=None):
     cmd = ["tmux"]
     if socket_path:
