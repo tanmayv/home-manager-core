@@ -1,11 +1,20 @@
-{ pkgs, lib, userSettings ? {}, inputs, ... }:
+{ pkgs, lib, config, userSettings ? {}, inputs, ... }:
+let
+  agentTrackerSettings = userSettings.agent-tracker or {};
+  registryTokenFileFromSettings = let
+    value = agentTrackerSettings.registry-token-file or null;
+  in if value == "" then null else value;
+  cacheHome = config.xdg.cacheHome or "${config.home.homeDirectory}/.cache";
+  enableAgentTracker = userSettings.enable-agent-tracker or false;
+  enableAgentTrackerTmuxIntegration = agentTrackerSettings.enable-tmux-integration or true;
+in
 {
   imports = [
     ./modules/tmux
     ./modules/tmux-palette.nix
     ./modules/terminal
     ./modules/scripts
-    ./modules/agent-tracker
+    inputs.broccoli-comms.homeManagerModules.broccoli-comms
     ./modules/agent-communicator-web.nix
     ./modules/git
   ] ++ (if userSettings.enable_bash_over_zsh or false then [ ./modules/bash ] else [ ./modules/zsh ])
@@ -31,6 +40,46 @@
     bat
     pure-prompt
   ];
+
+  programs.broccoli-comms.install = {
+    # home-manager-core still provides these user-facing wrappers/TUI scripts;
+    # Broccoli supplies the tracker/ctl/registry implementations.
+    wrapper = lib.mkDefault false;
+    tui = lib.mkDefault false;
+  };
+
+  services.broccoli-comms = {
+    enable = lib.mkDefault enableAgentTracker;
+    tracker = {
+      enable = lib.mkDefault enableAgentTracker;
+      # Preserve the historical home-manager-core socket so existing scripts and
+      # CLIs continue to work without setting AGENT_TRACKER_SOCKET.
+      cacheDir = lib.mkDefault "${cacheHome}/agent-tracker";
+      socketPath = lib.mkDefault "${cacheHome}/agent-tracker/agent-tracker.sock";
+      registries = lib.mkDefault (agentTrackerSettings.registries or []);
+      registryAuth = lib.mkDefault (agentTrackerSettings.registry-auth or false);
+      registryTokenFile = lib.mkDefault registryTokenFileFromSettings;
+      httpPort = lib.mkDefault (agentTrackerSettings.http-port or 19876);
+      registryHeartbeatSeconds = lib.mkDefault (agentTrackerSettings.registry-heartbeat-seconds or 30);
+      enableReliableSendKeys = lib.mkDefault (agentTrackerSettings.enable-reliable-send-keys or true);
+      capturePaneDefaultLines = lib.mkDefault (agentTrackerSettings.capture-pane-default-lines or 25);
+    };
+  };
+
+  programs.tmux.statusBar.extraLines = lib.mkIf (config.services.broccoli-comms.tracker.enable && enableAgentTrackerTmuxIntegration) [
+    {
+      name = "agents";
+      command = "#(agent-tracker-ctl status-bar '#{pane_id}')";
+    }
+  ];
+
+  programs.tmux.extraConfig = lib.mkIf (config.services.broccoli-comms.tracker.enable && enableAgentTrackerTmuxIntegration) ''
+    # Agent navigation contributed by Broccoli Comms agent-tracker integration
+    bind-key N run-shell "agent-tracker-ctl focus --next"
+    bind-key P run-shell "agent-tracker-ctl focus --prev"
+    bind-key -n MouseDown3Status if-shell -F '#{==:#{mouse_status_range},agent-registries}' \
+      { display-popup -w 80% -h 40% -E "agent-tracker-ctl registry-status; echo; printf 'Press Enter to close...'; read _" }
+  '';
 
   services.agent-communicator-web.enable = lib.mkDefault true;
 }

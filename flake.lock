@@ -16,6 +16,26 @@
         "type": "github"
       }
     },
+    "broccoli-comms": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1779822360,
+        "narHash": "sha256-6MdqrhWubdkbHWmwCbDiuoz8vHv53RgSGlwL3X6ICiU=",
+        "ref": "refs/heads/main",
+        "rev": "2541cc002b610d799ad4319affd6840a3bc860e0",
+        "revCount": 71,
+        "type": "git",
+        "url": "ssh://git@github.com/tanmayv/broccoli-comms.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "ssh://git@github.com/tanmayv/broccoli-comms.git"
+      }
+    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -55,6 +75,7 @@
     "root": {
       "inputs": {
         "astronvim-template": "astronvim-template",
+        "broccoli-comms": "broccoli-comms",
         "home-manager": "home-manager",
         "nixpkgs": "nixpkgs"
       }

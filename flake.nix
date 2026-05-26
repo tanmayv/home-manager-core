@@ -8,6 +8,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    broccoli-comms = {
+      url = "git+ssh://git@github.com/tanmayv/broccoli-comms.git";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     astronvim-template = {
       url = "github:AstroNvim/template";
       flake = false;
