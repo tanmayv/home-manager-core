@@ -85,6 +85,7 @@ in
       registries = lib.mkDefault (agentTrackerSettings.registries or []);
       registryAuth = lib.mkDefault (agentTrackerSettings.registry-auth or false);
       registryTokenFile = lib.mkDefault registryTokenFileFromSettings;
+      tmuxSocketPath = lib.mkDefault (agentTrackerSettings.tmux-socket-path or null);
       httpPort = lib.mkDefault (agentTrackerSettings.http-port or 19876);
       registryHeartbeatSeconds = lib.mkDefault (agentTrackerSettings.registry-heartbeat-seconds or 30);
       enableReliableSendKeys = lib.mkDefault (agentTrackerSettings.enable-reliable-send-keys or true);
