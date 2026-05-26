@@ -78,6 +78,7 @@ in
     enable = lib.mkDefault enableAgentTracker;
     tracker = {
       enable = lib.mkDefault enableAgentTracker;
+      hostname = lib.mkDefault (agentTrackerSettings.hostname or "${config.home.username}-broccoli");
       # Preserve the historical home-manager-core socket so existing scripts and
       # CLIs continue to work without setting AGENT_TRACKER_SOCKET.
       cacheDir = lib.mkDefault "${cacheHome}/agent-tracker";
