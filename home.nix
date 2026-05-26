@@ -5,8 +5,8 @@ let
     value = agentTrackerSettings.registry-token-file or null;
   in if value == "" then null else value;
   cacheHome = config.xdg.cacheHome or "${config.home.homeDirectory}/.cache";
-  enableAgentTracker = userSettings.enable-agent-tracker or false;
-  enableAgentTrackerTmuxIntegration = agentTrackerSettings.enable-tmux-integration or true;
+  enableAgentTracker = (userSettings.enable-agent-tracker or false) || config.services.agent-tracker.enable;
+  enableAgentTrackerTmuxIntegration = config.services.agent-tracker.enableTmuxIntegration && (agentTrackerSettings.enable-tmux-integration or true);
 in
 {
   imports = [
@@ -15,6 +15,31 @@ in
     ./modules/terminal
     ./modules/scripts
     inputs.broccoli-comms.homeManagerModules.broccoli-comms
+    ({ config, lib, pkgs, ... }:
+      let
+        agentWrapperPackage = import ./modules/scripts/agent-wrapper-package.nix { inherit pkgs config; };
+      in {
+        # Backward-compatible surface for extensions that still contribute
+        # agent aliases through services.agent-tracker.*. Broccoli Comms owns
+        # the tracker daemon now; this shim only accepts legacy settings and
+        # turns services.agent-tracker.agents into wrapper commands.
+        options.services.agent-tracker = with lib; {
+          enable = mkOption { type = types.bool; default = false; description = "Deprecated compatibility alias for services.broccoli-comms.tracker.enable."; };
+          enableTmuxIntegration = mkOption { type = types.bool; default = true; description = "Deprecated compatibility flag for tmux tracker integration."; };
+          agents = mkOption { type = types.attrsOf types.str; default = {}; description = "Deprecated map of agent aliases to commands wrapped with agent-wrapper."; };
+        };
+
+        config.home.packages = lib.mkIf config.services.broccoli-comms.tracker.enable (
+          lib.mapAttrsToList (alias: command:
+            pkgs.writeShellApplication {
+              name = alias;
+              runtimeInputs = [ agentWrapperPackage ];
+              text = ''
+                exec ${agentWrapperPackage}/bin/agent-wrapper ${lib.escapeShellArg command} "$@"
+              '';
+            }) config.services.agent-tracker.agents
+        );
+      })
     ./modules/agent-communicator-web.nix
     ./modules/git
   ] ++ (if userSettings.enable_bash_over_zsh or false then [ ./modules/bash ] else [ ./modules/zsh ])
