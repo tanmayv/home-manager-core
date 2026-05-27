@@ -23,11 +23,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1779857061,
-        "narHash": "sha256-1dkjZa5Eg9wHi6cwP+eE8ShSJWp9ZvDJNMEuc9fBjAA=",
+        "lastModified": 1779859592,
+        "narHash": "sha256-dmignPD642MSyVCUIQjT6b/YapXAnIiEpfI5Z4ynHAI=",
         "ref": "refs/heads/main",
-        "rev": "2ec1ba1cb60385e3185cc3ab5803d42b3177ef2d",
-        "revCount": 93,
+        "rev": "0247298150f7f34193de30166c7306901b579850",
+        "revCount": 94,
         "type": "git",
         "url": "ssh://git@github.com/tanmayv/broccoli-comms.git"
       },
