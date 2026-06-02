@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -31,6 +32,45 @@ func fakeClient(t *testing.T, handler func(r rpcRequest) any) *Client {
 	}
 }
 
+func TestDefaultSocketPathUsesBroccoliRuntimeDir(t *testing.T) {
+	t.Setenv("AGENT_TRACKER_SOCKET", "")
+	t.Setenv("BROCCOLI_COMMS_RUNTIME_DIR", "/tmp/broccoli-runtime")
+	if got, want := DefaultSocketPath(), filepath.Join("/tmp/broccoli-runtime", "agent-tracker.sock"); got != want {
+		t.Fatalf("DefaultSocketPath() = %q, want %q", got, want)
+	}
+}
+
+func TestDefaultSocketPathPrefersExplicitAgentTrackerSocket(t *testing.T) {
+	t.Setenv("AGENT_TRACKER_SOCKET", "/tmp/private/tracker.sock")
+	t.Setenv("BROCCOLI_COMMS_RUNTIME_DIR", "/tmp/broccoli-runtime")
+	if got := DefaultSocketPath(); got != "/tmp/private/tracker.sock" {
+		t.Fatalf("DefaultSocketPath() = %q, want explicit socket", got)
+	}
+}
+
+func TestDefaultSocketPathUsesCanonicalRuntimeDefault(t *testing.T) {
+	t.Setenv("AGENT_TRACKER_SOCKET", "")
+	t.Setenv("BROCCOLI_COMMS_RUNTIME_DIR", "")
+	t.Setenv("XDG_RUNTIME_DIR", "/tmp/xdg-runtime")
+	if got, want := DefaultSocketPath(), filepath.Join("/tmp/xdg-runtime", "broccoli-comms", "agent-tracker.sock"); got != want {
+		t.Fatalf("DefaultSocketPath() = %q, want %q", got, want)
+	}
+}
+
+func TestListDecodesDetectionStatus(t *testing.T) {
+	client := fakeClient(t, func(req rpcRequest) any {
+		return map[string]Agent{"alpha": {Detection: DetectionStatus{Configured: true, Enabled: true, Provider: "claude", SecondsUntilNextScan: 4, LastResult: "no_match"}}}
+	})
+	agents, err := client.List(context.Background())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	status := agents["alpha"].Detection
+	if !status.Configured || !status.Enabled || status.Provider != "claude" || status.SecondsUntilNextScan != 4 || status.LastResult != "no_match" {
+		t.Fatalf("unexpected detection status: %+v", status)
+	}
+}
+
 func TestListSetsAgentNamesFromMapKeys(t *testing.T) {
 	client := fakeClient(t, func(req rpcRequest) any {
 		if req.Method != "list" {
@@ -44,6 +84,20 @@ func TestListSetsAgentNamesFromMapKeys(t *testing.T) {
 	}
 	if agents["alpha"].Name != "alpha" || agents["alpha"].AgentID != "id-1" {
 		t.Fatalf("agent = %+v", agents["alpha"])
+	}
+}
+
+func TestTrackerInfo(t *testing.T) {
+	client := fakeClient(t, func(req rpcRequest) any {
+		if req.Method != "tracker_info" {
+			t.Fatalf("method = %s, want tracker_info", req.Method)
+		}
+		connected := true
+		return TrackerInfo{Status: "ok", AgentCount: 3, OnlineAgentCount: 2, RegistryConnected: &connected, RemoteTrackerCount: 4, OnlineRemoteTrackerCount: 3}
+	})
+	info, err := client.TrackerInfo(context.Background())
+	if err != nil || info.AgentCount != 3 || info.OnlineAgentCount != 2 || info.RegistryConnected == nil || !*info.RegistryConnected || info.OnlineRemoteTrackerCount != 3 {
+		t.Fatalf("TrackerInfo = %+v, %v", info, err)
 	}
 }
 
@@ -77,6 +131,40 @@ func TestReadInbox(t *testing.T) {
 	inbox, err := client.ReadInbox(context.Background(), "alpha", 5, false)
 	if err != nil || len(inbox.Messages) != 1 {
 		t.Fatalf("ReadInbox = %+v, %v", inbox, err)
+	}
+}
+
+func TestReadInboxForSenderAddsStableFilters(t *testing.T) {
+	client := fakeClient(t, func(req rpcRequest) any {
+		if req.Method != "get_inbox" {
+			t.Fatalf("method = %s, want get_inbox", req.Method)
+		}
+		params := req.Params.(map[string]any)
+		if params["sender_agent_id"] != "a1" || params["sender_tracker_id"] != "t1" || params["sender_name"] != "alice" {
+			t.Fatalf("params = %+v", params)
+		}
+		return ReadInboxResult{Mode: "last_n", Messages: []Message{{Sender: "alice", Body: "hi"}}}
+	})
+	inbox, err := client.ReadInboxForSender(context.Background(), "agent-communicator", 5, false, "a1", "t1", "alice")
+	if err != nil || len(inbox.Messages) != 1 {
+		t.Fatalf("ReadInboxForSender = %+v, %v", inbox, err)
+	}
+}
+
+func TestGetUnreadCounts(t *testing.T) {
+	client := fakeClient(t, func(req rpcRequest) any {
+		if req.Method != "get_unread_counts" {
+			t.Fatalf("method = %s, want get_unread_counts", req.Method)
+		}
+		params := req.Params.(map[string]any)
+		if params["agent_name"] != "agent-communicator" {
+			t.Fatalf("agent_name = %v", params["agent_name"])
+		}
+		return UnreadCountsResult{Counts: map[string]int{"local:a1": 2}, Total: 2}
+	})
+	counts, err := client.GetUnreadCounts(context.Background(), "agent-communicator")
+	if err != nil || counts.Counts["local:a1"] != 2 || counts.Total != 2 {
+		t.Fatalf("GetUnreadCounts = %+v, %v", counts, err)
 	}
 }
 
@@ -142,29 +230,30 @@ func TestSendTextCallsSendInput(t *testing.T) {
 			t.Fatalf("method = %s, want send_input", req.Method)
 		}
 		params := req.Params.(map[string]any)
-		if params["target_address"] != "host/alpha" || params["input_type"] != "text" || params["text"] != "hello" || params["submit"] != false {
+		if params["agent_name"] != "alpha" || params["input_type"] != "text" || params["text"] != "hello" || params["submit"] != false {
 			t.Fatalf("params = %+v", params)
 		}
-		return true
+		return map[string]any{"success": true}
 	})
-	if err := client.SendText(context.Background(), "host/alpha", "hello", false); err != nil {
+	if err := client.SendText(context.Background(), "alpha", "hello", false); err != nil {
 		t.Fatalf("SendText: %v", err)
 	}
 }
 
-func TestSendKeysCallsSendInput(t *testing.T) {
+func TestSendKeysCallsSendInputWithUUIDAgentID(t *testing.T) {
+	target := "123e4567-e89b-12d3-a456-426614174000"
 	client := fakeClient(t, func(req rpcRequest) any {
 		if req.Method != "send_input" {
 			t.Fatalf("method = %s, want send_input", req.Method)
 		}
 		params := req.Params.(map[string]any)
-		keys := params["keys"].([]any)
-		if params["agent_name"] != "alpha" || params["input_type"] != "keys" || len(keys) != 2 || keys[0] != "Escape" || keys[1] != "C-c" {
+		keys, _ := params["keys"].([]any)
+		if params["agent_id"] != target || params["target_address"] != nil || params["input_type"] != "keys" || len(keys) != 2 || keys[0] != "C-c" || keys[1] != "Enter" {
 			t.Fatalf("params = %+v", params)
 		}
-		return true
+		return map[string]any{"success": true}
 	})
-	if err := client.SendKeys(context.Background(), "alpha", []string{"Escape", "C-c"}); err != nil {
+	if err := client.SendKeys(context.Background(), target, []string{"C-c", "Enter"}); err != nil {
 		t.Fatalf("SendKeys: %v", err)
 	}
 }
@@ -181,5 +270,72 @@ func TestCallHonorsContextCancellationAfterDial(t *testing.T) {
 	defer cancel()
 	if err := client.SendMessage(ctx, "alpha", "hello", nil); err == nil {
 		t.Fatal("SendMessage succeeded, want context cancellation error")
+	}
+}
+
+func fakeErrorClient(t *testing.T, method string, rpcErr map[string]any) *Client {
+	t.Helper()
+	return &Client{
+		SocketPath: "fake.sock",
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			client, server := net.Pipe()
+			go func() {
+				defer server.Close()
+				var req rpcRequest
+				if err := json.NewDecoder(server).Decode(&req); err != nil {
+					return
+				}
+				if req.Method != method {
+					t.Errorf("method = %s, want %s", req.Method, method)
+				}
+				_ = json.NewEncoder(server).Encode(map[string]any{
+					"jsonrpc": "2.0",
+					"id":      req.ID,
+					"error":   rpcErr,
+				})
+			}()
+			return client, nil
+		},
+	}
+}
+
+func TestEnsureMailboxCallsRPC(t *testing.T) {
+	client := fakeClient(t, func(req rpcRequest) any {
+		if req.Method != "ensure_mailbox" {
+			t.Fatalf("method = %s, want ensure_mailbox", req.Method)
+		}
+		params := req.Params.(map[string]any)
+		if params["agent_name"] != "agent-communicator" || params["preserve_pane"] != true {
+			t.Fatalf("params = %+v", params)
+		}
+		return EnsureMailboxResult{Name: "agent-communicator", AgentID: "id-1", UUID: "id-1"}
+	})
+	result, err := client.EnsureMailbox(context.Background(), "agent-communicator")
+	if err != nil || result.AgentID != "id-1" {
+		t.Fatalf("EnsureMailbox = %+v, %v", result, err)
+	}
+}
+
+func TestRPCErrorPreservesRawStringAndStructuredData(t *testing.T) {
+	client := fakeErrorClient(t, "get_inbox", map[string]any{
+		"code":    -32004,
+		"message": "Agent 'agent-communicator' not found",
+		"data": map[string]any{
+			"error_code": "agent_not_found",
+			"agent":      "agent-communicator",
+			"operation":  "get_inbox",
+			"retryable":  true,
+		},
+	})
+	_, err := client.ReadInbox(context.Background(), "agent-communicator", 5, false)
+	if err == nil {
+		t.Fatal("ReadInbox succeeded, want error")
+	}
+	if err.Error() != "tracker rpc get_inbox failed: Agent 'agent-communicator' not found" {
+		t.Fatalf("error string = %q", err.Error())
+	}
+	rpcErr, ok := err.(*RPCError)
+	if !ok || rpcErr.Data == nil || rpcErr.Data.ErrorCode != "agent_not_found" || !rpcErr.Data.Retryable {
+		t.Fatalf("rpc error = %#v", err)
 	}
 }

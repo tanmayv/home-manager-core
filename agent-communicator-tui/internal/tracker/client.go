@@ -32,23 +32,41 @@ type rpcResponse struct {
 }
 
 type rpcError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
+	Code    int             `json:"code"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data,omitempty"`
+}
+
+type RPCErrorData struct {
+	ErrorCode string `json:"error_code,omitempty"`
+	Agent     string `json:"agent,omitempty"`
+	Hostname  string `json:"hostname,omitempty"`
+	Operation string `json:"operation,omitempty"`
+	Retryable bool   `json:"retryable,omitempty"`
+}
+
+type RPCError struct {
+	Method  string
+	Code    int
+	Message string
+	Data    *RPCErrorData
+}
+
+func (e *RPCError) Error() string {
+	return fmt.Sprintf("tracker rpc %s failed: %s", e.Method, e.Message)
 }
 
 func DefaultSocketPath() string {
 	if path := os.Getenv("AGENT_TRACKER_SOCKET"); path != "" {
 		return path
 	}
-	cacheHome := os.Getenv("XDG_CACHE_HOME")
-	if cacheHome == "" {
-		home, err := os.UserHomeDir()
-		if err != nil || home == "" {
-			return filepath.Join(".cache", "agent-tracker", "agent-tracker.sock")
-		}
-		cacheHome = filepath.Join(home, ".cache")
+	if runtimeDir := os.Getenv("BROCCOLI_COMMS_RUNTIME_DIR"); runtimeDir != "" {
+		return filepath.Join(runtimeDir, "agent-tracker.sock")
 	}
-	return filepath.Join(cacheHome, "agent-tracker", "agent-tracker.sock")
+	if runtimeDir := os.Getenv("XDG_RUNTIME_DIR"); runtimeDir != "" {
+		return filepath.Join(runtimeDir, "broccoli-comms", "agent-tracker.sock")
+	}
+	return filepath.Join("/tmp", fmt.Sprint(os.Getuid()), "broccoli-comms", "agent-tracker.sock")
 }
 
 func New(socketPath string) *Client {
@@ -109,12 +127,31 @@ func (c *Client) call(ctx context.Context, method string, params any, timeout ti
 		return err
 	}
 	if resp.Error != nil {
-		return fmt.Errorf("tracker rpc %s failed: %s", method, resp.Error.Message)
+		rpcErr := &RPCError{Method: method, Code: resp.Error.Code, Message: resp.Error.Message}
+		if len(resp.Error.Data) > 0 {
+			var data RPCErrorData
+			if err := json.Unmarshal(resp.Error.Data, &data); err == nil {
+				rpcErr.Data = &data
+			}
+		}
+		return rpcErr
 	}
 	if out == nil {
 		return nil
 	}
 	return json.Unmarshal(resp.Result, out)
+}
+
+func (c *Client) EnsureMailbox(ctx context.Context, agentName string) (EnsureMailboxResult, error) {
+	var result EnsureMailboxResult
+	err := c.call(ctx, "ensure_mailbox", map[string]any{"agent_name": agentName, "preserve_pane": true}, 5*time.Second, &result)
+	return result, err
+}
+
+func (c *Client) TrackerInfo(ctx context.Context) (TrackerInfo, error) {
+	var result TrackerInfo
+	err := c.call(ctx, "tracker_info", map[string]any{}, 5*time.Second, &result)
+	return result, err
 }
 
 func (c *Client) List(ctx context.Context) (map[string]Agent, error) {
@@ -146,12 +183,34 @@ func (c *Client) WaitEvents(ctx context.Context, opts WaitOptions) (WaitEventsRe
 }
 
 func (c *Client) ReadInbox(ctx context.Context, agentName string, last int, clear bool) (ReadInboxResult, error) {
+	return c.ReadInboxForSender(ctx, agentName, last, clear, "", "", "")
+}
+
+func (c *Client) ReadInboxForSender(ctx context.Context, agentName string, last int, clear bool, senderAgentID, senderTrackerID, senderName string) (ReadInboxResult, error) {
 	params := map[string]any{"agent_name": agentName, "clear": clear}
 	if last > 0 {
 		params["last_n"] = last
 	}
+	if senderAgentID != "" {
+		params["sender_agent_id"] = senderAgentID
+	}
+	if senderTrackerID != "" {
+		params["sender_tracker_id"] = senderTrackerID
+	}
+	if senderName != "" {
+		params["sender_name"] = senderName
+	}
 	var result ReadInboxResult
 	err := c.call(ctx, "get_inbox", params, 5*time.Second, &result)
+	return result, err
+}
+
+func (c *Client) GetUnreadCounts(ctx context.Context, agentName string) (UnreadCountsResult, error) {
+	var result UnreadCountsResult
+	err := c.call(ctx, "get_unread_counts", map[string]any{"agent_name": agentName}, 5*time.Second, &result)
+	if result.Counts == nil {
+		result.Counts = map[string]int{}
+	}
 	return result, err
 }
 
@@ -171,7 +230,9 @@ func (c *Client) SendMessageWithID(ctx context.Context, senderName, target, body
 	if messageID != "" {
 		params["message_id"] = messageID
 	}
-	applyTargetParams(params, target)
+	for key, value := range messageTargetParams(target) {
+		params[key] = value
+	}
 	if len(attachments) > 0 {
 		params["attachments"] = attachments
 	}
@@ -180,24 +241,38 @@ func (c *Client) SendMessageWithID(ctx context.Context, senderName, target, body
 
 func (c *Client) SendText(ctx context.Context, target, text string, submit bool) error {
 	params := map[string]any{"input_type": "text", "text": text, "submit": submit}
-	applyTargetParams(params, target)
+	for key, value := range directInputTargetParams(target) {
+		params[key] = value
+	}
 	return c.call(ctx, "send_input", params, 10*time.Second, nil)
 }
 
 func (c *Client) SendKeys(ctx context.Context, target string, keys []string) error {
 	params := map[string]any{"input_type": "keys", "keys": keys}
-	applyTargetParams(params, target)
+	for key, value := range directInputTargetParams(target) {
+		params[key] = value
+	}
 	return c.call(ctx, "send_input", params, 10*time.Second, nil)
 }
 
-func applyTargetParams(params map[string]any, target string) {
+func messageTargetParams(target string) map[string]any {
 	if strings.Contains(target, "/") {
-		params["target_address"] = target
-	} else if isUUID(target) {
-		params["target_address"] = "local/" + target
-	} else {
-		params["agent_name"] = target
+		return map[string]any{"target_address": target}
 	}
+	if isUUID(target) {
+		return map[string]any{"target_address": "local/" + target}
+	}
+	return map[string]any{"agent_name": target}
+}
+
+func directInputTargetParams(target string) map[string]any {
+	if strings.Contains(target, "/") {
+		return map[string]any{"target_address": target}
+	}
+	if isUUID(target) {
+		return map[string]any{"agent_id": target}
+	}
+	return map[string]any{"agent_name": target}
 }
 
 func isUUID(value string) bool {

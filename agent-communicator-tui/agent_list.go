@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -15,18 +16,47 @@ import (
 
 var agentListProvider = loadAgentsFromCtlProvider
 
+func broccoliAgentTrackerCommand(args ...string) *exec.Cmd {
+	return broccoliAgentTrackerCommandContext(context.Background(), args...)
+}
+
+func broccoliAgentTrackerCommandContext(ctx context.Context, args ...string) *exec.Cmd {
+	cli := os.Getenv("BROCCOLI_COMMS_CLI")
+	if cli == "" {
+		cli = "broccoli-comms"
+	}
+	trackerArgs := append([]string{"agent-tracker"}, args...)
+	return exec.CommandContext(ctx, cli, trackerArgs...)
+}
+
+func loadHealth(local localClient) tea.Cmd {
+	return func() tea.Msg {
+		if local == nil {
+			return healthLoaded{}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		info, err := local.TrackerInfo(ctx)
+		return healthLoaded{Info: info, Err: err}
+	}
+}
+
 type ctlAgent struct {
-	Name          string   `json:"name"`
-	Aliases       []string `json:"aliases"`
-	AgentID       string   `json:"agent_id"`
-	Scope         string   `json:"scope"`
-	Status        string   `json:"status"`
-	CWD           string   `json:"cwd"`
-	Hostname      string   `json:"hostname"`
-	TargetAddress string   `json:"target_address"`
-	TrackerID     string   `json:"tracker_id"`
-	TmuxPane      string   `json:"tmux_pane"`
-	AgentCmd      string   `json:"agent_cmd"`
+	Name          string                  `json:"name"`
+	Aliases       []string                `json:"aliases"`
+	AgentID       string                  `json:"agent_id"`
+	Scope         string                  `json:"scope"`
+	Status        string                  `json:"status"`
+	CWD           string                  `json:"cwd"`
+	Hostname      string                  `json:"hostname"`
+	TargetAddress string                  `json:"target_address"`
+	TrackerID     string                  `json:"tracker_id"`
+	RegistryName  string                  `json:"registry_name"`
+	TmuxPane      string                  `json:"tmux_pane"`
+	AgentCmd      string                  `json:"agent_cmd"`
+	AgentType     string                  `json:"agent_type"`
+	ModelType     string                  `json:"model_type"`
+	Detection     tracker.DetectionStatus `json:"detection"`
 }
 
 func loadAgents(local localClient) tea.Cmd {
@@ -68,13 +98,13 @@ func loadAgentsFromRPC(ctx context.Context, local localClient) ([]agentRow, erro
 }
 
 func loadAgentsFromCtl(ctx context.Context) ([]agentRow, error) {
-	out, err := exec.CommandContext(ctx, "agent-tracker-ctl", "list").Output()
+	out, err := broccoliAgentTrackerCommandContext(ctx, "list").Output()
 	if err != nil {
-		return nil, fmt.Errorf("agent-tracker-ctl list: %w", err)
+		return nil, fmt.Errorf("broccoli-comms agent-tracker list: %w", err)
 	}
 	var agents map[string]ctlAgent
 	if err := json.Unmarshal(out, &agents); err != nil {
-		return nil, fmt.Errorf("decode agent-tracker-ctl list: %w", err)
+		return nil, fmt.Errorf("decode broccoli-comms agent-tracker list: %w", err)
 	}
 	rows := make([]agentRow, 0, len(agents))
 	for key, agent := range agents {
@@ -95,8 +125,12 @@ func rowFromCtlAgent(key string, agent ctlAgent) agentRow {
 		Hostname:      agent.Hostname,
 		TargetAddress: agent.TargetAddress,
 		TrackerID:     agent.TrackerID,
+		RegistryName:  agent.RegistryName,
 		TmuxPane:      agent.TmuxPane,
 		AgentCmd:      agent.AgentCmd,
+		AgentType:     agent.AgentType,
+		ModelType:     agent.ModelType,
+		Detection:     agent.Detection,
 	})
 }
 
@@ -120,10 +154,15 @@ func rowFromTrackerAgent(key string, agent tracker.Agent) agentRow {
 			Scope:         "local",
 			Status:        agent.Status,
 			CWD:           fallback(agent.CWD, "unknown"),
+			Hostname:      agent.Hostname,
 			TmuxPane:      agent.TmuxPane,
 			AgentCmd:      agent.AgentCmd,
+			AgentType:     agent.AgentType,
 			AgentID:       agent.AgentID,
 			TrackerID:     agent.TrackerID,
+			RegistryName:  agent.RegistryName,
+			ModelType:     agent.ModelType,
+			Detection:     agent.Detection,
 		}
 	}
 	host, name := splitRemoteTarget(target)
@@ -143,8 +182,12 @@ func rowFromTrackerAgent(key string, agent tracker.Agent) agentRow {
 		CWD:           fallback(agent.CWD, "unavailable"),
 		TmuxPane:      agent.TmuxPane,
 		AgentCmd:      agent.AgentCmd,
+		AgentType:     agent.AgentType,
 		AgentID:       agent.AgentID,
 		TrackerID:     agent.TrackerID,
+		RegistryName:  agent.RegistryName,
+		ModelType:     agent.ModelType,
+		Detection:     agent.Detection,
 	}
 }
 

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -16,8 +15,12 @@ import (
 )
 
 type localClient interface {
+	EnsureMailbox(context.Context, string) (tracker.EnsureMailboxResult, error)
+	TrackerInfo(context.Context) (tracker.TrackerInfo, error)
 	List(context.Context) (map[string]tracker.Agent, error)
 	ReadInbox(context.Context, string, int, bool) (tracker.ReadInboxResult, error)
+	ReadInboxForSender(context.Context, string, int, bool, string, string, string) (tracker.ReadInboxResult, error)
+	GetUnreadCounts(context.Context, string) (tracker.UnreadCountsResult, error)
 	SendMessage(context.Context, string, string, []tracker.Attachment) error
 	SendMessageFrom(context.Context, string, string, string, []tracker.Attachment) error
 	SendText(context.Context, string, string, bool) error
@@ -31,9 +34,31 @@ type messageIDSender interface {
 	SendMessageWithID(context.Context, string, string, string, string, []tracker.Attachment) error
 }
 
-type agentRow struct{ Name, Scope, Status, CWD, TargetAddress, Hostname, AgentName, TmuxPane, AgentCmd, AgentID, TrackerID string }
+type agentRow struct {
+	Name          string
+	Scope         string
+	Status        string
+	CWD           string
+	TargetAddress string
+	Hostname      string
+	AgentName     string
+	TmuxPane      string
+	AgentCmd      string
+	AgentType     string
+	AgentID       string
+	TrackerID     string
+	RegistryName  string
+	ModelType     string
+	Detection     tracker.DetectionStatus
+}
+type mailboxEnsured struct{ Err error }
+
 type agentsLoaded struct {
 	Rows []agentRow
+	Err  error
+}
+type healthLoaded struct {
+	Info tracker.TrackerInfo
 	Err  error
 }
 type inboxLoaded struct {
@@ -44,6 +69,10 @@ type allInboxLoaded struct {
 	Messages []tracker.Message
 	Err      error
 }
+type unreadCountsLoaded struct {
+	Counts map[string]int
+	Err    error
+}
 type messageSent struct {
 	Body   string
 	Row    agentRow
@@ -51,10 +80,10 @@ type messageSent struct {
 	Err    error
 }
 type directInputSent struct {
-	Body   string
-	Row    agentRow
-	Action string
-	Err    error
+	Original string
+	Row      agentRow
+	Mode     string
+	Err      error
 }
 type eventsLoaded struct {
 	Result tracker.WaitEventsResult
@@ -63,6 +92,8 @@ type eventsLoaded struct {
 type refreshTick struct{}
 type retryEvents struct{}
 type agentListSpinnerTick struct{}
+type cursorBlinkTick struct{}
+type clearDirectInputStatusTick struct{}
 
 type promptTemplate struct {
 	Name string
@@ -118,6 +149,18 @@ func loadPromptTemplates(dir string) ([]promptTemplate, error) {
 	return prompts, nil
 }
 
+func ensureMailboxCmd(local localClient, ownName string) tea.Cmd {
+	return func() tea.Msg {
+		if local == nil || strings.TrimSpace(ownName) == "" {
+			return mailboxEnsured{}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_, err := local.EnsureMailbox(ctx, ownName)
+		return mailboxEnsured{Err: err}
+	}
+}
+
 func loadInbox(local localClient, inboxOwner string, row agentRow) tea.Cmd {
 	return func() tea.Msg {
 		if local == nil || row.Name == "" {
@@ -132,7 +175,8 @@ func loadInbox(local localClient, inboxOwner string, row agentRow) tea.Cmd {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		inbox, err := local.ReadInbox(ctx, owner, simpleInboxFetchLimit, false)
+		senderAgentID, senderTrackerID, senderName := rowInboxFilters(row)
+		inbox, err := local.ReadInboxForSender(ctx, owner, simpleInboxFetchLimit, false, senderAgentID, senderTrackerID, senderName)
 		return inboxLoaded{Messages: filterConversation(inbox.Messages, row), Err: err}
 	}
 }
@@ -149,6 +193,30 @@ func loadAllInbox(local localClient, inboxOwner string) tea.Cmd {
 	}
 }
 
+func loadUnreadCounts(local localClient, inboxOwner string) tea.Cmd {
+	return func() tea.Msg {
+		if local == nil || strings.TrimSpace(inboxOwner) == "" {
+			return unreadCountsLoaded{}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		result, err := local.GetUnreadCounts(ctx, inboxOwner)
+		return unreadCountsLoaded{Counts: result.Counts, Err: err}
+	}
+}
+
+func rowInboxFilters(row agentRow) (senderAgentID, senderTrackerID, senderName string) {
+	if row.AgentID != "" {
+		senderAgentID = row.AgentID
+		senderTrackerID = row.TrackerID
+		return senderAgentID, senderTrackerID, ""
+	}
+	if row.Scope == "remote" {
+		return "", "", ""
+	}
+	return "", "", fallback(row.AgentName, row.Name)
+}
+
 func filterConversation(messages []tracker.Message, row agentRow) []tracker.Message {
 	if row.Name == "" {
 		return messages
@@ -160,25 +228,6 @@ func filterConversation(messages []tracker.Message, row agentRow) []tracker.Mess
 		}
 	}
 	return filtered
-}
-
-func messageMatchesRow(msg tracker.Message, row agentRow) bool {
-	msgAgentID := strings.TrimSpace(msg.SenderAgentID)
-	rowAgentID := strings.TrimSpace(row.AgentID)
-	if msgAgentID != "" && rowAgentID != "" {
-		if msgAgentID != rowAgentID {
-			return false
-		}
-		if row.Scope == "remote" {
-			msgTrackerID := strings.TrimSpace(msg.SenderTrackerID)
-			rowTrackerID := strings.TrimSpace(row.TrackerID)
-			if msgTrackerID != "" && rowTrackerID != "" && msgTrackerID != rowTrackerID {
-				return false
-			}
-		}
-		return true
-	}
-	return senderMatchesRow(msg.Sender, row)
 }
 
 func senderMatchesRow(sender string, row agentRow) bool {
@@ -225,27 +274,62 @@ func deletePreviousWord(value []rune) []rune {
 const markdownReplyInstruction = "PS: Reply in markdown format."
 
 type composerAction struct {
-	Kind   string
-	Body   string
-	Submit bool
-	Keys   []string
+	Kind     string
+	Body     string
+	Text     string
+	Submit   bool
+	Keys     []string
+	Original string
 }
 
 func parseComposerAction(input string) composerAction {
-	body := strings.TrimSpace(input)
-	if strings.HasPrefix(body, "/text --no-submit ") {
-		return composerAction{Kind: "text", Body: strings.TrimSpace(strings.TrimPrefix(body, "/text --no-submit ")), Submit: false}
+	trimmed := strings.TrimSpace(input)
+	action := composerAction{Kind: "message", Body: input, Submit: true, Original: input}
+	if trimmed == "" {
+		return action
 	}
-	if strings.HasPrefix(body, "/text ") {
-		return composerAction{Kind: "text", Body: strings.TrimSpace(strings.TrimPrefix(body, "/text ")), Submit: true}
+	if trimmed == "/msg" {
+		action.Body = ""
+		return action
 	}
-	if strings.HasPrefix(body, "/key ") {
-		return composerAction{Kind: "key", Keys: strings.Fields(strings.TrimSpace(strings.TrimPrefix(body, "/key ")))}
+	if strings.HasPrefix(trimmed, "/msg ") {
+		action.Body = strings.TrimSpace(strings.TrimPrefix(trimmed, "/msg"))
+		return action
 	}
-	if strings.HasPrefix(body, "/msg ") {
-		return composerAction{Kind: "message", Body: strings.TrimSpace(strings.TrimPrefix(body, "/msg "))}
+	if trimmed == "/text" {
+		return composerAction{Kind: "direct_text", Submit: true, Original: input}
 	}
-	return composerAction{Kind: "message", Body: input}
+	if strings.HasPrefix(trimmed, "/text ") {
+		rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "/text"))
+		submit := true
+		if rest == "--no-submit" {
+			rest = ""
+			submit = false
+		} else if strings.HasPrefix(rest, "--no-submit ") {
+			rest = strings.TrimSpace(strings.TrimPrefix(rest, "--no-submit"))
+			submit = false
+		}
+		return composerAction{Kind: "direct_text", Text: rest, Submit: submit, Original: input}
+	}
+	if trimmed == "/key" || trimmed == "/keys" {
+		return composerAction{Kind: "direct_keys", Original: input}
+	}
+	if strings.HasPrefix(trimmed, "/key ") {
+		rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "/key"))
+		return composerAction{Kind: "direct_keys", Keys: strings.Fields(rest), Original: input}
+	}
+	if strings.HasPrefix(trimmed, "/keys ") {
+		rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "/keys"))
+		return composerAction{Kind: "direct_keys", Keys: strings.Fields(rest), Original: input}
+	}
+	if trimmed == "/broadcast" {
+		return composerAction{Kind: "broadcast", Original: input}
+	}
+	if strings.HasPrefix(trimmed, "/broadcast ") {
+		rest := strings.TrimSpace(strings.TrimPrefix(trimmed, "/broadcast"))
+		return composerAction{Kind: "broadcast", Body: rest, Original: input}
+	}
+	return action
 }
 
 func sendCurrentMessage(local localClient, senderName string, row agentRow, body string) tea.Cmd {
@@ -279,40 +363,58 @@ func sendOutboxRecord(local localClient, senderName string, row agentRow, record
 	}
 }
 
+func sendDirectInput(local localClient, row agentRow, action composerAction, allowRemote bool) tea.Cmd {
+	return func() tea.Msg {
+		if rowDisallowsDirectInput(row) {
+			return directInputSent{Original: action.Original, Row: row, Mode: action.Kind, Err: errors.New("direct pane input to Broccoli Comms UI is disabled")}
+		}
+		if local == nil {
+			return directInputSent{Original: action.Original, Row: row, Mode: action.Kind, Err: errors.New("local tracker client unavailable")}
+		}
+		if row.Scope == "remote" && !allowRemote {
+			return directInputSent{Original: action.Original, Row: row, Mode: action.Kind, Err: errors.New("remote direct pane input is disabled")}
+		}
+		target := rowTarget(row)
+		if target == "" {
+			return directInputSent{Original: action.Original, Row: row, Mode: action.Kind, Err: errors.New("target agent unavailable")}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		var err error
+		switch action.Kind {
+		case "direct_text":
+			if action.Text == "" {
+				err = errors.New("/text requires TEXT")
+			} else {
+				err = local.SendText(ctx, target, action.Text, action.Submit)
+			}
+		case "direct_keys":
+			if len(action.Keys) == 0 {
+				err = errors.New("/key requires KEY [KEY...]")
+			} else {
+				err = local.SendKeys(ctx, target, action.Keys)
+			}
+		default:
+			err = errors.New("unknown direct input command")
+		}
+		return directInputSent{Original: action.Original, Row: row, Mode: action.Kind, Err: err}
+	}
+}
+
+func rowDisallowsDirectInput(row agentRow) bool {
+	agentName := strings.TrimSpace(row.AgentName)
+	if agentName == "" {
+		agentName = strings.TrimSpace(row.Name)
+		if strings.Contains(agentName, "/") {
+			parts := strings.Split(agentName, "/")
+			agentName = parts[len(parts)-1]
+		}
+	}
+	return row.AgentType == "agent-communicator-ui" || agentName == "agent-communicator" || strings.Contains(row.AgentCmd, "agent-communicator")
+}
+
 func messageBodyForDelivery(body string) string {
 	return strings.TrimRight(body, " \t\r\n") + "\n\n(" + markdownReplyInstruction + ")"
-}
-
-func sendDirectText(local localClient, row agentRow, body string, submit bool, original string) tea.Cmd {
-	return func() tea.Msg {
-		if local == nil {
-			return directInputSent{Body: original, Row: row, Action: "send-text", Err: errors.New("local tracker client unavailable")}
-		}
-		target := rowTarget(row)
-		if strings.TrimSpace(body) == "" || target == "" {
-			return directInputSent{Body: original, Row: row, Action: "send-text"}
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		err := local.SendText(ctx, target, body, submit)
-		return directInputSent{Body: original, Row: row, Action: "send-text", Err: err}
-	}
-}
-
-func sendDirectKeys(local localClient, row agentRow, keys []string, original string) tea.Cmd {
-	return func() tea.Msg {
-		if local == nil {
-			return directInputSent{Body: original, Row: row, Action: "send-key", Err: errors.New("local tracker client unavailable")}
-		}
-		target := rowTarget(row)
-		if len(keys) == 0 || target == "" {
-			return directInputSent{Body: original, Row: row, Action: "send-key"}
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		err := local.SendKeys(ctx, target, keys)
-		return directInputSent{Body: original, Row: row, Action: "send-key", Err: err}
-	}
 }
 
 func waitEvents(local localClient, since int64) tea.Cmd {
@@ -355,6 +457,9 @@ func tickRefresh() tea.Cmd {
 func tickAgentListSpinner() tea.Cmd {
 	return tea.Tick(150*time.Millisecond, func(time.Time) tea.Msg { return agentListSpinnerTick{} })
 }
+func tickCursorBlink() tea.Cmd {
+	return tea.Tick(550*time.Millisecond, func(time.Time) tea.Msg { return cursorBlinkTick{} })
+}
 func retryWaitEvents() tea.Cmd {
 	return tea.Tick(2*time.Second, func(time.Time) tea.Msg { return retryEvents{} })
 }
@@ -394,7 +499,7 @@ func spinAgentCmd(cfg AgentConfig) tea.Cmd {
 		}
 
 		args := append([]string{"spin", dir, cfg.AgentCommand}, cfg.AgentArgs...)
-		cmd := exec.Command("agent-tracker-ctl", args...)
+		cmd := broccoliAgentTrackerCommand(args...)
 		err := cmd.Run()
 		return agentConfigSpun{Name: cfg.Name, Err: err}
 	}
@@ -488,8 +593,8 @@ type clearPaneCaptureStatusTick struct{}
 
 func requestPaneCaptureCmd(targetAddress string) tea.Cmd {
 	return func() tea.Msg {
-		args := []string{"send-pane", "agent-communicator", "--source", targetAddress, "--note", "Requested from agent-communicator"}
-		cmd := exec.Command("agent-tracker-ctl", args...)
+		args := []string{"send-pane", "agent-communicator", "--source", targetAddress, "--last", "20", "--note", "Requested from agent-communicator"}
+		cmd := broccoliAgentTrackerCommand(args...)
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			return paneCaptured{Target: targetAddress, Err: fmt.Errorf("%s: %s", err, string(out))}

@@ -27,15 +27,15 @@ func TestHiddenAgentsPersist(t *testing.T) {
 	}
 }
 
-func TestHiddenAgentsSortAfterActiveWithSeparator(t *testing.T) {
+func TestHiddenAgentsSortAfterActiveWithoutVisibleExplanation(t *testing.T) {
 	m := model{hiddenAgents: map[string]bool{"beta": true}, rows: []agentRow{{Name: "beta", Scope: "local"}, {Name: "alpha", Scope: "local"}}}
 	m.sortRowsByHidden("")
 	if m.rows[0].Name != "alpha" || m.rows[1].Name != "beta" {
 		t.Fatalf("rows = %+v", m.rows)
 	}
 	view := m.agentList(40, 20)
-	if !strings.Contains(view, "hidden") || strings.Index(view, "alpha") > strings.Index(view, "beta") {
-		t.Fatalf("agent list =\n%s", view)
+	if strings.Contains(strings.ToLower(view), "system agents hidden") || strings.Contains(view, "hidden / Filtered") {
+		t.Fatalf("agent list should not show hidden explanatory text =\n%s", view)
 	}
 }
 
@@ -92,6 +92,26 @@ func TestInitialHideMarksAgentsWithoutHistoryHidden(t *testing.T) {
 	m := model{rows: []agentRow{{Name: "alpha", Scope: "local"}, {Name: "beta", Scope: "local"}}, hiddenAgents: map[string]bool{}}
 	m.applyInitialHiddenForNoHistory()
 	if m.hiddenAgents["alpha"] || !m.hiddenAgents["beta"] {
+		t.Fatalf("hidden=%+v", m.hiddenAgents)
+	}
+}
+
+func TestInitialHideKeepsLocalAgentWithIDHistoryAndTrackerID(t *testing.T) {
+	state := t.TempDir()
+	cache := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", state)
+	t.Setenv("XDG_CACHE_HOME", cache)
+	inbox := communicatorInboxPath()
+	if err := os.MkdirAll(filepath.Dir(inbox), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	line := `{"sender":"old-alpha","sender_agent_id":"agent-1","sender_tracker_id":"tracker-local","message":"hi"}` + "\n"
+	if err := os.WriteFile(inbox, []byte(line), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := model{rows: []agentRow{{Name: "alpha", Scope: "local", AgentID: "agent-1"}, {Name: "beta", Scope: "local", AgentID: "agent-2"}}, hiddenAgents: map[string]bool{}}
+	m.applyInitialHiddenForNoHistory()
+	if m.hiddenAgents["local:agent-1"] || !m.hiddenAgents["local:agent-2"] {
 		t.Fatalf("hidden=%+v", m.hiddenAgents)
 	}
 }

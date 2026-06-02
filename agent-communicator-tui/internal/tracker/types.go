@@ -2,23 +2,43 @@ package tracker
 
 import "time"
 
+type DetectionStatus struct {
+	Enabled              bool     `json:"enabled"`
+	Configured           bool     `json:"configured"`
+	Provider             string   `json:"provider"`
+	CaptureLines         int      `json:"capture_lines"`
+	ScanIntervalSeconds  float64  `json:"scan_interval_seconds"`
+	LastScanAt           float64  `json:"last_scan_at"`
+	NextScanAt           float64  `json:"next_scan_at"`
+	SecondsUntilNextScan int      `json:"seconds_until_next_scan"`
+	LastResult           string   `json:"last_result"`
+	LastDetectedAt       float64  `json:"last_detected_at"`
+	LastNotifiedAt       float64  `json:"last_notified_at"`
+	MatchedKeywords      []string `json:"matched_keywords"`
+	PaneTitle            string   `json:"pane_title"`
+	Error                string   `json:"error"`
+}
+
 type Agent struct {
-	Name            string   `json:"name"`
-	AgentID         string   `json:"agent_id"`
-	UUID            string   `json:"uuid"`
-	Session         string   `json:"session"`
-	TmuxPane        string   `json:"tmux_pane"`
-	Status          string   `json:"status"`
-	WaitingApproval bool     `json:"waiting_approval"`
-	AgentType       string   `json:"agent_type"`
-	AgentCmd        string   `json:"agent_cmd"`
-	Aliases         []string `json:"aliases"`
-	IsThisMe        bool     `json:"is_this_me"`
-	CWD             string   `json:"cwd,omitempty"`
-	Scope           string   `json:"scope,omitempty"`
-	Hostname        string   `json:"hostname,omitempty"`
-	TargetAddress   string   `json:"target_address,omitempty"`
-	TrackerID       string   `json:"tracker_id,omitempty"`
+	Name            string          `json:"name"`
+	AgentID         string          `json:"agent_id"`
+	UUID            string          `json:"uuid"`
+	Session         string          `json:"session"`
+	TmuxPane        string          `json:"tmux_pane"`
+	Status          string          `json:"status"`
+	WaitingApproval bool            `json:"waiting_approval"`
+	AgentType       string          `json:"agent_type"`
+	AgentCmd        string          `json:"agent_cmd"`
+	ModelType       string          `json:"model_type"`
+	Aliases         []string        `json:"aliases"`
+	IsThisMe        bool            `json:"is_this_me"`
+	CWD             string          `json:"cwd,omitempty"`
+	Scope           string          `json:"scope,omitempty"`
+	Hostname        string          `json:"hostname,omitempty"`
+	TargetAddress   string          `json:"target_address,omitempty"`
+	TrackerID       string          `json:"tracker_id,omitempty"`
+	RegistryName    string          `json:"registry_name,omitempty"`
+	Detection       DetectionStatus `json:"detection,omitempty"`
 }
 
 type Attachment struct {
@@ -33,6 +53,11 @@ type Message struct {
 	Sender          string       `json:"sender"`
 	SenderAgentID   string       `json:"sender_agent_id,omitempty"`
 	SenderTrackerID string       `json:"sender_tracker_id,omitempty"`
+	SenderHostname  string       `json:"sender_hostname,omitempty"`
+	SenderModelType string       `json:"sender_model_type,omitempty"`
+	SenderAgentType string       `json:"sender_agent_type,omitempty"`
+	SenderAgentCmd  string       `json:"sender_agent_cmd,omitempty"`
+	Kind            string       `json:"kind,omitempty"`
 	Timestamp       string       `json:"timestamp"`
 	Body            string       `json:"message"`
 	ContentType     string       `json:"content_type,omitempty"`
@@ -52,6 +77,14 @@ type Event struct {
 	Sender          string  `json:"sender,omitempty"`
 	MessageID       string  `json:"message_id,omitempty"`
 	HasAttachments  bool    `json:"has_attachments,omitempty"`
+	Hostname        string  `json:"hostname,omitempty"`
+	TrackerID       string  `json:"tracker_id,omitempty"`
+	Status          string  `json:"status,omitempty"`
+	OldStatus       string  `json:"old_status,omitempty"`
+	ModelType       string  `json:"model_type,omitempty"`
+	AgentType       string  `json:"agent_type,omitempty"`
+	AgentCmd        string  `json:"agent_cmd,omitempty"`
+	Message         string  `json:"message,omitempty"`
 }
 
 type WaitEventsResult struct {
@@ -66,9 +99,20 @@ type ReadInboxResult struct {
 	Messages []Message `json:"messages"`
 }
 
+type UnreadCountsResult struct {
+	Counts map[string]int `json:"counts"`
+	Total  int            `json:"total"`
+}
+
 type SendResult struct {
 	Success bool   `json:"success,omitempty"`
 	Warning string `json:"warning,omitempty"`
+}
+
+type EnsureMailboxResult struct {
+	Name    string `json:"name"`
+	AgentID string `json:"agent_id"`
+	UUID    string `json:"uuid"`
 }
 
 type WaitOptions struct {
@@ -81,6 +125,30 @@ type WaitOptions struct {
 type AgentConfig struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+}
+
+type TrackerInfo struct {
+	Hostname                 string           `json:"hostname"`
+	TrackerID                string           `json:"tracker_id"`
+	HTTPPort                 int              `json:"http_port"`
+	Status                   string           `json:"status"`
+	AgentCount               int              `json:"agent_count"`
+	OnlineAgentCount         int              `json:"online_agent_count"`
+	RegistryConnected        *bool            `json:"registry_connected,omitempty"`
+	Registries               []RegistryHealth `json:"registries,omitempty"`
+	RemoteTrackerCount       int              `json:"remote_tracker_count,omitempty"`
+	OnlineRemoteTrackerCount int              `json:"online_remote_tracker_count,omitempty"`
+}
+
+type RegistryHealth struct {
+	Name          string  `json:"name"`
+	Connected     bool    `json:"connected"`
+	RegistryURL   string  `json:"registry_url,omitempty"`
+	LastOperation string  `json:"last_operation,omitempty"`
+	StatusCode    int     `json:"status_code,omitempty"`
+	LastAttempt   float64 `json:"last_attempt,omitempty"`
+	LastSuccess   float64 `json:"last_success,omitempty"`
+	LastError     string  `json:"last_error,omitempty"`
 }
 
 type RemoteTracker struct {

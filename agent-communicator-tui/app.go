@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -19,11 +20,21 @@ const (
 	savedView
 )
 
+type runtimeInfo struct {
+	AppRuntime               bool
+	RuntimeDir               string
+	TrackerSocket            string
+	TmuxSocket               string
+	RemoteDirectInputEnabled bool
+}
+
 type model struct {
 	width, height, selected int
 	agentOffset             int
 	mode                    viewMode
 	rows                    []agentRow
+	allRows                 []agentRow
+	showSystemAgents        bool
 	messages                []tracker.Message
 	allMessages             []tracker.Message
 	outbox                  []outboxRecord
@@ -31,6 +42,7 @@ type model struct {
 	savedSelected           int
 	sentMessages            map[string][]tracker.Message
 	unreadRows              map[string]bool
+	unreadCounts            map[string]int
 	hiddenAgents            map[string]bool
 	agentSection            agentSection
 	autoHiddenApplied       bool
@@ -41,10 +53,16 @@ type model struct {
 	agentListLoading        bool
 	agentListFrame          int
 	composer                []rune
+	inputMode               inputMode
+	cursorHidden            bool
 	err                     error
 	eventSeq                int64
+	health                  tracker.TrackerInfo
+	healthErr               error
+	systemEvents            []tracker.Event
 	ownName                 string
 	local                   localClient
+	runtime                 runtimeInfo
 
 	// Custom Agent Configurations (Ctrl-L)
 	configItems       []ConfigSelectionItem
@@ -56,34 +74,81 @@ type model struct {
 	showingPromptMenu bool
 	promptSelected    int
 
+	// Command palette (Ctrl-P)
+	commandPalette commandPaletteState
+
 	// Save Agent Form (Ctrl-S)
 	showingSaveForm bool
 	saveFormIndex   int // 0: Name, 1: Description, 2: Command, 3: CWD, 4: Save, 5: Cancel
 	saveFormInputs  []textinput.Model
 
-	// Pane Debug Capture Status (Ctrl-X)
-	paneCaptureStatus string
+	// Short footer statuses
+	paneCaptureStatus    string
+	directInputStatus    string
+	directInputStatusErr bool
+	retryOperation       string
+}
+
+func runtimeInfoFromEnv() runtimeInfo {
+	info := runtimeInfo{
+		RuntimeDir:    os.Getenv("BROCCOLI_COMMS_RUNTIME_DIR"),
+		TrackerSocket: os.Getenv("AGENT_TRACKER_SOCKET"),
+		TmuxSocket:    firstNonEmpty(os.Getenv("BROCCOLI_COMMS_TMUX_SOCKET"), os.Getenv("AGENT_TRACKER_TMUX_SOCKET")),
+	}
+	info.AppRuntime = os.Getenv("BROCCOLI_COMMS_APP_RUNTIME") == "1" || info.RuntimeDir != "" || os.Getenv("BROCCOLI_COMMS_TMUX_SOCKET") != ""
+	info.RemoteDirectInputEnabled = envEnabled("BROCCOLI_COMMS_REMOTE_PANE_INPUT_ENABLED") || envEnabled("BROCCOLI_COMMS_REMOTE_PANE_INPUT_SEND_ENABLED") || envEnabled("AGENT_TRACKER_REMOTE_PANE_INPUT_SEND_ENABLED")
+	if info.TrackerSocket == "" && info.RuntimeDir != "" {
+		info.TrackerSocket = info.RuntimeDir + "/agent-tracker.sock"
+	}
+	return info
+}
+
+func envEnabled(name string) bool {
+	switch strings.ToLower(os.Getenv(name)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func newModel(local localClient, ownName string) model {
 	return model{
 		local:             local,
 		ownName:           ownName,
+		runtime:           runtimeInfoFromEnv(),
 		sentMessages:      map[string][]tracker.Message{},
 		unreadRows:        map[string]bool{},
+		unreadCounts:      map[string]int{},
 		hiddenAgents:      map[string]bool{},
 		showingConfigMenu: false,
 	}
 }
 func (m model) Init() tea.Cmd {
+	return ensureMailboxCmd(m.local, m.ownName)
+}
+
+func initialLoadCmds(m model) tea.Cmd {
 	return tea.Batch(
+		loadHealth(m.local),
 		loadAgents(m.local),
 		loadOutboxCmd(),
 		loadSavedMessagesCmd(),
 		loadHiddenAgentsCmd(),
 		loadPromptsCmd(),
 		loadConfigItemsCmd(m.local),
+		loadUnreadCounts(m.local, m.ownName),
 		tickRefresh(),
+		tickCursorBlink(),
 		waitEvents(m.local, 0),
 	)
 }
@@ -92,12 +157,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
 	case tea.KeyMsg:
 		keyStart := time.Now()
 		debugLogf("key start type=%v runes=%d", msg.Type, len(msg.Runes))
 		defer func() {
 			debugLogf("key end type=%v duration=%s composer_len=%d", msg.Type, time.Since(keyStart), len(m.composer))
 		}()
+		if m.commandPalette.Open {
+			return m.updateCommandPalette(msg)
+		}
 		if m.showingSaveForm {
 			return m.updateSaveForm(msg)
 		}
@@ -161,6 +231,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
+			return m, nil
+		}
+		if isCommandPaletteOpenKey(msg) {
+			m.commandPalette.Open = true
+			m.commandPalette.Query = nil
+			m.commandPalette.Selected = 0
 			return m, nil
 		}
 		switch msg.Type {
@@ -248,28 +324,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.messageOffset = clampMessageOffset(m.messageOffset-messagePageSize(m.height), len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
 		case tea.KeyPgDown, tea.KeyCtrlD:
 			m.messageOffset = clampMessageOffset(m.messageOffset+messagePageSize(m.height), len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
-		case tea.KeyCtrlJ:
-			return m, switchToAgentPane(m.currentRow())
+		case tea.KeyF1:
+			m.inputMode = inputModeMessage
+			return m, nil
+		case tea.KeyF2:
+			m.inputMode = inputModeText
+			return m, nil
+		case tea.KeyF3:
+			m.inputMode = inputModeKeys
+			return m, nil
+		case tea.KeyF4:
+			return m, nil
 		case tea.KeyEnter:
 			if m.mode != savedView && m.canSendCurrent() && strings.TrimSpace(string(m.composer)) != "" {
-				body := string(m.composer)
+				input := string(m.composer)
 				row := m.rows[m.selected]
-				action := parseComposerAction(body)
+				action := composerActionForMode(input, m.inputMode)
+				if action.Kind == "broadcast" {
+					m.directInputStatus = "Broadcast mode is disabled in this milestone; no message was sent"
+					m.directInputStatusErr = true
+					return m, tea.Tick(4*time.Second, func(time.Time) tea.Msg { return clearDirectInputStatusTick{} })
+				}
+				if action.Kind == "direct_text" || action.Kind == "direct_keys" {
+					m.composer = nil
+					m.directInputStatus = fmt.Sprintf("Sending pane control to %s...", row.Name)
+					return m, sendDirectInput(m.local, row, action, m.runtime.RemoteDirectInputEnabled)
+				}
+				if strings.TrimSpace(action.Body) == "" {
+					return m, nil
+				}
+				record := makeOutboxRecord(m.ownName, row, action.Body)
 				m.composer = nil
 				unhideCmd := m.unhideAgent(row)
 				m.clearUnread(row)
-				switch action.Kind {
-				case "text":
-					return m, tea.Batch(unhideCmd, sendDirectText(m.local, row, action.Body, action.Submit, body))
-				case "key":
-					return m, tea.Batch(unhideCmd, sendDirectKeys(m.local, row, action.Keys, body))
-				default:
-					record := makeOutboxRecord(m.ownName, row, action.Body)
-					m.appendSentMessage(row, record)
-					m.refreshMergedMessages()
-					m.selectLatestMessage()
-					return m, tea.Batch(unhideCmd, sendOutboxRecord(m.local, m.ownName, row, record))
-				}
+				m.appendSentMessage(row, record)
+				m.refreshMergedMessages()
+				m.selectLatestMessage()
+				return m, tea.Batch(unhideCmd, sendOutboxRecord(m.local, m.ownName, row, record))
 			}
 		case tea.KeyBackspace:
 			m.messageFocused = false
@@ -285,6 +376,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, openMessageInEditor(messages[m.messageSelected])
 			}
 		case tea.KeyRunes:
+			if len(msg.Runes) == 1 && msg.Runes[0] == 'r' && len(m.composer) == 0 && m.err != nil && m.retryOperation != "" {
+				return m, m.retryCurrentOperation()
+			}
+			if len(msg.Runes) == 1 && msg.Runes[0] == 'n' && len(m.composer) == 0 && m.mode != savedView && m.selectNextUnread() {
+				m.scrollSelectedAgentIntoView()
+				m.selectLatestMessage()
+				return m, m.reloadMessages()
+			}
 			m.messageFocused = false
 			m.composer = append(m.composer, msg.Runes...)
 			m.messageOffset = 0
@@ -293,6 +392,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.composer = append(m.composer, ' ')
 			m.messageOffset = 0
 		}
+	case directInputSent:
+		if msg.Err != nil {
+			m.composer = []rune(msg.Original)
+			m.directInputStatus = fmt.Sprintf("Pane control failed for %s: %s", msg.Row.Name, msg.Err.Error())
+			m.directInputStatusErr = true
+		} else {
+			m.directInputStatusErr = false
+			if msg.Mode == "direct_text" {
+				m.directInputStatus = fmt.Sprintf("Pane text sent to %s", msg.Row.Name)
+			} else {
+				m.directInputStatus = fmt.Sprintf("Pane key(s) sent to %s", msg.Row.Name)
+			}
+		}
+		return m, tea.Tick(4*time.Second, func(time.Time) tea.Msg { return clearDirectInputStatusTick{} })
+	case clearDirectInputStatusTick:
+		m.directInputStatus = ""
+		m.directInputStatusErr = false
+		return m, nil
 	case paneCaptured:
 		if msg.Err != nil {
 			m.paneCaptureStatus = fmt.Sprintf("Failed to capture %s: %s", msg.Target, msg.Err.Error())
@@ -307,7 +424,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case refreshTick:
 		m.agentListLoading = true
-		return m, tea.Batch(loadAgents(m.local), loadOutboxCmd(), tickRefresh(), tickAgentListSpinner())
+		return m, tea.Batch(loadHealth(m.local), loadAgents(m.local), loadOutboxCmd(), loadUnreadCounts(m.local, m.ownName), tickRefresh(), tickAgentListSpinner())
+	case cursorBlinkTick:
+		m.cursorHidden = !m.cursorHidden
+		return m, tickCursorBlink()
 	case agentListSpinnerTick:
 		if m.agentListLoading {
 			m.agentListFrame++
@@ -315,21 +435,37 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case retryEvents:
 		return m, waitEvents(m.local, m.eventSeq)
+	case mailboxEnsured:
+		m.err = msg.Err
+		if msg.Err != nil {
+			m.retryOperation = "mailbox"
+			break
+		}
+		m.retryOperation = ""
+		return m, initialLoadCmds(m)
+	case healthLoaded:
+		m.healthErr = msg.Err
+		if msg.Err == nil {
+			m.health = msg.Info
+		}
 	case agentsLoaded:
 		m.agentListLoading = false
 		m.err = msg.Err
 		if msg.Err != nil {
+			m.retryOperation = "agents"
 			m.agentListStale = true
 			break
 		}
+		m.retryOperation = ""
 		m.agentListStale = false
 		preserveKey := conversationKey(m.currentRow())
-		m.rows = filterOwnAgent(msg.Rows, m.ownName)
-		m.sortRowsByHidden(preserveKey)
+		m.allRows = filterOwnAgent(msg.Rows, m.ownName)
+		m.applyAgentVisibility(preserveKey)
 		if m.selected >= len(m.rows) {
 			m.selected = max(0, len(m.rows)-1)
 		}
 		m.applyInitialHiddenForNoHistory()
+		m.applyAgentVisibility(preserveKey)
 		m.scrollSelectedAgentIntoView()
 		if len(m.rows) > 0 {
 			m.selectLatestMessage()
@@ -339,28 +475,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case inboxLoaded:
 		if msg.Err != nil {
 			m.err = msg.Err
+			m.retryOperation = "inbox"
 		} else {
 			m.err = nil
+			m.retryOperation = ""
 			m.messages = m.mergeSentMessages(m.currentRow(), msg.Messages)
 			m.selectLatestMessage()
+			return m, loadUnreadCounts(m.local, m.ownName)
 		}
 	case allInboxLoaded:
 		if msg.Err != nil {
 			m.err = msg.Err
+			m.retryOperation = "all_inbox"
 		} else {
 			m.err = nil
+			m.retryOperation = ""
 			m.allMessages = m.mergeAllMessages(msg.Messages)
 			m.selectLatestMessage()
-		}
-	case directInputSent:
-		m.err = msg.Err
-		if msg.Err != nil {
-			m.composer = []rune(msg.Body)
-		} else {
-			m.paneCaptureStatus = fmt.Sprintf("%s sent to %s", msg.Action, rowTarget(msg.Row))
-			return m, tea.Tick(4*time.Second, func(time.Time) tea.Msg {
-				return clearPaneCaptureStatusTick{}
-			})
+			return m, loadUnreadCounts(m.local, m.ownName)
 		}
 	case messageSent:
 		m.err = msg.Err
@@ -385,13 +517,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.eventSeq = msg.Result.LastSeq
 			m.markUnreadFromEvents(msg.Result)
 			m.applyStatusEvents(msg.Result)
-			cmds := []tea.Cmd{waitEvents(m.local, m.eventSeq)}
+			m.appendSystemEvents(msg.Result)
+			cmds := []tea.Cmd{waitEvents(m.local, m.eventSeq), loadUnreadCounts(m.local, m.ownName)}
 			if len(m.rows) > 0 && shouldReloadForEvents(m.ownName, m.rows[m.selected], msg.Result) {
 				cmds = append(cmds, m.reloadMessages())
 			}
 			return m, tea.Batch(cmds...)
 		}
 		return m, retryWaitEvents()
+	case unreadCountsLoaded:
+		if msg.Err != nil {
+			m.err = msg.Err
+		} else {
+			m.unreadCounts = msg.Counts
+			if m.unreadCounts == nil {
+				m.unreadCounts = map[string]int{}
+			}
+		}
 	case promptsLoaded:
 		m.err = msg.Err
 		if msg.Err == nil {
@@ -405,7 +547,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.Err
 		} else {
 			m.hiddenAgents = msg.Hidden
-			m.sortRowsByHidden("")
+			m.applyAgentVisibility("")
 			m.scrollSelectedAgentIntoView()
 		}
 	case hiddenAgentsSaved:
@@ -425,6 +567,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.outbox = msg.Records
 			m.applyInitialHiddenForNoHistory()
+			m.applyAgentVisibility(conversationKey(m.currentRow()))
 			m.refreshMergedMessages()
 		}
 	case paneSwitched:
@@ -470,45 +613,19 @@ func (m model) canSendCurrent() bool {
 	return len(m.rows) > 0 && !m.agentListStale
 }
 
-func conversationKey(row agentRow) string {
-	agentID := strings.TrimSpace(row.AgentID)
-	if agentID != "" {
-		if row.Scope == "remote" {
-			trackerID := strings.TrimSpace(row.TrackerID)
-			if trackerID != "" {
-				return "remote:" + trackerID + ":" + agentID
-			}
-			host := strings.TrimSpace(row.Hostname)
-			if host == "" {
-				host, _ = splitRemoteTarget(rowTarget(row))
-			}
-			if host != "" {
-				return "remote:" + host + ":" + agentID
-			}
-		} else {
-			return "local:" + agentID
-		}
+func (m model) retryCurrentOperation() tea.Cmd {
+	switch m.retryOperation {
+	case "mailbox":
+		return ensureMailboxCmd(m.local, m.ownName)
+	case "agents":
+		return loadAgents(m.local)
+	case "inbox":
+		return m.reloadMessages()
+	case "all_inbox":
+		return loadAllInbox(m.local, m.ownName)
+	default:
+		return nil
 	}
-	return rowTarget(row)
-}
-
-func outboxRecordMatchesRow(rec outboxRecord, row agentRow) bool {
-	recAgentID := strings.TrimSpace(rec.TargetAgentID)
-	rowAgentID := strings.TrimSpace(row.AgentID)
-	if recAgentID != "" && rowAgentID != "" {
-		if recAgentID != rowAgentID {
-			return false
-		}
-		if row.Scope == "remote" {
-			recTrackerID := strings.TrimSpace(rec.TargetTrackerID)
-			rowTrackerID := strings.TrimSpace(row.TrackerID)
-			if recTrackerID != "" && rowTrackerID != "" && recTrackerID != rowTrackerID {
-				return false
-			}
-		}
-		return true
-	}
-	return rec.TargetAddress == rowTarget(row)
 }
 
 func (m *model) selectLatestMessage() {

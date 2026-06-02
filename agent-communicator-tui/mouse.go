@@ -1,0 +1,123 @@
+package main
+
+import (
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+func (m model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	event := tea.MouseEvent(msg)
+	if event.Action != tea.MouseActionPress || event.Button != tea.MouseButtonLeft {
+		return m, nil
+	}
+	if m.mode != savedView && m.mouseSelectAgent(event.X, event.Y) {
+		m.scrollSelectedAgentIntoView()
+		m.selectLatestMessage()
+		return m, m.reloadMessages()
+	}
+	if mode, ok := m.mouseInputMode(event.X, event.Y); ok {
+		m.inputMode = mode
+		return m, nil
+	}
+	return m, nil
+}
+
+func (m *model) mouseSelectAgent(x, y int) bool {
+	if m.width < 70 {
+		return false
+	}
+	leftW, _, _ := m.layoutWidths()
+	bodyH := max(3, m.height-lineCount(m.footer(max(1, m.width))))
+	if x < 0 || x >= leftW || y < 1 || y >= bodyH-1 || len(m.rows) == 0 {
+		return false
+	}
+	listY := y - 4 // top border + title + device hostname + section header
+	if listY < 0 {
+		return false
+	}
+	return m.selectAgentAtListLine(listY, panelInnerWidth(leftW))
+}
+
+func (m *model) selectAgentAtListLine(listY, width int) bool {
+	visible := max(1, m.sidebarAgentListHeight()/agentCardHeight)
+	offset := min(max(0, m.agentOffset), max(0, len(m.rows)-visible))
+	end := min(len(m.rows), offset+visible)
+	hiddenStart := m.hiddenStartIndex()
+	line := 0
+	lastGroup := ""
+	for i := offset; i < end; i++ {
+		if i == hiddenStart && hiddenStart > 0 {
+			line++
+			lastGroup = ""
+		}
+		group := m.agentView(m.rows[i]).GroupHeader
+		if group != "" && group != lastGroup {
+			line++
+			lastGroup = group
+		}
+		cardLines := lineCount(m.agentCard(m.rows[i], i == m.selected, width-2))
+		if listY >= line && listY < line+cardLines {
+			m.selected = i
+			return true
+		}
+		line += cardLines
+		if i < end-1 {
+			line++
+		}
+	}
+	return false
+}
+
+func (m model) sidebarAgentListHeight() int {
+	bodyH := max(3, m.height-lineCount(m.footer(max(1, m.width))))
+	return max(1, panelInnerHeight(bodyH)-3)
+}
+
+func (m model) mouseInputMode(x, y int) (inputMode, bool) {
+	if m.mode == savedView || m.width == 0 || m.height == 0 {
+		return inputModeMessage, false
+	}
+	leftW, midW, _ := m.layoutWidths()
+	panelX := 0
+	panelW := midW
+	if m.width >= 70 {
+		panelX = leftW
+	} else {
+		panelW = m.width
+	}
+	innerX := x - panelX - 2
+	innerW := panelInnerWidth(panelW)
+	if m.width < 70 {
+		innerW = max(1, panelW-2)
+	}
+	if innerX < 0 || innerX >= innerW {
+		return inputModeMessage, false
+	}
+	titleH := lineCount(titleStyle.Render(m.conversationTitle()))
+	composerTop := 1 + titleH
+	if m.width < 70 {
+		composerTop = titleH
+	}
+	inputH := lineCount(m.composerInputBox(innerW))
+	buttonTop := composerTop + inputH
+	buttonH := lineCount(m.composerModeButtons(innerW))
+	if y < buttonTop || y >= buttonTop+buttonH {
+		return inputModeMessage, false
+	}
+	return inputModeButtonAtX(innerX)
+}
+
+func inputModeButtonAtX(x int) (inputMode, bool) {
+	cursor := 0
+	for i, button := range inputModeButtons() {
+		buttonWidth := lipgloss.Width(modeTabStyle.Render(button.Label))
+		if x >= cursor && x < cursor+buttonWidth {
+			return button.Mode, true
+		}
+		cursor += buttonWidth
+		if i < len(inputModeButtons())-1 {
+			cursor++
+		}
+	}
+	return inputModeMessage, false
+}
