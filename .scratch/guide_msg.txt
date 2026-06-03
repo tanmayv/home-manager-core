@@ -1,0 +1,74 @@
+### User Guide: TMUX Pane Capture & Debug Snapshots
+
+We are excited to provide the complete, practical usage guide for the new **TMUX Pane Capture and Debug Snapshots** feature suite. Since all 5 phases of the project have successfully graduated and been pushed to production, all CLI commands, daemon RPCs, registry event loops, and Go TUI keybindings are **completely active and ready to use**!
+
+---
+
+### 1. TUI Integration: Capture Directly from `agent-communicator`
+
+You can request and view a debug snapshot of any active local or remote agent directly from the TUI list:
+
+1. Launch the agent communicator TUI:
+   ```bash
+   agent-communicator
+   ```
+2. Navigate the list using standard arrow keys and select the target agent row you wish to audit (e.g. `jetski-coder-agent`).
+3. Press **`Ctrl+X`** (marked as `c-x debug capture` in the keyboard help panel).
+4. **TUI Actions**:
+   * The TUI immediately updates the footer bar with a temporary alert: `Capturing pane snapshot for <agent>...`
+   * The CLI send-pane processes execute completely asynchronously in background goroutines, guaranteeing the TUI never experiences lags, freezes, or blocking delays.
+   * Once complete, the dynamic status footer flashes a confirmation banner, and a beautifully formatted Markdown pane snapshot message automatically appears inside that agent's conversation window!
+
+---
+
+### 2. CLI: Local Pane Capture (`capture-pane`)
+
+You can print a live debug snapshot of any local agent directly to your stdout screen:
+
+* **Basic usage** (captures latest 200 lines):
+   ```bash
+   agent-tracker-ctl capture-pane <agent-name-or-uuid>
+   ```
+* **Target direct tmux pane ID**:
+   ```bash
+   agent-tracker-ctl capture-pane --pane %1 --last 100
+   ```
+* **Extract in structured JSON format**:
+   ```bash
+   agent-tracker-ctl capture-pane <agent-name> --format json
+   ```
+* **Include ANSI colors**:
+   ```bash
+   agent-tracker-ctl capture-pane <agent-name> --include-ansi
+   ```
+
+---
+
+### 3. CLI: Capture and Deliver Snapshot (`send-pane`)
+
+You can capture a target agent's pane and deliver the compiled snapshot as a normal agent message to any local or remote recipient's inbox:
+
+* **Capture local agent and send to local recipient**:
+   ```bash
+   agent-tracker-ctl send-pane agent-communicator --source jetski-coder-agent
+   ```
+* **Capture local agent and send to remote macOS recipient**:
+   ```bash
+   agent-tracker-ctl send-pane tanmayvijay-mac.roam.internal/agent-communicator --source jetski-coder-agent
+   ```
+* **Capture remote macOS agent and deliver back to local Cloudtop recipient**:
+   ```bash
+   agent-tracker-ctl send-pane agent-communicator --source tanmayvijay-mac.roam.internal/jetski-bridge-agent
+   ```
+* **Append custom requester notes**:
+   ```bash
+   agent-tracker-ctl send-pane agent-communicator --source jetski-coder-agent --note "Auditing memory leak logs"
+   ```
+
+---
+
+### 4. Registry Routing & Safety Hardening (Behind the Scenes)
+
+* **Thread-Isolated Remote Capture**: When you request a snapshot of a remote agent (e.g., the Mac bridge agent), the local tracker publishes a `pane_capture_request` tracker event. The remote machine's background client loop intercepts this event, delegates execution to separate background threads to prevent blocking the event queues, formats the snapshot, and delivers it back.
+* **Safety Limits & Capping**: The daemon RPC automatically enforces a strict limit of **`1000` lines maximum** on all captured histories (with a floor of `1`) to prevent memory footprints and huge network payload bloating, regardless of `--last` overrides.
+* **Graceful Exception Catching**: Any runtime exceptions (such as zero-column panes, dead sessions, or blank buffers) are safely intercepted and cleanly bubble up as JSON-RPC params errors instead of crashing the daemon process.

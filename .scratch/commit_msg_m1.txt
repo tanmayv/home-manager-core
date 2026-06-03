@@ -1,0 +1,13 @@
+feat(agent-tracker): scaffold local pane capture primitive (Milestone 1)
+
+Implement Milestone 1 (Phase 1) of the pane capture debug snapshots plan. Add local pane text capture, resolution helpers, copy-mode checks, and CLI subcommands.
+
+Changes:
+- Implement `capture_pane_visible_text` and `is_pane_in_copy_mode` inside `tmux_util.py`.
+- Integrate `capture_pane` RPC handler and resolving helpers inside `rpc_handler.py`.
+- Create `agent-tracker-ctl capture-pane` CLI command inside `ctl_commands/capture_pane.py`.
+- Expose CLI subcommand inside `agent-tracker-ctl.py`.
+- Add complete unit/integration tests verifying resolution logic, ANSI escape stripping, copy-mode checks, and Markdown/JSON formatting.
+
+TAG=agy
+CONV=4ecccc12-2991-4ff5-a088-fd2e4bce5a16

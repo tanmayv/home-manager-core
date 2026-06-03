@@ -1,0 +1,11 @@
+feat(agent-tracker): enforce safety bounds and graceful exception wrapping (Phase 5)
+
+Implement Phase 5 (Polish & Safety Hardening) of the pane capture debug snapshots plan. Enforce safety boundaries on scrollbacks, handle blank tmux screens, and finalize the test suite.
+
+Changes:
+- Implement strict scrollback line limits (capping at 1000, flooring at 1) inside `handle_capture_pane` Daemon RPC in `rpc_handler.py`.
+- Integrate robust try-except blocks inside `rpc_handler.py` to gracefully capture and wrap tmux visible text extraction exceptions.
+- Add dedicated safety bounds and exception unit tests inside `test_rpc_handler.py`.
+
+TAG=agy
+CONV=4ecccc12-2991-4ff5-a088-fd2e4bce5a16

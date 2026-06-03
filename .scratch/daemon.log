@@ -1,0 +1,48 @@
+2026-05-23 14:30:00,423 [INFO] Initializing state from tmux panes...
+2026-05-23 14:30:00,431 [INFO] Found recovered agent: jetski-review-agent of type cli in pane %1
+2026-05-23 14:30:00,521 [INFO] Recovered agent jetski-review-agent with PID 3688281 and agent ID 6c9795df-d050-48dd-9b61-60afdb9252f6
+2026-05-23 14:30:00,521 [INFO] Starting background monitor...
+2026-05-23 14:30:00,522 [INFO] Starting background inbox reminder...
+2026-05-23 14:30:00,524 [INFO] registry sync disabled: no registry configured
+2026-05-23 14:30:00,524 [INFO] Agent Tracker listening on /usr/local/google/home/tanmayvijay/.cache/agent-tracker/agent-tracker.sock
+2026-05-23 14:30:05,514 [ERROR] Socket error handling client: timed out
+2026-05-23 14:30:12,519 [ERROR] Socket error handling client: timed out
+2026-05-23 14:30:19,525 [ERROR] Socket error handling client: timed out
+2026-05-23 14:30:22,962 [ERROR] Socket error handling client: [Errno 32] Broken pipe
+2026-05-23 14:30:23,063 [ERROR] Socket error handling client: [Errno 32] Broken pipe
+2026-05-23 14:30:23,341 [ERROR] Socket error handling client: [Errno 32] Broken pipe
+2026-05-23 14:30:23,709 [INFO] Agent jetski-review-agent acknowledged by user (pane active). Transitioning to idle.
+2026-05-23 14:30:26,530 [ERROR] Socket error handling client: timed out
+2026-05-23 14:30:32,353 [ERROR] Socket error handling client: [Errno 32] Broken pipe
+2026-05-23 14:30:32,469 [ERROR] Socket error handling client: [Errno 32] Broken pipe
+2026-05-23 14:30:32,638 [ERROR] Tmux worker error: Command '['tmux', '-S', '/run/user/991866/tmux-991866/default', 'set-option', '-p', '-t', '%9999', '@agent_id', '077f1b62-7388-4c44-a75f-7ff6e2fa1adf']' returned non-zero exit status 1.
+2026-05-23 14:30:32,644 [ERROR] Tmux worker error: Command '['tmux', '-S', '/run/user/991866/tmux-991866/default', 'set-option', '-p', '-t', '%9999', '@agent_uuid', '077f1b62-7388-4c44-a75f-7ff6e2fa1adf']' returned non-zero exit status 1.
+2026-05-23 14:30:32,650 [ERROR] Tmux worker error: Command '['tmux', '-S', '/run/user/991866/tmux-991866/default', 'set-option', '-p', '-t', '%9999', '@agent_name', 'test-receiver-dead']' returned non-zero exit status 1.
+2026-05-23 14:30:32,656 [ERROR] Tmux worker error: Command '['tmux', '-S', '/run/user/991866/tmux-991866/default', 'set-option', '-p', '-t', '%9999', '@agent_type', 'unknown']' returned non-zero exit status 1.
+2026-05-23 14:30:32,662 [ERROR] Tmux worker error: Command '['tmux', '-S', '/run/user/991866/tmux-991866/default', 'set-option', '-p', '-t', '%9999', '@agent_cmd', 'unknown']' returned non-zero exit status 1.
+2026-05-23 14:30:32,668 [ERROR] Tmux worker error: Command '['tmux', '-S', '/run/user/991866/tmux-991866/default', 'set-option', '-p', '-t', '%9999', '@agent_no_notify_with_send_keys', 'off']' returned non-zero exit status 1.
+2026-05-23 14:30:32,674 [ERROR] Tmux worker error: Command '['tmux', '-S', '/run/user/991866/tmux-991866/default', 'set-option', '-p', '-t', '%9999', '@agent_no_registry', 'off']' returned non-zero exit status 1.
+2026-05-23 14:30:32,681 [ERROR] Tmux worker error: Command '['tmux', '-S', '/run/user/991866/tmux-991866/default', 'select-pane', '-t', '%9999', '-T', 'test-receiver-dead']' returned non-zero exit status 1.
+2026-05-23 14:30:32,731 [INFO] local delivery payload target=test-receiver-dead sender=jetski-review-agent message_id=None sender_agent_id=6c9795df-d050-48dd-9b61-60afdb9252f6 sender_tracker_id=827c4b7b-afd5-5d83-a9a3-68f227ac5118
+2026-05-23 14:30:32,732 [INFO] Attempting reliable notification delivery for test-receiver-dead to pane %9999 (verify=True)
+2026-05-23 14:30:32,739 [WARNING] Cannot send keys to pane %9999: pane is dead or invalid.
+2026-05-23 14:30:32,752 [INFO] Unregistering agent: test-receiver-dead
+2026-05-23 14:30:32,753 [INFO] Removing existing agent jetski-review-agent for pane %1 before re-registering
+2026-05-23 14:30:32,851 [INFO] local delivery payload target=test-receiver-active sender=test-receiver-active message_id=None sender_agent_id=6c9795df-d050-48dd-9b61-60afdb9252f6 sender_tracker_id=827c4b7b-afd5-5d83-a9a3-68f227ac5118
+2026-05-23 14:30:32,852 [INFO] Attempting reliable notification delivery for test-receiver-active to pane %1 (verify=True)
+2026-05-23 14:30:33,383 [INFO] Reliable notification successfully delivered to test-receiver-active in pane %1
+2026-05-23 14:30:33,397 [INFO] Unregistering agent: test-receiver-active
+2026-05-23 14:30:33,537 [ERROR] Socket error handling client: timed out
+2026-05-23 14:30:33,593 [ERROR] Socket error handling client: [Errno 32] Broken pipe
+2026-05-23 14:30:36,822 [ERROR] Socket error handling client: [Errno 32] Broken pipe
+2026-05-23 14:30:36,913 [ERROR] Socket error handling client: [Errno 32] Broken pipe
+2026-05-23 14:30:37,222 [ERROR] Socket error handling client: [Errno 32] Broken pipe
+2026-05-23 14:30:37,819 [ERROR] Socket error handling client: [Errno 32] Broken pipe
+2026-05-23 14:30:37,901 [ERROR] Socket error handling client: [Errno 32] Broken pipe
+2026-05-23 14:30:38,465 [ERROR] Socket error handling client: [Errno 32] Broken pipe
+2026-05-23 14:30:38,810 [INFO] Agent test-receiver-active acknowledged by user (pane active). Transitioning to idle.
+2026-05-23 14:30:40,541 [ERROR] Socket error handling client: timed out
+2026-05-23 14:30:42,650 [ERROR] Socket error handling client: [Errno 32] Broken pipe
+2026-05-23 14:30:42,804 [ERROR] Socket error handling client: [Errno 32] Broken pipe
+2026-05-23 14:30:42,974 [ERROR] Socket error handling client: [Errno 32] Broken pipe
+2026-05-23 14:30:43,147 [ERROR] Socket error handling client: [Errno 32] Broken pipe

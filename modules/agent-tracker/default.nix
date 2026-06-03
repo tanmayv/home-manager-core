@@ -42,23 +42,11 @@ let
   '');
   agentWrapperPackage = import ../scripts/agent-wrapper-package.nix { inherit pkgs config; };
   monitorEnvVars = {
-    AGENT_TRACKER_SOCKET = socketPath;
-    POLL_INTERVAL = toString cfg.pollInterval;
-    HEARTBEAT_STALE_SECONDS = toString cfg.heartbeatStaleSeconds;
-    HEARTBEAT_GRACE_SECONDS = toString cfg.heartbeatGraceSeconds;
-    AGENT_TRACKER_HTTP_PORT = toString cfg.httpPort;
-    AGENT_REGISTRY_HEARTBEAT_SECONDS = toString cfg.registryHeartbeatSeconds;
-    AGENT_REGISTRY_AUTH = if cfg.registryAuth then "true" else "false";
-    ENABLE_RELIABLE_SEND_KEYS = if cfg.enableReliableSendKeys then "true" else "false";
-    AGENT_TRACKER_CAPTURE_PANE_DEFAULT_LINES = toString cfg.capturePaneDefaultLines;
-    AGENT_TRACKER_ALLOW_REMOTE_PANE_INPUT = if cfg.allowRemotePaneInput then "true" else "false";
     # systemd user services and launchd agents both start with a minimal PATH.
     # agent-tracker intentionally invokes `tmux` and `sleep` by name from
     # Python, so provide an explicit cross-platform tool PATH instead of
     # relying on the interactive shell environment.
     PATH = "${userNixPaths}:${agentTrackerToolPath}:${platformFallbackPath}";
-  } // lib.optionalAttrs (cfg.registries != []) {
-    AGENT_REGISTRIES_JSON = builtins.toJSON cfg.registries;
   };
   monitorEnv = lib.mapAttrsToList (name: value: "${name}=\"${builtins.replaceStrings ["\""] ["\\\""] value}\"") monitorEnvVars;
 in
@@ -68,6 +56,32 @@ in
   ];
 
   config = mkMerge [
+
+      xdg.configFile."broccoli-comms/config.toml" = mkIf cfg.enable {
+        text = let
+          tomlStr = lib.generators.toTOML {} {
+            tracker = {
+              poll_interval_seconds = cfg.pollInterval;
+              heartbeat_stale_seconds = cfg.heartbeatStaleSeconds;
+              heartbeat_grace_seconds = cfg.heartbeatGraceSeconds;
+              registry_port = cfg.httpPort;
+            };
+            registry = {
+              heartbeat_seconds = cfg.registryHeartbeatSeconds;
+              auth_enabled = cfg.registryAuth;
+              registries = cfg.registries;
+            };
+            ui = {
+              capture_pane_default_lines = cfg.capturePaneDefaultLines;
+              remote_pane_input_enabled = cfg.allowRemotePaneInput;
+            };
+            paths = {
+              agent_tracker_socket = socketPath;
+            };
+          };
+        in tomlStr;
+      };
+
     {
       services.agent-tracker.enable = mkDefault (userSettings.enable-agent-tracker or false);
       services.agent-tracker.registries = mkDefault (agentTrackerSettings.registries or []);
@@ -102,31 +116,6 @@ in
 
       home.packages = [
         agentWrapperPackage
-        (pkgs.writeScriptBin "agent-tracker-ctl" ''
-          #!${pkgs.python3}/bin/python3
-          import os
-          import sys
-          sys.path.insert(0, "${agentTrackerFiles}")
-          os.environ.setdefault("AGENT_TRACKER_SOCKET", "${socketPath}")
-          ${lib.optionalString (!cfg.enable) ''os.environ.setdefault("AGENT_TRACKER_DAEMON", "${daemonCmd}")''}
-          os.environ.setdefault("POLL_INTERVAL", "${toString cfg.pollInterval}")
-          os.environ.setdefault("HEARTBEAT_STALE_SECONDS", "${toString cfg.heartbeatStaleSeconds}")
-          os.environ.setdefault("HEARTBEAT_GRACE_SECONDS", "${toString cfg.heartbeatGraceSeconds}")
-          os.environ.setdefault("AGENT_TRACKER_HTTP_PORT", "${toString cfg.httpPort}")
-          os.environ.setdefault("AGENT_REGISTRY_HEARTBEAT_SECONDS", "${toString cfg.registryHeartbeatSeconds}")
-          os.environ.setdefault("AGENT_REGISTRY_AUTH", "${if cfg.registryAuth then "true" else "false"}")
-          os.environ.setdefault("ENABLE_RELIABLE_SEND_KEYS", "${if cfg.enableReliableSendKeys then "true" else "false"}")
-          os.environ.setdefault("AGENT_TRACKER_CAPTURE_PANE_DEFAULT_LINES", "${toString cfg.capturePaneDefaultLines}")
-          os.environ.setdefault("AGENT_TRACKER_ALLOW_REMOTE_PANE_INPUT", "${if cfg.allowRemotePaneInput then "true" else "false"}")
-          ${lib.optionalString (cfg.registries != []) ''os.environ.setdefault("AGENT_REGISTRIES_JSON", ${builtins.toJSON (builtins.toJSON cfg.registries)})''}
-          os.environ.setdefault("PALETTE_COLOR8", "${palette.color8}")
-          os.environ.setdefault("PALETTE_COLOR1", "${palette.color1}")
-          os.environ.setdefault("PALETTE_COLOR3", "${palette.color3}")
-          os.environ.setdefault("PALETTE_COLOR6", "${palette.color6}")
-          os.environ.setdefault("PALETTE_COLOR2", "${palette.color2}")
-          os.environ.setdefault("PALETTE_COLOR4", "${palette.color4}")
-          ${builtins.readFile ./agent-tracker-ctl.py}
-        '')
       ] ++ (lib.mapAttrsToList (alias: path:
         pkgs.writeShellApplication {
           name = alias;

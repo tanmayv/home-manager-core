@@ -1,0 +1,12 @@
+feat(agent-tracker): deprecate registry-url and enforce registries assertions
+
+Deprecate `registry-url` option in favor of the `registries` list, enforce strict Nix assertions during compilation, and fix systemd JSON double quote escaping.
+
+Changes:
+- Mark `services.agent-tracker.registryUrl` deprecated inside `options.nix`.
+- Add strict assertion in `default.nix` to abort build evaluations with instructions if `registryUrl` is used.
+- Remove legacy environment defaults in `default.nix` CLI wrappers.
+- Fix a critical systemd JSON escaping bug in `default.nix` by wrapping `Environment` values in double quotes and escaping internal double quotes to ensure `AGENT_REGISTRIES_JSON` is parsed cleanly.
+
+TAG=agy
+CONV=4ecccc12-2991-4ff5-a088-fd2e4bce5a16

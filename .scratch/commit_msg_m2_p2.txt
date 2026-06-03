@@ -1,0 +1,13 @@
+feat(agent-tracker): implement send-pane snapshot routing (Phase 2)
+
+Implement Phase 2 of the pane capture snapshots plan. Add `send-pane` CLI command to capture local pane buffers, format Markdown/JSON templates, and route snapshots via `send_message` RPC.
+
+Changes:
+- Create `agent-tracker-ctl send-pane` subcommand inside `ctl_commands/send_pane.py`.
+- Format snapshot Markdown templates containing display name, ID, pane, session, copy-mode, captured timestamp, and requested lines.
+- Deliver pane snapshot messages via standard local and remote `send_message` routing pathways.
+- Restore `registryUrl` configuration option in `options.nix` to ensure backward compatibility for user's setups.
+- Add unit and parser tests in `test_agent_tracker_ctl.py`, hermetically isolating handler executions via cleared environment patches.
+
+TAG=agy
+CONV=4ecccc12-2991-4ff5-a088-fd2e4bce5a16

@@ -1,0 +1,11 @@
+feat(agent-tracker): implement remote registry capture handoff (Milestone 2)
+
+Implement Phase 3 of the pane capture snapshots plan. Add remote pane capture handoffs via registry tracker events, featuring thread-isolated execution queues.
+
+Changes:
+- Update `send-pane` command inside `ctl_commands/send_pane.py` to publish `pane_capture_request` events to remote registries when target source resides on a remote host.
+- Implement `_handle_remote_pane_capture` inside `registry_client.py` to subscribe to remote capture requests, delegate execution to background daemon threads, and route formatted snapshots back to the requester.
+- Add registry event unit tests in `test_registry_events.py` verifying event-loop parsing, thread spawning, and snapshot deliver actions.
+
+TAG=agy
+CONV=4ecccc12-2991-4ff5-a088-fd2e4bce5a16

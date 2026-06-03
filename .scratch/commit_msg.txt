@@ -1,0 +1,14 @@
+feat(agent-tracker): implement reusable tmux send-keys reliability library
+
+Introduce a robust tmux send-keys reliability layer that cancels copy-mode, validates key rendering via polling pane screen captures, and verifies command execution completion using unique concatenated sentinels.
+
+Changes:
+- Create `tmux_reliability.py` library exposing `send_keys_reliable` and `execute_command_reliable` APIs.
+- Expose library functions in `tmux_util.py` and daemon in `rpc_handler.py`.
+- Upgrade local notifications delivery to always trigger immediately with legacy fallbacks.
+- Add CLI `--verify` option in `send_message.py` command for blocking synchronous confirmation.
+- Introduce `enableReliableSendKeys` option flag in `options.nix` mapped to the daemon to allow globally toggling verification.
+- Add unit tests in `test_rpc_handler.py` and integration tests in `test_tmux_reliability_integration.py` and `test_send_message_verify.py`.
+
+TAG=agy
+CONV=4ecccc12-2991-4ff5-a088-fd2e4bce5a16

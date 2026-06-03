@@ -1,0 +1,1 @@
+ACTION: Started debugging tmux status bar. Created implementation plan.

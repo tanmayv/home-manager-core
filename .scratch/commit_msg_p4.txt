@@ -1,0 +1,12 @@
+feat(agent-communicator): integrate pane debug shortcut in Go TUI (Phase 4)
+
+Implement Phase 4 of the pane capture snapshots plan. Integrate selection-aware `Ctrl+X` pane capture shortcut and async Bubble Tea CLI goroutine dispatchers in the TUI.
+
+Changes:
+- Add `Ctrl+X` shortcut keybinding in `agent-communicator-tui/app.go` to capture the active row agent.
+- Implement `requestPaneCaptureCmd` Bubble Tea command in `agent-communicator-tui/commands.go` executing `agent-tracker-ctl send-pane` inside asynchronous background goroutines.
+- Upgrade shortcuts view panel and add dynamic, timed footer alerts in `agent-communicator-tui/view.go`.
+- Add unit tests inside `agent-communicator-tui/app_test.go` verifying key events.
+
+TAG=agy
+CONV=4ecccc12-2991-4ff5-a088-fd2e4bce5a16

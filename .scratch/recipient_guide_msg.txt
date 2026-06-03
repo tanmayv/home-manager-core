@@ -1,0 +1,36 @@
+### Clarification: Who Receives the Pane Snapshot?
+
+Here is the systematic clarification regarding snapshot recipient behaviors and the underlying design rationale:
+
+---
+
+### 1. For CLI: `agent-tracker-ctl send-pane TARGET --source SOURCE`
+* **Recipient**: The snapshot is sent **exclusively** to the `TARGET` address.
+* **Source Behavior**: The `SOURCE` agent does **not** receive the snapshot in its inbox. In the messaging pipeline, the `SOURCE` represents the "sender" (the subject being captured), and the `TARGET` represents the "recipient" (the destination). Only the destination receives the message.
+
+---
+
+### 2. For TUI: pressing `Ctrl+X` on a Selected Agent
+* **TUI Flow**: Pressing `Ctrl+X` on a selected agent (e.g., `jetski-coder-agent`) in `agent-communicator` executes this command under the hood:
+  ```bash
+  agent-tracker-ctl send-pane agent-communicator --source jetski-coder-agent
+  ```
+* **TUI Representation**: Because `agent-communicator` receives the message *from* `jetski-coder-agent`, the TUI routes the incoming snapshot message directly to the **`jetski-coder-agent` conversation panel**.
+* **Selected Agent Behavior**: The selected agent (`jetski-coder-agent`) **never** receives the snapshot in its inbox. The message goes exclusively to the `agent-communicator` TUI's inbox, meaning the autonomous agent is never notified or interrupted.
+
+---
+
+### 3. How to Intentionally Send the Snapshot *to* the Agent itself?
+If you want to programmatically feed the snapshot back to the agent itself (for example, to pass its scrollback history back to its LLM context for **self-healing**, self-correction, or log-error diagnostics):
+* **Execute via CLI**: Set both `--source` and the `TARGET` to the same agent address:
+  ```bash
+  agent-tracker-ctl send-pane jetski-coder-agent --source jetski-coder-agent
+  ```
+  *This writes the snapshot Markdown block directly into `jetski-coder-agent`'s inbox file, allowing its internal processes to ingest it.*
+
+---
+
+### 4. Design & Safety Rationale
+* **Non-Intrusiveness**: Pushing snapshots back to the busy source agent by default would trigger inbox notifications, clutter their workspace inboxes, and potentially disrupt their active terminal execution loops.
+* **Recursion Protection**: If a busy agent receives a notification alert containing its own screen contents, it could trigger a new event handler loop, causing an infinite execution recursion loop.
+* **Human-Centric Auditing**: Pane snapshots are primarily human-centric diagnostic captures designed for observers using the `agent-communicator` TUI. By keeping the source agent isolated, we ensure clean audits with zero execution side-effects.
