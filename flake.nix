@@ -9,7 +9,7 @@
     };
 
     broccoli-comms = {
-      url = "git+ssh://git@github.com/tanmayv/broccoli-comms.git";
+      url = "path:/usr/local/google/home/tanmayvijay/broccoli-comms";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
