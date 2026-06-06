@@ -6,9 +6,15 @@ let
   in if value == "" then null else value;
   cacheHome = config.xdg.cacheHome or "${config.home.homeDirectory}/.cache";
   configHome = config.xdg.configHome or "${config.home.homeDirectory}/.config";
-  broccoliRuntimeDir = agentTrackerSettings.runtime-dir or "${cacheHome}/broccoli-comms/runtime";
-  enableAgentTracker = (userSettings.enable-agent-tracker or false) || config.services.agent-tracker.enable;
-  enableAgentTrackerTmuxIntegration = config.services.agent-tracker.enableTmuxIntegration && (agentTrackerSettings.enable-tmux-integration or true);
+  # Leave Broccoli Comms on its canonical app-owned runtime by default
+  # (${XDG_RUNTIME_DIR:-/tmp/$UID}/broccoli-comms).  Only pin the runtime
+  # when the user explicitly requests one; otherwise wrappers, the service,
+  # and the UI all converge on the same Broccoli-managed daemon.
+  broccoliRuntimeDir = agentTrackerSettings.runtime-dir or null;
+  broccoliTrackerSocket = if broccoliRuntimeDir == null then "" else "${broccoliRuntimeDir}/agent-tracker.sock";
+  legacyAgentTracker = config.services.agent-tracker;
+  enableAgentTracker = (userSettings.enable-agent-tracker or false) || legacyAgentTracker.enable;
+  enableAgentTrackerTmuxIntegration = legacyAgentTracker.enableTmuxIntegration && (agentTrackerSettings.enable-tmux-integration or true);
 in
 {
   imports = [
@@ -16,19 +22,13 @@ in
     ./modules/tmux-palette.nix
     ./modules/terminal
     ./modules/scripts
+    ./modules/agent-tracker/options.nix
     inputs.broccoli-comms.homeManagerModules.broccoli-comms
     ({ config, lib, pkgs, ... }: {
       # Backward-compatible surface for extensions that still contribute
       # agent aliases through services.agent-tracker.*. Broccoli Comms owns
-      # the tracker/registry runtime; this shim only accepts legacy settings
-      # and turns services.agent-tracker.agents into `broccoli-comms track`
-      # launchers pinned to the app-owned runtime.
-      options.services.agent-tracker = with lib; {
-        enable = mkOption { type = types.bool; default = false; description = "Deprecated compatibility alias for services.broccoli-comms.tracker.enable."; };
-        enableTmuxIntegration = mkOption { type = types.bool; default = true; description = "Deprecated compatibility flag for tmux tracker integration."; };
-        agents = mkOption { type = types.attrsOf types.str; default = {}; description = "Deprecated map of agent aliases to commands launched with `broccoli-comms track`."; };
-      };
-
+      # the tracker/registry runtime; this shim only turns legacy agents into
+      # `broccoli-comms track` launchers pinned to the app-owned runtime.
       config.home.packages = lib.mkIf config.services.broccoli-comms.tracker.enable (
         lib.mapAttrsToList (alias: command:
           pkgs.writeShellApplication {
@@ -82,14 +82,15 @@ in
     tracker = {
       enable = lib.mkDefault enableAgentTracker;
       hostname = lib.mkDefault (agentTrackerSettings.hostname or null);
-      registries = lib.mkDefault (agentTrackerSettings.registries or []);
-      registryAuth = lib.mkDefault (agentTrackerSettings.registry-auth or false);
-      registryTokenFile = lib.mkDefault registryTokenFileFromSettings;
+      registries = lib.mkDefault (if legacyAgentTracker.registries != [] then legacyAgentTracker.registries else (agentTrackerSettings.registries or []));
+      registryAuth = lib.mkDefault (legacyAgentTracker.registryAuth || (agentTrackerSettings.registry-auth or false));
+      registryTokenFile = lib.mkDefault (if legacyAgentTracker.registryTokenFile != null then legacyAgentTracker.registryTokenFile else registryTokenFileFromSettings);
       tmuxSocketPath = lib.mkDefault (agentTrackerSettings.tmux-socket-path or null);
-      httpPort = lib.mkDefault (agentTrackerSettings.http-port or 19876);
-      registryHeartbeatSeconds = lib.mkDefault (agentTrackerSettings.registry-heartbeat-seconds or 30);
-      enableReliableSendKeys = lib.mkDefault (agentTrackerSettings.enable-reliable-send-keys or true);
-      capturePaneDefaultLines = lib.mkDefault (agentTrackerSettings.capture-pane-default-lines or 25);
+      httpPort = lib.mkDefault (if legacyAgentTracker.httpPort != 19876 then legacyAgentTracker.httpPort else (agentTrackerSettings.http-port or 19876));
+      registryHeartbeatSeconds = lib.mkDefault (if legacyAgentTracker.registryHeartbeatSeconds != 30 then legacyAgentTracker.registryHeartbeatSeconds else (agentTrackerSettings.registry-heartbeat-seconds or 30));
+      enableReliableSendKeys = lib.mkDefault (legacyAgentTracker.enableReliableSendKeys && (agentTrackerSettings.enable-reliable-send-keys or true));
+      capturePaneDefaultLines = lib.mkDefault (if legacyAgentTracker.capturePaneDefaultLines != 25 then legacyAgentTracker.capturePaneDefaultLines else (agentTrackerSettings.capture-pane-default-lines or 25));
+      remotePaneInput.enable = lib.mkDefault (legacyAgentTracker.allowRemotePaneInput && (agentTrackerSettings.allow-remote-pane-input or true));
     };
   };
 
@@ -109,5 +110,5 @@ in
   '';
 
   services.agent-communicator-web.enable = lib.mkDefault true;
-  services.agent-communicator-web.socket = lib.mkDefault "${broccoliRuntimeDir}/agent-tracker.sock";
+  services.agent-communicator-web.socket = lib.mkDefault broccoliTrackerSocket;
 }

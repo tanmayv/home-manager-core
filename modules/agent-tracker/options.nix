@@ -7,19 +7,19 @@ with lib;
     enable = mkOption {
       type = types.bool;
       default = false;
-      description = "Enable agent-tracker daemon";
+      description = "Deprecated compatibility alias for services.broccoli-comms.tracker.enable.";
     };
 
     enableTmuxIntegration = mkOption {
       type = types.bool;
       default = true;
-      description = "Enable agent-related tmux configuration (status bar, keybindings)";
+      description = "Deprecated compatibility flag for Broccoli Comms tracker tmux integration (status bar, keybindings).";
     };
 
     agents = mkOption {
       type = types.attrsOf types.str;
       default = {};
-      description = "Map of agent aliases to their executable paths.";
+      description = "Deprecated map of agent aliases to commands launched with `broccoli-comms track`.";
     };
 
     pollInterval = mkOption {

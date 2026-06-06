@@ -9,7 +9,7 @@
     };
 
     broccoli-comms = {
-      url = "path:/usr/local/google/home/tanmayvijay/broccoli-comms";
+      url = "github:tanmayv/broccoli-comms";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

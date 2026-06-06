@@ -55,12 +55,23 @@ func NewClient(socketPath string) (*Client, error) {
 	return &Client{SocketPath: socketPath}, nil
 }
 
-// resolveSocketPath discovers socket path matching standard XDG locations
+// resolveSocketPath discovers the Broccoli Comms app-owned tracker socket.
 func resolveSocketPath() (string, error) {
 	if path := os.Getenv("AGENT_TRACKER_SOCKET"); path != "" {
 		return expandTilde(path)
 	}
+	if runtimeDir := os.Getenv("BROCCOLI_COMMS_RUNTIME_DIR"); runtimeDir != "" {
+		return expandTilde(filepath.Join(runtimeDir, "agent-tracker.sock"))
+	}
 
+	var candidates []string
+	if runtimeDir := os.Getenv("XDG_RUNTIME_DIR"); runtimeDir != "" {
+		candidates = append(candidates, filepath.Join(runtimeDir, "broccoli-comms", "agent-tracker.sock"))
+	} else {
+		candidates = append(candidates, filepath.Join(fmt.Sprintf("/tmp/%d", os.Getuid()), "broccoli-comms", "agent-tracker.sock"))
+	}
+
+	// Legacy standalone location, kept as a last-resort compatibility fallback.
 	cacheDir := os.Getenv("XDG_CACHE_HOME")
 	if cacheDir == "" {
 		home, err := os.UserHomeDir()
@@ -69,9 +80,18 @@ func resolveSocketPath() (string, error) {
 		}
 		cacheDir = filepath.Join(home, ".cache")
 	}
+	candidates = append(candidates, filepath.Join(cacheDir, "agent-tracker", "agent-tracker.sock"))
 
-	path := filepath.Join(cacheDir, "agent-tracker", "agent-tracker.sock")
-	return expandTilde(path)
+	for _, candidate := range candidates {
+		path, err := expandTilde(candidate)
+		if err != nil {
+			return "", err
+		}
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+	}
+	return expandTilde(candidates[0])
 }
 
 func expandTilde(path string) (string, error) {

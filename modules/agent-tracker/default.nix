@@ -1,87 +1,21 @@
-{ pkgs, lib, config, userSettings ? {}, ... }:
+{ pkgs, lib, config, userSettings ? {}, inputs, ... }:
 
 with lib;
 
 let
   cfg = config.services.agent-tracker;
-  agentTrackerFiles = pkgs.stdenv.mkDerivation {
-    name = "agent-tracker-files";
-    src = ./.;
-    installPhase = ''
-      mkdir -p $out
-      cp -r * $out/
-    '';
-  };
-  tmuxUserSettings = userSettings // lib.optionalAttrs (userSettings ? tmuxTheme) {
-    theme = userSettings.tmuxTheme;
-  };
   agentTrackerSettings = userSettings.agent-tracker or {};
   registryTokenFileFromSettings = let
     value = agentTrackerSettings.registry-token-file or null;
   in if value == "" then null else value;
-  palette = import ../palette.nix { userSettings = tmuxUserSettings; };
-  cacheHome = config.xdg.cacheHome or "${config.home.homeDirectory}/.cache";
-  socketPath = "${cacheHome}/agent-tracker/agent-tracker.sock";
-  logDir = "${cacheHome}/agent-tracker";
-  launchdStdoutPath = "${logDir}/launchd.stdout.log";
-  launchdStderrPath = "${logDir}/launchd.stderr.log";
-  agentTrackerToolPath = lib.makeBinPath [ pkgs.tmux pkgs.coreutils pkgs.gnugrep ];
-  platformFallbackPath =
-    if pkgs.stdenv.isDarwin
-    then "/usr/bin:/bin:/usr/sbin:/sbin"
-    else "/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin";
-  userNixPaths = lib.concatStringsSep ":" [
-    "${config.home.homeDirectory}/.nix-profile/bin"
-    "/etc/profiles/per-user/${config.home.username}/bin"
-    "/nix/var/nix/profiles/default/bin"
-  ];
-  daemonCmd = toString (pkgs.writeShellScript "agent-tracker-daemon" ''
-    export AGENT_REGISTRY_AUTH=${if cfg.registryAuth then "true" else "false"}
-    ${lib.optionalString (cfg.registryAuth && cfg.registryTokenFile != null) ''export AGENT_REGISTRY_TOKEN="$(cat ${lib.escapeShellArg (toString cfg.registryTokenFile)})"''}
-    exec ${pkgs.python3}/bin/python3 ${agentTrackerFiles}/agent-tracker.py
-  '');
-  agentWrapperPackage = import ../scripts/agent-wrapper-package.nix { inherit pkgs config; };
-  monitorEnvVars = {
-    # systemd user services and launchd agents both start with a minimal PATH.
-    # agent-tracker intentionally invokes `tmux` and `sleep` by name from
-    # Python, so provide an explicit cross-platform tool PATH instead of
-    # relying on the interactive shell environment.
-    PATH = "${userNixPaths}:${agentTrackerToolPath}:${platformFallbackPath}";
-  };
-  monitorEnv = lib.mapAttrsToList (name: value: "${name}=\"${builtins.replaceStrings ["\""] ["\\\""] value}\"") monitorEnvVars;
 in
 {
   imports = [
     ./options.nix
+    inputs.broccoli-comms.homeManagerModules.broccoli-comms
   ];
 
   config = mkMerge [
-
-      xdg.configFile."broccoli-comms/config.toml" = mkIf cfg.enable {
-        text = let
-          tomlStr = lib.generators.toTOML {} {
-            tracker = {
-              poll_interval_seconds = cfg.pollInterval;
-              heartbeat_stale_seconds = cfg.heartbeatStaleSeconds;
-              heartbeat_grace_seconds = cfg.heartbeatGraceSeconds;
-              registry_port = cfg.httpPort;
-            };
-            registry = {
-              heartbeat_seconds = cfg.registryHeartbeatSeconds;
-              auth_enabled = cfg.registryAuth;
-              registries = cfg.registries;
-            };
-            ui = {
-              capture_pane_default_lines = cfg.capturePaneDefaultLines;
-              remote_pane_input_enabled = cfg.allowRemotePaneInput;
-            };
-            paths = {
-              agent_tracker_socket = socketPath;
-            };
-          };
-        in tomlStr;
-      };
-
     {
       services.agent-tracker.enable = mkDefault (userSettings.enable-agent-tracker or false);
       services.agent-tracker.registries = mkDefault (agentTrackerSettings.registries or []);
@@ -110,109 +44,46 @@ in
         }
       ];
 
-      home.activation.ensureAgentTrackerCacheDir = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        mkdir -p ${lib.escapeShellArg logDir}
-      '';
+      warnings = [
+        "services.agent-tracker is deprecated in home-manager-core; delegating to services.broccoli-comms.tracker so no standalone agent-tracker.service is created."
+      ];
 
-      home.packages = [
-        agentWrapperPackage
-      ] ++ (lib.mapAttrsToList (alias: path:
+      services.broccoli-comms.enable = mkDefault true;
+      services.broccoli-comms.tracker = {
+        enable = mkDefault true;
+        registries = mkDefault cfg.registries;
+        registryAuth = mkDefault cfg.registryAuth;
+        registryTokenFile = mkDefault cfg.registryTokenFile;
+        httpPort = mkDefault cfg.httpPort;
+        registryHeartbeatSeconds = mkDefault cfg.registryHeartbeatSeconds;
+        enableReliableSendKeys = mkDefault cfg.enableReliableSendKeys;
+        capturePaneDefaultLines = mkDefault cfg.capturePaneDefaultLines;
+        remotePaneInput.enable = mkDefault cfg.allowRemotePaneInput;
+      };
+
+      home.packages = lib.mapAttrsToList (alias: command:
         pkgs.writeShellApplication {
           name = alias;
-          runtimeInputs = [ agentWrapperPackage ];
+          runtimeInputs = [ config.programs.broccoli-comms.package ];
           text = ''
-            ${agentWrapperPackage}/bin/agent-wrapper "${path}" "$@"
+            exec ${config.programs.broccoli-comms.package}/bin/broccoli-comms track --name ${lib.escapeShellArg alias} -- ${lib.escapeShellArg command} "$@"
           '';
-        }
-      ) cfg.agents);
+        }) cfg.agents;
 
       programs.tmux.statusBar.extraLines = mkIf cfg.enableTmuxIntegration [
         {
           name = "agents";
-          command = "#(agent-tracker-ctl status-bar '#{pane_id}')";
+          command = "#(broccoli-comms agent-tracker status-bar '#{pane_id}')";
         }
       ];
 
-      # Contribute tmux configuration if enabled
       programs.tmux.extraConfig = mkIf cfg.enableTmuxIntegration ''
-        # Agent navigation contributed by agent-tracker extension
-        bind-key N run-shell "agent-tracker-ctl focus --next"
-        bind-key P run-shell "agent-tracker-ctl focus --prev"
+        # Agent navigation contributed by Broccoli Comms agent-tracker compatibility integration
+        bind-key N run-shell "broccoli-comms agent-tracker focus --next"
+        bind-key P run-shell "broccoli-comms agent-tracker focus --prev"
         bind-key -n MouseDown3Status if-shell -F '#{==:#{mouse_status_range},agent-registries}' \
-          { display-popup -w 80% -h 40% -E "agent-tracker-ctl registry-status; echo; printf 'Press Enter to close...'; read _" }
+          { display-popup -w 80% -h 40% -E "broccoli-comms agent-tracker registry-status; echo; printf 'Press Enter to close...'; read _" }
       '';
-    })
-
-    (mkIf (cfg.enable && pkgs.stdenv.isLinux) {
-      home.activation.restartAgentTracker = lib.hm.dag.entryAfter [ "reloadSystemd" ] ''
-        echo "Force restarting agent-tracker.service"
-        if ${config.systemd.user.systemctlPath} --user show-environment >/dev/null 2>&1; then
-          ${config.systemd.user.systemctlPath} --user daemon-reload >/dev/null 2>&1 || true
-          ${config.systemd.user.systemctlPath} --user reset-failed agent-tracker.service >/dev/null 2>&1 || true
-          ${config.systemd.user.systemctlPath} --user stop agent-tracker.service >/dev/null 2>&1 || true
-          ${config.systemd.user.systemctlPath} --user start agent-tracker.service >/dev/null 2>&1 || true
-        else
-          echo "User systemd is not available; skipping agent-tracker restart"
-        fi
-      '';
-
-      systemd.user.services.agent-tracker = {
-        Unit = {
-          Description = "Agent Tracker Daemon";
-          StartLimitIntervalSec = 60;
-          StartLimitBurst = 10;
-        };
-        Service = {
-          Environment = monitorEnv;
-          ExecStart = daemonCmd;
-          Restart = "always";
-          RestartSec = 2;
-        };
-        Install = {
-          WantedBy = [ "default.target" ];
-        };
-      };
-    })
-
-    (mkIf (cfg.enable && pkgs.stdenv.isDarwin) {
-      home.activation.restartAgentTracker = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
-        label="org.nix-community.home.agent-tracker"
-        domain="gui/$(id -u)"
-        service="$domain/$label"
-        plist="$HOME/Library/LaunchAgents/$label.plist"
-
-        echo "Force restarting $label"
-        if [ -f "$plist" ]; then
-          /bin/launchctl bootout "$service" >/dev/null 2>&1 || true
-          for _ in 1 2 3 4 5; do
-            if ! /bin/launchctl print "$service" >/dev/null 2>&1; then
-              break
-            fi
-            /bin/sleep 1
-          done
-          if ! /bin/launchctl bootstrap "$domain" "$plist" >/dev/null 2>&1; then
-            echo "launchctl bootstrap failed for $service; trying kickstart"
-          fi
-          if ! /bin/launchctl kickstart -k "$service" >/dev/null 2>&1; then
-            echo "launchctl kickstart failed for $service"
-          fi
-        else
-          echo "LaunchAgent plist not found: $plist"
-        fi
-      '';
-
-      launchd.agents.agent-tracker = {
-        enable = true;
-        config = {
-          ProgramArguments = [ "${daemonCmd}" ];
-          EnvironmentVariables = monitorEnvVars;
-          KeepAlive = false;
-          ProcessType = "Background";
-          RunAtLoad = true;
-          StandardOutPath = launchdStdoutPath;
-          StandardErrorPath = launchdStderrPath;
-        };
-      };
     })
   ];
 }
