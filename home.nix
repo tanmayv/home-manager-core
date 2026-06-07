@@ -6,12 +6,12 @@ let
   in if value == "" then null else value;
   cacheHome = config.xdg.cacheHome or "${config.home.homeDirectory}/.cache";
   configHome = config.xdg.configHome or "${config.home.homeDirectory}/.config";
-  # Leave Broccoli Comms on its canonical app-owned runtime by default
-  # (${XDG_RUNTIME_DIR:-/tmp/$UID}/broccoli-comms).  Only pin the runtime
-  # when the user explicitly requests one; otherwise wrappers, the service,
-  # and the UI all converge on the same Broccoli-managed daemon.
-  broccoliRuntimeDir = agentTrackerSettings.runtime-dir or null;
-  broccoliTrackerSocket = if broccoliRuntimeDir == null then "" else "${broccoliRuntimeDir}/agent-tracker.sock";
+  # Pin the Broccoli Comms runtime so the service, wrappers, and UI converge
+  # on the same app-owned tracker socket.  Without this, older broccoli-comms
+  # releases fall back to $XDG_RUNTIME_DIR/agent-tracker.sock for `ui`, while
+  # existing wrappers may still use the configured Broccoli runtime.
+  broccoliRuntimeDir = agentTrackerSettings.runtime-dir or "${cacheHome}/broccoli-comms/runtime";
+  broccoliTrackerSocket = "${broccoliRuntimeDir}/agent-tracker.sock";
   legacyAgentTracker = config.services.agent-tracker;
   enableAgentTracker = (userSettings.enable-agent-tracker or false) || legacyAgentTracker.enable;
   enableAgentTrackerTmuxIntegration = legacyAgentTracker.enableTmuxIntegration && (agentTrackerSettings.enable-tmux-integration or true);

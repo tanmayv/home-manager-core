@@ -66,7 +66,10 @@ func resolveSocketPath() (string, error) {
 
 	var candidates []string
 	if runtimeDir := os.Getenv("XDG_RUNTIME_DIR"); runtimeDir != "" {
-		candidates = append(candidates, filepath.Join(runtimeDir, "broccoli-comms", "agent-tracker.sock"))
+		candidates = append(candidates,
+			filepath.Join(runtimeDir, "agent-tracker.sock"),
+			filepath.Join(runtimeDir, "broccoli-comms", "agent-tracker.sock"),
+		)
 	} else {
 		candidates = append(candidates, filepath.Join(fmt.Sprintf("/tmp/%d", os.Getuid()), "broccoli-comms", "agent-tracker.sock"))
 	}
