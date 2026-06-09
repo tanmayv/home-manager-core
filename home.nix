@@ -24,22 +24,9 @@ in
     ./modules/scripts
     ./modules/agent-tracker/options.nix
     inputs.broccoli-comms.homeManagerModules.broccoli-comms
-    ({ config, lib, pkgs, ... }: {
-      # Backward-compatible surface for extensions that still contribute
-      # agent aliases through services.agent-tracker.*. Broccoli Comms owns
-      # the tracker/registry runtime; this shim only turns legacy agents into
-      # `broccoli-comms track` launchers pinned to the app-owned runtime.
-      config.home.packages = lib.mkIf config.services.broccoli-comms.tracker.enable (
-        lib.mapAttrsToList (alias: command:
-          pkgs.writeShellApplication {
-            name = alias;
-            runtimeInputs = [ config.programs.broccoli-comms.package ];
-            text = ''
-              exec ${config.programs.broccoli-comms.package}/bin/broccoli-comms track --name ${lib.escapeShellArg alias} -- ${lib.escapeShellArg command} "$@"
-            '';
-          }) config.services.agent-tracker.agents
-      );
-    })
+    # services.agent-tracker.agents remains as metadata for compatibility, but
+    # no command-name wrappers are generated anymore. Launch agents explicitly:
+    #   broccoli-comms run NAME --cwd DIR -- COMMAND [ARGS...]
     ./modules/agent-communicator-web.nix
     ./modules/git
   ] ++ (if userSettings.enable_bash_over_zsh or false then [ ./modules/bash ] else [ ./modules/zsh ])

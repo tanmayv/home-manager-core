@@ -61,14 +61,9 @@ in
         remotePaneInput.enable = mkDefault cfg.allowRemotePaneInput;
       };
 
-      home.packages = lib.mapAttrsToList (alias: command:
-        pkgs.writeShellApplication {
-          name = alias;
-          runtimeInputs = [ config.programs.broccoli-comms.package ];
-          text = ''
-            exec ${config.programs.broccoli-comms.package}/bin/broccoli-comms track --name ${lib.escapeShellArg alias} -- ${lib.escapeShellArg command} "$@"
-          '';
-        }) cfg.agents;
+      # cfg.agents is retained only as compatibility metadata. Do not generate
+      # command-name wrappers; tracked launches must be explicit, e.g.:
+      #   broccoli-comms run NAME --cwd DIR -- COMMAND [ARGS...]
 
       programs.tmux.statusBar.extraLines = mkIf cfg.enableTmuxIntegration [
         {

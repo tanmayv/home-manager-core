@@ -23,6 +23,5 @@ in
     ./iamdone.nix
     ./waiting.nix
     ./send-message-to-agent.nix
-    ./agent-wrapper.nix
   ] else []);
 }

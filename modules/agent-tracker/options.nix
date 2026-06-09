@@ -19,7 +19,7 @@ with lib;
     agents = mkOption {
       type = types.attrsOf types.str;
       default = {};
-      description = "Deprecated map of agent aliases to commands launched with `broccoli-comms track`.";
+      description = "Deprecated compatibility metadata for named agent commands. No shell wrappers are generated; launch explicitly with `broccoli-comms run NAME --cwd DIR -- COMMAND [ARGS...]`.";
     };
 
     pollInterval = mkOption {
