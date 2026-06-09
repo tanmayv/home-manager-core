@@ -16,6 +16,28 @@
         "type": "github"
       }
     },
+    "broccoli-comms": {
+      "inputs": {
+        "home-manager": "home-manager_2",
+        "nixpkgs": [
+          "minimal-cloudtop",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1780967475,
+        "narHash": "sha256-tGtLcg88Gu7LveAgbguC+tY53XDzzfHKotSqrYNgpJk=",
+        "owner": "tanmayv",
+        "repo": "broccoli-comms",
+        "rev": "0dc6b74121e83901d871e433f5a9c8563d686d0b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "tanmayv",
+        "repo": "broccoli-comms",
+        "type": "github"
+      }
+    },
     "extensions": {
       "inputs": {
         "nixpkgs": [
@@ -26,11 +48,11 @@
         "tasks-nvim": "tasks-nvim"
       },
       "locked": {
-        "lastModified": 1779651106,
-        "narHash": "sha256-AKQ+KFsyqc0g/z2ih82XBSOuYVdfTFb/gVyOxIGo2pY=",
+        "lastModified": 1780967991,
+        "narHash": "sha256-UYML+ITCZ61ZBdhp55s9K2ytleHfZg1IC6HIbVNhBSc=",
         "owner": "tanmayv",
         "repo": "home-manager-extensions",
-        "rev": "9ee3f5460149083abae73388f3b09605e4a22774",
+        "rev": "ae192f26dce4da8fb54a8d7ff8f3463f60372563",
         "type": "github"
       },
       "original": {
@@ -108,15 +130,37 @@
       "inputs": {
         "nixpkgs": [
           "minimal-cloudtop",
+          "broccoli-comms",
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1778444552,
-        "narHash": "sha256-f18pIiR9q/p1vHY93gmAum7aHhQOG49oGvAB9+lptRo=",
+        "lastModified": 1780408569,
+        "narHash": "sha256-s7Tv6FUQThRAvW8En8XVC6HMb0uiikzVccCcCo9u/Bg=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "dcebe66f958673729896eec2de4abfd86ef22d21",
+        "rev": "f384af1bec6423a0d4ba1855917ab948f64e5808",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "type": "github"
+      }
+    },
+    "home-manager_3": {
+      "inputs": {
+        "nixpkgs": [
+          "minimal-cloudtop",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1780679734,
+        "narHash": "sha256-KmRNvpNOb7QEORa06bVgjW9kITcx0VhsI7w0vhmZyD8=",
+        "owner": "nix-community",
+        "repo": "home-manager",
+        "rev": "b2b7db486e06e098711dc291bb25db82850e1d16",
         "type": "github"
       },
       "original": {
@@ -128,17 +172,18 @@
     "minimal-cloudtop": {
       "inputs": {
         "astronvim-template": "astronvim-template",
-        "home-manager": "home-manager_2",
+        "broccoli-comms": "broccoli-comms",
+        "home-manager": "home-manager_3",
         "nixpkgs": [
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1779692188,
-        "narHash": "sha256-1gSNnoMS46+Wylf5SuHoXWeHHKpN6yNsZMIAiqheElI=",
+        "lastModified": 1780967583,
+        "narHash": "sha256-TG90hH6Q1IH3iWEYSwDwNTkECxZ6F/XSx9u4VVRZ5gg=",
         "owner": "tanmayv",
         "repo": "home-manager-core",
-        "rev": "34b83bfd8af5b3b86a2acbf9b6ba5842b0605e96",
+        "rev": "c1b159678e5f218eb2f5a16146ea0031c550330a",
         "type": "github"
       },
       "original": {
