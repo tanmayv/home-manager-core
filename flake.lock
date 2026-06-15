@@ -24,11 +24,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1781538366,
-        "narHash": "sha256-maqMyak9sGGgOKeBEYxw2PeC8PcB33oLUaf4FPCxYT4=",
+        "lastModified": 1781538876,
+        "narHash": "sha256-oLZS5r1j+zy4n7HR38AoFxJ/0gFLrrGzp/GZTeREisU=",
         "owner": "tanmayv",
         "repo": "broccoli-comms",
-        "rev": "e0ae64311cf92ed3496b2abb43b16b91ed7acb0f",
+        "rev": "037442f72ebdb650ee04d6229447bb341ac8abdf",
         "type": "github"
       },
       "original": {
