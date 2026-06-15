@@ -239,11 +239,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1780967991,
-        "narHash": "sha256-UYML+ITCZ61ZBdhp55s9K2ytleHfZg1IC6HIbVNhBSc=",
+        "lastModified": 1781533841,
+        "narHash": "sha256-mff8fAFMUoXqkRM3JYUASvLbQ/+V8Y7SoFJEgtGug+w=",
         "owner": "tanmayv",
         "repo": "home-manager-extensions",
-        "rev": "ae192f26dce4da8fb54a8d7ff8f3463f60372563",
+        "rev": "b7879ad3117749cb45b0d159db04f15968ee44e1",
         "type": "github"
       },
       "original": {
