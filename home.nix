@@ -58,7 +58,6 @@ in
     # Broccoli supplies the tracker/ctl/registry implementations.
     wrapper = lib.mkDefault false;
     tui = lib.mkDefault false;
-    electron = lib.mkDefault (userSettings.enable-agent-communicator-electron or false);
   };
 
   services.broccoli-comms = {
