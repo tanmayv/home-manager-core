@@ -62,21 +62,37 @@ in
 
   services.broccoli-comms = {
     enable = lib.mkDefault enableAgentTracker;
-    runtimeDir = lib.mkDefault broccoliRuntimeDir;
-    cacheDir = lib.mkDefault "${cacheHome}/broccoli-comms";
-    configDir = lib.mkDefault "${configHome}/broccoli-comms";
+    config = {
+      paths = {
+        runtimeDir = lib.mkDefault broccoliRuntimeDir;
+        cacheDir = lib.mkDefault "${cacheHome}/broccoli-comms";
+        configDir = lib.mkDefault "${configHome}/broccoli-comms";
+      };
+      tracker = {
+        hostname = lib.mkDefault (agentTrackerSettings.hostname or null);
+        httpPort = lib.mkDefault (if legacyAgentTracker.httpPort != 19876 then legacyAgentTracker.httpPort else (agentTrackerSettings.http-port or 19876));
+        registries = lib.mkDefault (if legacyAgentTracker.registries != [] then legacyAgentTracker.registries else (agentTrackerSettings.registries or []));
+      };
+      registry = {
+        authEnabled = lib.mkDefault (legacyAgentTracker.registryAuth || (agentTrackerSettings.registry-auth or false));
+        heartbeatSeconds = lib.mkDefault (if legacyAgentTracker.registryHeartbeatSeconds != 30 then legacyAgentTracker.registryHeartbeatSeconds else (agentTrackerSettings.registry-heartbeat-seconds or 30));
+      };
+      ui = {
+        capturePaneDefaultLines = lib.mkDefault (if legacyAgentTracker.capturePaneDefaultLines != 25 then legacyAgentTracker.capturePaneDefaultLines else (agentTrackerSettings.capture-pane-default-lines or 25));
+        remotePaneInputEnabled = lib.mkDefault (legacyAgentTracker.allowRemotePaneInput && (agentTrackerSettings.allow-remote-pane-input or true));
+      };
+      core = {
+        enableReliableSendKeys = lib.mkDefault (legacyAgentTracker.enableReliableSendKeys && (agentTrackerSettings.enable-reliable-send-keys or true));
+      };
+    };
     tracker = {
       enable = lib.mkDefault enableAgentTracker;
-      hostname = lib.mkDefault (agentTrackerSettings.hostname or null);
-      registries = lib.mkDefault (if legacyAgentTracker.registries != [] then legacyAgentTracker.registries else (agentTrackerSettings.registries or []));
-      registryAuth = lib.mkDefault (legacyAgentTracker.registryAuth || (agentTrackerSettings.registry-auth or false));
       registryTokenFile = lib.mkDefault (if legacyAgentTracker.registryTokenFile != null then legacyAgentTracker.registryTokenFile else registryTokenFileFromSettings);
       tmuxSocketPath = lib.mkDefault (agentTrackerSettings.tmux-socket-path or null);
-      httpPort = lib.mkDefault (if legacyAgentTracker.httpPort != 19876 then legacyAgentTracker.httpPort else (agentTrackerSettings.http-port or 19876));
-      registryHeartbeatSeconds = lib.mkDefault (if legacyAgentTracker.registryHeartbeatSeconds != 30 then legacyAgentTracker.registryHeartbeatSeconds else (agentTrackerSettings.registry-heartbeat-seconds or 30));
-      enableReliableSendKeys = lib.mkDefault (legacyAgentTracker.enableReliableSendKeys && (agentTrackerSettings.enable-reliable-send-keys or true));
-      capturePaneDefaultLines = lib.mkDefault (if legacyAgentTracker.capturePaneDefaultLines != 25 then legacyAgentTracker.capturePaneDefaultLines else (agentTrackerSettings.capture-pane-default-lines or 25));
-      remotePaneInput.enable = lib.mkDefault (legacyAgentTracker.allowRemotePaneInput && (agentTrackerSettings.allow-remote-pane-input or true));
+    };
+    registry = {
+      auth = lib.mkDefault (legacyAgentTracker.registryAuth || (agentTrackerSettings.registry-auth or false));
+      tokenFile = lib.mkDefault (legacyAgentTracker.registryTokenFile or null);
     };
   };
 
