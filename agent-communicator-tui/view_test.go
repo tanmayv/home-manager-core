@@ -153,3 +153,37 @@ func maxRenderedLineWidth(s string) int {
 	}
 	return maxWidth
 }
+
+func TestHomeTabWelcomeScreenRendersASCIIAndShortcuts(t *testing.T) {
+	m := model{
+		width:  120,
+		height: 30,
+		mode:   homeView,
+		rows:   []agentRow{{Name: "alpha", Scope: "local"}},
+	}
+	view := m.View()
+
+	// Should contain welcome text, tagline, and core instructions
+	for _, want := range []string{
+		"Welcome to Broccoli Comms TUI",
+		"Decentralized, task-oriented multi-agent communications protocol.",
+		"Core Shortcuts:",
+		"Ctrl-t",
+		"Ctrl-u",
+		"TUI Tabs:",
+	} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("home tab welcome screen missing %q:\n%s", want, view)
+		}
+	}
+
+	// Should NOT contain the composer box input prompt button (/msg)
+	if strings.Contains(view, "/msg") {
+		t.Fatalf("home tab should not display composer input buttons:\n%s", view)
+	}
+
+	// Should NOT contain standard conversation timelines or messages
+	if strings.Contains(view, "Conversation") {
+		t.Fatalf("home tab should not display conversation timeline:\n%s", view)
+	}
+}

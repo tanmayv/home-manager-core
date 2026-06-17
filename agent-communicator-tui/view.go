@@ -40,12 +40,23 @@ func (m model) baseView() string {
 		return m.renderConfigMenu(m.width, bodyH)
 	}
 	if m.width < 70 {
-		return truncateLines(m.conversationPanel(m.width, bodyH), bodyH)
+		var panel string
+		if m.mode == homeView {
+			panel = m.homePanel(m.width, bodyH)
+		} else {
+			panel = m.conversationPanel(m.width, bodyH)
+		}
+		return truncateLines(panel, bodyH)
 	}
 	chatW, rightW, _ := m.layoutWidths()
-	chat := m.conversationPanel(chatW, bodyH)
+	var leftPanel string
+	if m.mode == homeView {
+		leftPanel = m.homePanel(chatW, bodyH)
+	} else {
+		leftPanel = m.conversationPanel(chatW, bodyH)
+	}
 	right := m.rightColumn(rightW, bodyH)
-	return truncateLines(lipgloss.JoinHorizontal(lipgloss.Top, chat, right), bodyH)
+	return truncateLines(lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, right), bodyH)
 }
 
 func (m model) layoutWidths() (int, int, int) {
@@ -159,11 +170,11 @@ func (m model) conversationPanel(width, height int) string {
 }
 
 func (m model) conversationTitle() string {
+	if m.mode == homeView {
+		return "Home"
+	}
 	if m.mode == savedView {
 		return "Saved Messages"
-	}
-	if m.mode == advancedView {
-		return "Conversation"
 	}
 	return "Conversation"
 }
@@ -859,4 +870,114 @@ func (m model) renderConfigMenu(width, height int) string {
 	title := titleStyle.Render("Custom Agent Configurations")
 	boxContent := title + "\n\n" + body
 	return box(boxContent, width, height)
+}
+
+func (m model) homePanel(width, height int) string {
+	padX := 3
+	if width < 70 {
+		padX = 1
+	}
+	innerW := max(1, width-(padX*2))
+
+	// ASCII Art (centered)
+	ascii := []string{
+		"  ____                             _ _   ____",
+		" | __ ) _ __ ___   ___  ___  ___  | (_) / ___|___  _ __ ___  _ __ ___  ___",
+		" |  _ \\| '__/ _ \\ / __|/ __|/ _ \\ | | |/ /   / _ \\| '_ ` _ \\| '_ ` _ \\/ __|",
+		" | |_) | | | (_) | (__| (__| (_) || | | |__| (_) | | | | | | | | | | \\__ \\",
+		" |____/|_|  \\___/ \\___|\\___|\\___/ |_|_|\\____\\___/|_| |_| |_|_| |_| |_|___/",
+	}
+
+	var asciiLines []string
+	for _, line := range ascii {
+		if len(line) < innerW {
+			padding := (innerW - len(line)) / 2
+			asciiLines = append(asciiLines, strings.Repeat(" ", padding)+line)
+		} else {
+			asciiLines = append(asciiLines, line)
+		}
+	}
+	asciiText := lipgloss.NewStyle().Foreground(colors.Accent).Bold(true).Render(strings.Join(asciiLines, "\n"))
+
+	// Tagline
+	tagline := "Decentralized, task-oriented multi-agent communications protocol."
+	var taglineText string
+	if len(tagline) < innerW {
+		padding := (innerW - len(tagline)) / 2
+		taglineText = strings.Repeat(" ", padding) + tagline
+	} else {
+		taglineText = tagline
+	}
+	taglineText = lipgloss.NewStyle().Foreground(colors.Muted).Italic(true).Render(taglineText)
+
+	// Divider
+	divider := lipgloss.NewStyle().Foreground(colors.Border).Render(strings.Repeat("─", innerW))
+
+	// Styles
+	accentStyle := lipgloss.NewStyle().Foreground(colors.AccentStrong).Bold(true)
+	boldStyle := lipgloss.NewStyle().Bold(true).Foreground(colors.TextStrong)
+
+	// Instructions
+	var b strings.Builder
+	b.WriteString(titleStyle.Render("Welcome to Broccoli Comms TUI") + "\n\n")
+	b.WriteString(accentStyle.Render("Core Shortcuts:") + "\n")
+	b.WriteString("  " + boldStyle.Render("Ctrl-t (C-t)") + " : Cycle between TUI Tabs\n")
+	b.WriteString("  " + boldStyle.Render("Ctrl-u / Ctrl-d") + " : Scroll messages/instructions Up / Down (also PgUp/PgDn)\n")
+	b.WriteString("  " + boldStyle.Render("Ctrl-n / Ctrl-p") + " : Navigate agent lists\n")
+	b.WriteString("  " + boldStyle.Render("Tab / Shift-Tab") + " : Toggle focus between Active and Remote lists\n\n")
+
+	b.WriteString(accentStyle.Render("TUI Tabs:") + "\n")
+	b.WriteString("  " + boldStyle.Render("[Home]") + "     : Welcome screen and usage instructions.\n")
+	b.WriteString("  " + boldStyle.Render("[Chat]") + "     : Track agents, direct chat, and send pane commands.\n")
+	b.WriteString("  " + boldStyle.Render("[Advanced]") + " : View consolidated global event and message history.\n")
+	b.WriteString("  " + boldStyle.Render("[Saved]") + "    : Review bookmarked/saved messages.\n\n")
+
+	b.WriteString(accentStyle.Render("Interactive Pane Control (in Chat Tab):") + "\n")
+	b.WriteString("  - Type " + boldStyle.Render("/text <text>") + " to send keystrokes directly to the agent's tmux pane.\n")
+	b.WriteString("  - Type " + boldStyle.Render("/keys <keys>") + " to send symbolic keys (e.g. Enter, C-c) to the pane.\n")
+	b.WriteString("  - Press " + boldStyle.Render("Ctrl-x") + " to capture a high-fidelity snapshot of the agent's current pane.\n\n")
+
+	b.WriteString(accentStyle.Render("Agent Commands:") + "\n")
+	b.WriteString("  - Press " + boldStyle.Render("Ctrl-r") + " to launch/spin up a new local or remote agent instance.\n")
+	b.WriteString("  - Press " + boldStyle.Render("Ctrl-h") + " to toggle hiding/showing the selected agent from the list.\n")
+	b.WriteString("  - Press " + boldStyle.Render("Ctrl-s") + " to save a running agent's parameters to a local config.\n")
+
+	instructions := b.String()
+
+	bodyText := asciiText + "\n\n" + taglineText + "\n\n" + divider + "\n\n" + instructions
+	bodyLines := strings.Split(bodyText, "\n")
+
+	// Scroll management
+	visibleH := height - 2 // Padding/margins
+	totalLines := len(bodyLines)
+	maxOffset := max(0, totalLines-visibleH)
+	if m.messageOffset > maxOffset {
+		m.messageOffset = maxOffset
+	}
+	if m.messageOffset < 0 {
+		m.messageOffset = 0
+	}
+
+	endLine := min(totalLines, m.messageOffset+visibleH)
+	visibleLines := bodyLines[m.messageOffset:endLine]
+
+	var footerText string
+	if totalLines > visibleH {
+		footerText = fmt.Sprintf(" -- scroll with C-u/C-d or PgUp/PgDn (%d-%d/%d) --", m.messageOffset+1, endLine, totalLines)
+		footerText = mutedStyle.Italic(true).Render(footerText)
+	}
+
+	renderedBody := strings.Join(visibleLines, "\n")
+	if footerText != "" && len(visibleLines) < visibleH {
+		renderedBody += "\n" + footerText
+	}
+
+	return lipgloss.NewStyle().
+		Width(width).
+		Height(height).
+		MaxWidth(width).
+		MaxHeight(height).
+		Padding(1, padX, 0, padX).
+		Background(colors.BaseBg).
+		Render(renderedBody)
 }

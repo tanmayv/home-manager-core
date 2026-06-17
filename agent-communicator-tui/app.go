@@ -18,7 +18,9 @@ const (
 	simpleView viewMode = iota
 	advancedView
 	savedView
+	homeView
 )
+
 
 type runtimeInfo struct {
 	AppRuntime               bool
@@ -131,6 +133,7 @@ func newModel(local localClient, ownName string) model {
 		unreadCounts:      map[string]int{},
 		hiddenAgents:      map[string]bool{},
 		showingConfigMenu: false,
+		mode:              homeView,
 	}
 }
 func (m model) Init() tea.Cmd {
@@ -276,6 +279,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selectNextInSection(-1)
 				m.scrollSelectedAgentIntoView()
 				m.selectLatestMessage()
+				if m.mode == homeView {
+					m.mode = simpleView
+				}
 				return m, m.reloadMessages()
 			}
 		case tea.KeyCtrlN:
@@ -288,6 +294,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selectNextInSection(1)
 				m.scrollSelectedAgentIntoView()
 				m.selectLatestMessage()
+				if m.mode == homeView {
+					m.mode = simpleView
+				}
 				return m, m.reloadMessages()
 			}
 		case tea.KeyTab, tea.KeyShiftTab:
@@ -321,9 +330,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.scrollSelectedMessageIntoView()
 			}
 		case tea.KeyPgUp, tea.KeyCtrlU:
-			m.messageOffset = clampMessageOffset(m.messageOffset-messagePageSize(m.height), len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
+			if m.mode == homeView {
+				m.messageOffset = max(0, m.messageOffset-messagePageSize(m.height))
+			} else {
+				m.messageOffset = clampMessageOffset(m.messageOffset-messagePageSize(m.height), len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
+			}
 		case tea.KeyPgDown, tea.KeyCtrlD:
-			m.messageOffset = clampMessageOffset(m.messageOffset+messagePageSize(m.height), len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
+			if m.mode == homeView {
+				m.messageOffset = m.messageOffset + messagePageSize(m.height)
+			} else {
+				m.messageOffset = clampMessageOffset(m.messageOffset+messagePageSize(m.height), len(m.messageLinesForWidth(m.messageContentWidth())), m.messageVisibleLines())
+			}
 		case tea.KeyF1:
 			m.inputMode = inputModeMessage
 			return m, nil
@@ -336,7 +353,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyF4:
 			return m, nil
 		case tea.KeyEnter:
-			if m.mode != savedView && m.canSendCurrent() && strings.TrimSpace(string(m.composer)) != "" {
+			if m.mode != homeView && m.mode != savedView && m.canSendCurrent() && strings.TrimSpace(string(m.composer)) != "" {
 				input := string(m.composer)
 				row := m.rows[m.selected]
 				action := composerActionForMode(input, m.inputMode)
@@ -363,11 +380,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Batch(unhideCmd, sendOutboxRecord(m.local, m.ownName, row, record))
 			}
 		case tea.KeyBackspace:
+			if m.mode == homeView {
+				return m, nil
+			}
 			m.messageFocused = false
 			if len(m.composer) > 0 {
 				m.composer = m.composer[:len(m.composer)-1]
 			}
 		case tea.KeyCtrlW:
+			if m.mode == homeView {
+				return m, nil
+			}
 			m.messageFocused = false
 			m.composer = deletePreviousWord(m.composer)
 		case tea.KeyCtrlE:
@@ -382,12 +405,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(msg.Runes) == 1 && msg.Runes[0] == 'n' && len(m.composer) == 0 && m.mode != savedView && m.selectNextUnread() {
 				m.scrollSelectedAgentIntoView()
 				m.selectLatestMessage()
+				if m.mode == homeView {
+					m.mode = simpleView
+				}
 				return m, m.reloadMessages()
+			}
+			if m.mode == homeView {
+				return m, nil
 			}
 			m.messageFocused = false
 			m.composer = append(m.composer, msg.Runes...)
 			m.messageOffset = 0
 		case tea.KeySpace:
+			if m.mode == homeView {
+				return m, nil
+			}
 			m.messageFocused = false
 			m.composer = append(m.composer, ' ')
 			m.messageOffset = 0

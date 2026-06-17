@@ -11,10 +11,10 @@
       packages = forAllSystems (system: pkgs: {
         default = pkgs.buildGoModule {
           pname = "agent-communicator";
-          version = "0.1.0";
+          version = "0.1.3";
           src = ./.;
           vendorHash = "sha256-TUbaUoqDZoQTkcOMtoE/FlAiqkWN+x49JeGkDguh2UU=";
-          ldflags = [ "-X main.version=0.1.0" ];
+          ldflags = [ "-X main.version=0.1.3" ];
         };
       });
 
