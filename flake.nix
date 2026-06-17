@@ -24,19 +24,10 @@
       systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system nixpkgs.legacyPackages.${system});
     in {
-      packages = forAllSystems (system: pkgs:
-        let
-          agentCommunicator = pkgs.buildGoModule {
-            pname = "agent-communicator";
-            version = "0.1.3";
-            src = ./agent-communicator-tui;
-            vendorHash = "sha256-TUbaUoqDZoQTkcOMtoE/FlAiqkWN+x49JeGkDguh2UU=";
-            ldflags = [ "-X main.version=0.1.3" ];
-          };
-        in {
-          agent-communicator = agentCommunicator;
-          default = agentCommunicator;
-        });
+      packages = forAllSystems (system: pkgs: {
+        agent-communicator = inputs.broccoli-comms.packages.${system}.agent-communicator;
+        default = inputs.broccoli-comms.packages.${system}.agent-communicator;
+      });
 
       homeManagerModules.default = {
         imports = [ ./home.nix ];
