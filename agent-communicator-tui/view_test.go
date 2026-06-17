@@ -187,3 +187,38 @@ func TestHomeTabWelcomeScreenRendersASCIIAndShortcuts(t *testing.T) {
 		t.Fatalf("home tab should not display conversation timeline:\n%s", view)
 	}
 }
+
+func TestChangelogTabRendersReleaseNotes(t *testing.T) {
+	m := model{
+		width:  120,
+		height: 30,
+		mode:   changelogView,
+		rows:   []agentRow{{Name: "alpha", Scope: "local"}},
+	}
+	view := m.View()
+
+	// Should contain title, tagline, and release version headers
+	for _, want := range []string{
+		"Agent Communicator Changelog",
+		"v0.1.3 (Latest Release)",
+		"TUI [Home] Tab",
+		"v0.1.2",
+		"Tmux Status Bar & Click Actions",
+		"Interactive Pane Control",
+		"Default Interrupt Flag",
+	} {
+		if !strings.Contains(view, want) {
+			t.Fatalf("changelog tab missing %q:\n%s", want, view)
+		}
+	}
+
+	// Should NOT contain the composer box input prompt button (/msg)
+	if strings.Contains(view, "/msg") {
+		t.Fatalf("changelog tab should not display composer input buttons:\n%s", view)
+	}
+
+	// Should NOT contain standard conversation timelines or messages
+	if strings.Contains(view, "Conversation") {
+		t.Fatalf("changelog tab should not display conversation timeline:\n%s", view)
+	}
+}

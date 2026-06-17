@@ -43,6 +43,8 @@ func (m model) baseView() string {
 		var panel string
 		if m.mode == homeView {
 			panel = m.homePanel(m.width, bodyH)
+		} else if m.mode == changelogView {
+			panel = m.changelogPanel(m.width, bodyH)
 		} else {
 			panel = m.conversationPanel(m.width, bodyH)
 		}
@@ -52,6 +54,8 @@ func (m model) baseView() string {
 	var leftPanel string
 	if m.mode == homeView {
 		leftPanel = m.homePanel(chatW, bodyH)
+	} else if m.mode == changelogView {
+		leftPanel = m.changelogPanel(chatW, bodyH)
 	} else {
 		leftPanel = m.conversationPanel(chatW, bodyH)
 	}
@@ -172,6 +176,9 @@ func (m model) conversationPanel(width, height int) string {
 func (m model) conversationTitle() string {
 	if m.mode == homeView {
 		return "Home"
+	}
+	if m.mode == changelogView {
+		return "Changelog"
 	}
 	if m.mode == savedView {
 		return "Saved Messages"
@@ -945,6 +952,94 @@ func (m model) homePanel(width, height int) string {
 	instructions := b.String()
 
 	bodyText := asciiText + "\n\n" + taglineText + "\n\n" + divider + "\n\n" + instructions
+	bodyLines := strings.Split(bodyText, "\n")
+
+	// Scroll management
+	visibleH := height - 2 // Padding/margins
+	totalLines := len(bodyLines)
+	maxOffset := max(0, totalLines-visibleH)
+	if m.messageOffset > maxOffset {
+		m.messageOffset = maxOffset
+	}
+	if m.messageOffset < 0 {
+		m.messageOffset = 0
+	}
+
+	endLine := min(totalLines, m.messageOffset+visibleH)
+	visibleLines := bodyLines[m.messageOffset:endLine]
+
+	var footerText string
+	if totalLines > visibleH {
+		footerText = fmt.Sprintf(" -- scroll with C-u/C-d or PgUp/PgDn (%d-%d/%d) --", m.messageOffset+1, endLine, totalLines)
+		footerText = mutedStyle.Italic(true).Render(footerText)
+	}
+
+	renderedBody := strings.Join(visibleLines, "\n")
+	if footerText != "" && len(visibleLines) < visibleH {
+		renderedBody += "\n" + footerText
+	}
+
+	return lipgloss.NewStyle().
+		Width(width).
+		Height(height).
+		MaxWidth(width).
+		MaxHeight(height).
+		Padding(1, padX, 0, padX).
+		Background(colors.BaseBg).
+		Render(renderedBody)
+}
+
+func (m model) changelogPanel(width, height int) string {
+	padX := 3
+	if width < 70 {
+		padX = 1
+	}
+	innerW := max(1, width-(padX*2))
+
+	// Styles
+	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(colors.Accent).Underline(true)
+	versionStyle := lipgloss.NewStyle().Bold(true).Foreground(colors.AccentStrong)
+	bulletStyle := lipgloss.NewStyle().Foreground(colors.Success)
+	taglineStyle := lipgloss.NewStyle().Foreground(colors.Muted).Italic(true)
+	boldStyle := lipgloss.NewStyle().Bold(true).Foreground(colors.TextStrong)
+
+	var b strings.Builder
+
+	// Title
+	titleText := "Agent Communicator Changelog"
+	if len(titleText) < innerW {
+		padding := (innerW - len(titleText)) / 2
+		b.WriteString(strings.Repeat(" ", padding) + titleStyle.Render(titleText) + "\n\n")
+	} else {
+		b.WriteString(titleStyle.Render(titleText) + "\n\n")
+	}
+
+	// Divider
+	divider := lipgloss.NewStyle().Foreground(colors.Border).Render(strings.Repeat("━", innerW))
+	b.WriteString(divider + "\n\n")
+
+	// v0.1.3
+	b.WriteString(versionStyle.Render("v0.1.3 (Latest Release)") + "\n")
+	b.WriteString(taglineStyle.Render("Focus on onboarding, readability, and platform polishing") + "\n\n")
+	b.WriteString("  " + bulletStyle.Render("•") + " " + boldStyle.Render("TUI [Home] Tab") + ": Implemented a dedicated welcome screen and usage instructions.\n")
+	b.WriteString("  " + bulletStyle.Render("•") + " " + boldStyle.Render("Instruction Scrolling") + ": Added smooth vertical scrolling for long-form welcome text to prevent truncation.\n")
+	b.WriteString("  " + bulletStyle.Render("•") + " " + boldStyle.Render("Version Upgrade") + ": Bumped project and Nix flake packages to version 0.1.3.\n\n")
+
+	// Divider between releases
+	b.WriteString(lipgloss.NewStyle().Foreground(colors.Border).Render(strings.Repeat("─", innerW)) + "\n\n")
+
+	// v0.1.2
+	b.WriteString(versionStyle.Render("v0.1.2") + "\n")
+	b.WriteString(taglineStyle.Render("Major feature release adding local tmux integration and TUI control loops") + "\n\n")
+	b.WriteString("  " + bulletStyle.Render("•") + " " + boldStyle.Render("Tmux Status Bar & Click Actions") + ": Interactive session list, agent status tracking, and click-to-focus mouse binds.\n")
+	b.WriteString("  " + bulletStyle.Render("•") + " " + boldStyle.Render("Pane Borders & Titles") + ": Pane borders styled with active @agent_name and task titles.\n")
+	b.WriteString("  " + bulletStyle.Render("•") + " " + boldStyle.Render("Interactive Pane Control") + ": Added /text and /keys composer commands to send inputs directly to agent panes.\n")
+	b.WriteString("  " + bulletStyle.Render("•") + " " + boldStyle.Render("High-Fidelity Pane Snapshots") + ": Added Ctrl-x (C-x) to capture and deliver high-fidelity active pane snapshots.\n")
+	b.WriteString("  " + bulletStyle.Render("•") + " " + boldStyle.Render("Default Interrupt Flag") + ": Enabled automatic Escape-key pre-delivery interrupts to unstick busy agents.\n")
+	b.WriteString("  " + bulletStyle.Render("•") + " " + boldStyle.Render("Cooperative Agent Restart") + ": Added TUI /restart slash command and tracker 'request-stop'/'restart' RPC handlers.\n")
+	b.WriteString("  " + bulletStyle.Render("•") + " " + boldStyle.Render("Mouse Alternate Screen Scrolling") + ": Custom WheelUp/WheelDown mouse scrolling for alternate screen applications.\n\n")
+
+	bodyText := b.String()
 	bodyLines := strings.Split(bodyText, "\n")
 
 	// Scroll management

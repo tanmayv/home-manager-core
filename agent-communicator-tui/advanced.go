@@ -8,13 +8,26 @@ import (
 )
 
 func (m *model) toggleMode() {
-	m.mode = (m.mode + 1) % 4
+	switch m.mode {
+	case homeView:
+		m.mode = simpleView
+	case simpleView:
+		m.mode = advancedView
+	case advancedView:
+		m.mode = savedView
+	case savedView:
+		m.mode = changelogView
+	case changelogView:
+		m.mode = homeView
+	default:
+		m.mode = homeView
+	}
 	m.messageOffset = 0
 	m.messageSelected = clampSelectedMessage(m.messageSelected, len(m.displayOrderedMessages()))
 }
 
 func (m model) reloadMessages() tea.Cmd {
-	if m.mode == homeView || m.mode == savedView {
+	if m.mode == homeView || m.mode == changelogView || m.mode == savedView {
 		return nil
 	}
 	if m.mode == advancedView && m.ownName != "" {
@@ -24,7 +37,7 @@ func (m model) reloadMessages() tea.Cmd {
 }
 
 func (m model) displayMessages() []tracker.Message {
-	if m.mode == homeView {
+	if m.mode == homeView || m.mode == changelogView {
 		return nil
 	}
 	if m.mode == savedView {

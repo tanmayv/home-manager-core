@@ -11,7 +11,7 @@ func (m model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if m.mode != savedView && m.mouseSelectAgent(event.X, event.Y) {
-		if m.mode == homeView {
+		if m.mode == homeView || m.mode == changelogView {
 			m.mode = simpleView
 		}
 		m.scrollSelectedAgentIntoView()
@@ -77,7 +77,7 @@ func (m model) sidebarAgentListHeight() int {
 }
 
 func (m model) mouseInputMode(x, y int) (inputMode, bool) {
-	if m.mode == homeView || m.mode == savedView || m.width == 0 || m.height == 0 {
+	if m.mode == homeView || m.mode == changelogView || m.mode == savedView || m.width == 0 || m.height == 0 {
 		return inputModeMessage, false
 	}
 	leftW, midW, _ := m.layoutWidths()
