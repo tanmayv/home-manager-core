@@ -236,6 +236,9 @@ in
         # Tmux Command Palette
         bind-key C-p display-popup -T "Command Palette" -w 90% -h 70% -E "tmux-palette #{pane_id}"
         
+        # Fuzzy window search and selection
+        bind-key f display-popup -w 80% -h 60% -E "tmux list-windows -t '#{session_name}' -F '#I: #W' | fzf --reverse | cut -d ':' -f 1 | xargs -I {} tmux select-window -t '#{session_name}:{}'"
+        
         # Status Bar Position
         set -g status-position ${config.programs.tmux.statusBarPosition}
         
