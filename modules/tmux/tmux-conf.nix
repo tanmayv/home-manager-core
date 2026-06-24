@@ -237,7 +237,7 @@ in
         bind-key C-p display-popup -T "Command Palette" -w 90% -h 70% -E "tmux-palette #{pane_id}"
         
         # Fuzzy window search and selection
-        bind-key f display-popup -w 80% -h 60% -E "tmux list-windows -t '#{session_name}' -F '#I: #W' | fzf --reverse | cut -d ':' -f 1 | xargs -I {} tmux select-window -t '#{session_name}:{}'"
+        bind-key f display-popup -w 80% -h 60% -E "(tmux list-windows -t AGENTS -F 'AGENTS:#I: #W' 2>/dev/null; tmux list-windows -t ham-agents -F 'ham-agents:#I: #W' 2>/dev/null) | fzf --reverse | cut -d ':' -f 1,2 | xargs -I {} tmux switch-client -t '{}'"
         
         # Status Bar Position
         set -g status-position ${config.programs.tmux.statusBarPosition}
