@@ -50,7 +50,6 @@
           extensions.homeManagerModules.ai-agents
         ] else [ ]) ++ [
           ({ lib, pkgs, ... }: {
-            services.broccoli-comms.enable = lib.mkForce (userSettings.enable-agent-tracker or false);
             home.username = userSettings.username or "your-username";
             home.homeDirectory = if pkgs.stdenv.isLinux then "/home/${userSettings.username or "your-username"}" else "/Users/${userSettings.username or "your-username"}";
             home.stateVersion = "25.11";

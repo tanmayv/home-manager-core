@@ -24,10 +24,11 @@ in
     home.packages = [
       (pkgs.writeShellApplication {
         name = "agent-communicator";
-        runtimeInputs = [ config.programs.broccoli-comms.package ];
+        runtimeInputs = with pkgs; [ coreutils ];
         text = ''
           mkdir -p "''${XDG_CONFIG_HOME:-$HOME/.config}/agent-communicator/prompts"
-          exec broccoli-comms ui
+          port="${toString config.services.agent-communicator-web.port}"
+          echo "Open the agent communicator web interface at http://localhost:$port"
         '';
       })
     ];

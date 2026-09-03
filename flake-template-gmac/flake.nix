@@ -56,7 +56,6 @@
           public-extensions.homeManagerModules.tasks
           public-extensions.homeManagerModules.ai-agents
           ({ lib, pkgs, ... }: {
-            services.broccoli-comms.enable = lib.mkForce (userSettings.enable-agent-tracker or false);
             home.username = userSettings.username or "your-username";
             home.homeDirectory = "/Users/${userSettings.username or "your-username"}";
             home.stateVersion = "25.11";

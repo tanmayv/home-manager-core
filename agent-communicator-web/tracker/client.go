@@ -55,23 +55,19 @@ func NewClient(socketPath string) (*Client, error) {
 	return &Client{SocketPath: socketPath}, nil
 }
 
-// resolveSocketPath discovers the Broccoli Comms app-owned tracker socket.
+// resolveSocketPath discovers the agent tracker socket.
 func resolveSocketPath() (string, error) {
 	if path := os.Getenv("AGENT_TRACKER_SOCKET"); path != "" {
 		return expandTilde(path)
-	}
-	if runtimeDir := os.Getenv("BROCCOLI_COMMS_RUNTIME_DIR"); runtimeDir != "" {
-		return expandTilde(filepath.Join(runtimeDir, "agent-tracker.sock"))
 	}
 
 	var candidates []string
 	if runtimeDir := os.Getenv("XDG_RUNTIME_DIR"); runtimeDir != "" {
 		candidates = append(candidates,
 			filepath.Join(runtimeDir, "agent-tracker.sock"),
-			filepath.Join(runtimeDir, "broccoli-comms", "agent-tracker.sock"),
 		)
 	} else {
-		candidates = append(candidates, filepath.Join(fmt.Sprintf("/tmp/%d", os.Getuid()), "broccoli-comms", "agent-tracker.sock"))
+		candidates = append(candidates, filepath.Join(fmt.Sprintf("/tmp/%d", os.Getuid()), "agent-tracker.sock"))
 	}
 
 	// Legacy standalone location, kept as a last-resort compatibility fallback.

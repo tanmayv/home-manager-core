@@ -7,19 +7,19 @@ with lib;
     enable = mkOption {
       type = types.bool;
       default = false;
-      description = "Deprecated compatibility alias for services.broccoli-comms.tracker.enable.";
+      description = "Deprecated compatibility alias for the agent tracker.";
     };
 
     enableTmuxIntegration = mkOption {
       type = types.bool;
       default = true;
-      description = "Deprecated compatibility flag for Broccoli Comms tracker tmux integration (status bar, keybindings).";
+      description = "Deprecated compatibility flag for agent tracker tmux integration (status bar, keybindings).";
     };
 
     agents = mkOption {
       type = types.attrsOf types.str;
       default = {};
-      description = "Deprecated compatibility metadata for named agent commands. No shell wrappers are generated; launch explicitly with `broccoli-comms run NAME --cwd DIR -- COMMAND [ARGS...]`.";
+      description = "Deprecated compatibility metadata for named agent commands. No shell wrappers are generated.";
     };
 
     pollInterval = mkOption {

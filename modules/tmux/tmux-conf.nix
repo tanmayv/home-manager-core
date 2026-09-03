@@ -300,8 +300,7 @@ in
                                        tmux switch-client -t \"\$target_id\"; \
                                        tmux select-pane -t \"\$target_id\"; \
                                    else \
-                                       broccoli-comms agent-tracker unregister --pane \"\$target_id\"; \
-                                       tmux display-message \"Agent pane not found, entry removed\"; \
+                                       tmux display-message \"Agent pane not found\"; \
                                    fi"
                     } \
                     { select-window -t = } \

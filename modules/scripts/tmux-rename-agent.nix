@@ -1,14 +1,14 @@
-{ pkgs, config, ... }:
+{ pkgs, ... }:
 
 {
   home.packages = [
     (pkgs.writeShellApplication {
       name = "tmux-rename-agent";
-      runtimeInputs = (with pkgs; [
+      runtimeInputs = with pkgs; [
         tmux
         coreutils
         gnused
-      ]) ++ [ config.programs.broccoli-comms.package ];
+      ];
 
       text = ''
         original_pane="''${1:-}"
@@ -39,9 +39,8 @@
 
         echo "Found agent '$agent_name' in pane $original_pane."
         echo "Renaming to '$new_name'..."
-        
-        # Run through Broccoli Comms so the app-owned tracker is used.
-        if broccoli-comms agent-tracker rename --force "$agent_name" "$new_name"; then
+
+        if tmux set-option -p -t "$original_pane" @agent_name "$new_name"; then
             echo "Successfully renamed agent."
         else
             echo "Failed to rename agent."
